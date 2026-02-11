@@ -11,3 +11,23 @@
   - Development workflow (explore→plan→execute→verify loop)
   - RAG/retrieval guidance, budget safety, validation criteria
 - Next: Begin modelling phase deliverables per CLAUDE.md checklist
+
+[2026-02-11 Session 2] Completed item A: source_registry.yaml ✓
+- Created: artifacts/modelling/source_registry.yaml (56 sources)
+- Created: artifacts/modelling/MODELLING_CHECKLIST.md (tracking deliverables A-I)
+- Source registry includes:
+  - 20 Tier 1 sources (central banks, government stats, SEC filings)
+  - 28 Tier 2 sources (reputable news, institutional letters, corporate IR)
+  - 5 Tier 3 sources (supplementary/alternative perspectives)
+  - 3 Tier 4 sources (monitor-only/low-trust for minority views)
+- New source categories added:
+  - Institutional letters: Oaktree (Howard Marks), GMO, Bridgewater, AQR, BlackRock, JPM AM
+  - SEC filings: EDGAR latest, 8-K, 10-Q, 10-K, structured disclosure directory
+  - Corporate IR: NVIDIA RSS (example), Apple/MSFT/TSLA placeholders for watchlist filtering
+  - Asia coverage: RBA, RBI, HKMA, ADB (in addition to existing BoJ, PBoC, MAS)
+- Paywall policy enforced: FT, WSJ, Bloomberg, Economist, Nikkei, Straits Times = metadata_only
+- Tier 4 (monitor-only): ZeroHedge, Seeking Alpha, Ray Dalio LinkedIn
+- All sources have: id, name, url, type (rss|html|pdf), tags, credibility_tier (1-4), fetch_interval, paywall_policy, notes
+- Tags include: policy_centralbank, macro_data, macro_research, institutional_letter, institutional_pr, corporate_filings, earnings_ir, market_narrative, asia
+- Validation: 56 sources, all required fields present, tier 1-4 system implemented
+- Next recommended: Item B (data_model.md) — SQLite schema + FTS indexing plan

@@ -1,0 +1,590 @@
+# Source Registry v1 — Financial News & Macro Literature Review Assistant
+# Purpose: Define all ingestion sources with credibility tiers, fetch intervals, and paywall policies
+# Last updated: 2026-02-11
+
+# Credibility Tiers:
+#   1 = Primary/Official (central banks, government agencies, SEC)
+#   2 = Reputable established (major news outlets, institutional research)
+#   3 = Secondary/Supplementary (additional perspectives)
+#   4 = Monitor-only/Low-trust (minority view discovery, must not dominate retrieval)
+
+# Paywall Policy:
+#   full = can extract full text reliably
+#   metadata_only = paywalled/blocked, store title + snippet + link only
+
+sources:
+  # ============================================================================
+  # TIER 1: PRIMARY/OFFICIAL SOURCES
+  # ============================================================================
+
+  - id: fed_press_releases
+    name: Federal Reserve - Press Releases
+    url: https://www.federalreserve.gov/feeds/press_all.xml
+    type: rss
+    tags: [policy_centralbank, macro_data, rates, us]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary US monetary policy source
+
+  - id: ecb_press_releases
+    name: European Central Bank - Press Releases
+    url: https://www.ecb.europa.eu/rss/press.html
+    type: rss
+    tags: [policy_centralbank, macro_data, rates, europe]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary EUR monetary policy source
+
+  - id: boe_news
+    name: Bank of England - News
+    url: https://www.bankofengland.co.uk/news
+    type: html
+    tags: [policy_centralbank, macro_data, rates, uk]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary UK monetary policy source (no RSS, scrape news page)
+
+  - id: boj_press_releases
+    name: Bank of Japan - Press Releases
+    url: https://www.boj.or.jp/en/rss/whatsnew.xml
+    type: rss
+    tags: [policy_centralbank, macro_data, rates, japan, asia]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary JPY monetary policy source
+
+  - id: pboc_news
+    name: People's Bank of China - News
+    url: http://www.pbc.gov.cn/en/3688006/index.html
+    type: html
+    tags: [policy_centralbank, macro_data, rates, china, asia]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary CNY monetary policy source (no reliable RSS)
+
+  - id: mas_press_releases
+    name: Monetary Authority of Singapore - Press Releases
+    url: https://www.mas.gov.sg/news?category=Press%20Releases&rows=20
+    type: html
+    tags: [policy_centralbank, macro_data, rates, singapore, asia]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary SGD monetary policy source (user timezone)
+
+  - id: rba_media_releases
+    name: Reserve Bank of Australia - Media Releases
+    url: https://www.rba.gov.au/rss-feeds/media-releases.xml
+    type: rss
+    tags: [policy_centralbank, macro_data, rates, australia, asia]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary AUD monetary policy source
+
+  - id: rbi_press_releases
+    name: Reserve Bank of India - Press Releases
+    url: https://rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx
+    type: html
+    tags: [policy_centralbank, macro_data, rates, india, asia]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary INR monetary policy source
+
+  - id: hkma_press_releases
+    name: Hong Kong Monetary Authority - Press Releases
+    url: https://www.hkma.gov.hk/eng/news-and-media/press-releases/
+    type: html
+    tags: [policy_centralbank, macro_data, rates, hongkong, asia]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Primary HKD monetary policy source
+
+  - id: us_bea_news
+    name: U.S. Bureau of Economic Analysis - News Releases
+    url: https://www.bea.gov/rss/news_release.xml
+    type: rss
+    tags: [macro_data, growth, us]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: GDP, consumer spending, trade data
+
+  - id: us_bls_news
+    name: U.S. Bureau of Labor Statistics - News Releases
+    url: https://www.bls.gov/feed/bls_latest.rss
+    type: rss
+    tags: [macro_data, inflation, employment, us]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: CPI, jobs, wages data
+
+  - id: imf_news
+    name: International Monetary Fund - News
+    url: https://www.imf.org/en/News/RSS
+    type: rss
+    tags: [macro_research, global, policy]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Global macro outlook, policy recommendations
+
+  - id: oecd_news
+    name: OECD - News
+    url: https://www.oecd.org/newsroom/rss.xml
+    type: rss
+    tags: [macro_research, global, policy]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Economic indicators, policy research
+
+  - id: adb_news
+    name: Asian Development Bank - News
+    url: https://www.adb.org/news/rss
+    type: rss
+    tags: [macro_research, asia, policy]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Asia-Pacific macro outlook
+
+  - id: fomc_statements
+    name: Federal Reserve FOMC - Statements & Minutes
+    url: https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+    type: html
+    tags: [policy_centralbank, rates, us]
+    credibility_tier: 1
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: FOMC statements and minutes (PDF links on page)
+
+  - id: sec_latest_filings
+    name: SEC EDGAR - Latest Filings
+    url: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=&company=&dateb=&owner=include&start=0&count=40&output=atom
+    type: rss
+    tags: [corporate_filings, us]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: All recent SEC filings (filter by ticker later)
+
+  - id: sec_8k_filings
+    name: SEC - Form 8-K (Material Events)
+    url: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&count=40&output=atom
+    type: rss
+    tags: [corporate_filings, us]
+    credibility_tier: 1
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Material corporate events (M&A, earnings warnings, leadership changes)
+
+  - id: sec_10q_filings
+    name: SEC - Form 10-Q (Quarterly Reports)
+    url: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=10-Q&count=40&output=atom
+    type: rss
+    tags: [corporate_filings, earnings_ir, us]
+    credibility_tier: 1
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Quarterly financial reports
+
+  - id: sec_10k_filings
+    name: SEC - Form 10-K (Annual Reports)
+    url: https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=10-K&count=40&output=atom
+    type: rss
+    tags: [corporate_filings, earnings_ir, us]
+    credibility_tier: 1
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Annual financial reports
+
+  - id: sec_structured_disclosure
+    name: SEC - Structured Disclosure RSS Feeds
+    url: https://www.sec.gov/data-research/structured-data/structured-disclosure-rss-feeds
+    type: html
+    tags: [corporate_filings, us]
+    credibility_tier: 1
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Directory of structured data RSS feeds (XBRL, inline XBRL)
+
+  # ============================================================================
+  # TIER 2: REPUTABLE ESTABLISHED SOURCES
+  # ============================================================================
+
+  - id: ft_markets
+    name: Financial Times - Markets
+    url: https://www.ft.com/markets
+    type: rss
+    tags: [market_narrative, equity_risk, credit, global]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: metadata_only
+    notes: Paywall - store metadata + snippet only
+
+  - id: wsj_markets
+    name: Wall Street Journal - Markets
+    url: https://feeds.a.dj.com/rss/RSSMarketsMain.xml
+    type: rss
+    tags: [market_narrative, equity_risk, us]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: metadata_only
+    notes: Paywall - store metadata + snippet only
+
+  - id: bloomberg_markets
+    name: Bloomberg - Markets
+    url: https://www.bloomberg.com/markets
+    type: html
+    tags: [market_narrative, equity_risk, credit, fx, commodities, global]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: metadata_only
+    notes: Paywall - store metadata + snippet only
+
+  - id: reuters_business
+    name: Reuters - Business News
+    url: https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best
+    type: rss
+    tags: [market_narrative, global]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Free, reliable wire service
+
+  - id: reuters_markets
+    name: Reuters - Markets
+    url: https://www.reuters.com/markets/
+    type: html
+    tags: [market_narrative, equity_risk, credit, global]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Free market news and analysis
+
+  - id: marketwatch_top
+    name: MarketWatch - Top Stories
+    url: https://feeds.content.dowjones.io/public/rss/mw_topstories
+    type: rss
+    tags: [market_narrative, equity_risk, us]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Free retail investor focus
+
+  - id: cnbc_economy
+    name: CNBC - Economy
+    url: https://www.cnbc.com/id/20910258/device/rss/rss.html
+    type: rss
+    tags: [macro_data, growth, us]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Economic news and data coverage
+
+  - id: cnbc_markets
+    name: CNBC - Markets
+    url: https://www.cnbc.com/id/10000664/device/rss/rss.html
+    type: rss
+    tags: [market_narrative, equity_risk, us]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Market news and commentary
+
+  - id: economist_finance
+    name: The Economist - Finance & Economics
+    url: https://www.economist.com/finance-and-economics/rss.xml
+    type: rss
+    tags: [macro_research, global, policy]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: metadata_only
+    notes: Paywall - high quality analysis, store metadata only
+
+  - id: nikkei_asia_markets
+    name: Nikkei Asia - Markets
+    url: https://asia.nikkei.com/
+    type: html
+    tags: [market_narrative, asia]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: metadata_only
+    notes: Partial paywall - Asia markets focus
+
+  - id: scmp_business
+    name: South China Morning Post - Business
+    url: https://www.scmp.com/rss/91/feed
+    type: rss
+    tags: [market_narrative, china, asia]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Hong Kong/China business news
+
+  - id: straits_times_business
+    name: Straits Times - Business
+    url: https://www.straitstimes.com/business
+    type: html
+    tags: [market_narrative, singapore, asia]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: metadata_only
+    notes: Paywall - Singapore/ASEAN focus
+
+  - id: bis_publications
+    name: Bank for International Settlements - Publications
+    url: https://www.bis.org/rss/rssbankpub.xml
+    type: rss
+    tags: [macro_research, policy_centralbank, credit, global]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Central banks' central bank - research and analysis
+
+  - id: stlouisfed_research
+    name: Federal Reserve Bank of St. Louis - Economic Research
+    url: https://research.stlouisfed.org/wp/
+    type: html
+    tags: [macro_research, us]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Working papers and FRED blog
+
+  - id: voxeu_cepr
+    name: VoxEU / CEPR - Policy Insights
+    url: https://cepr.org/voxeu/articles
+    type: html
+    tags: [macro_research, policy, global]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Academic policy research portal
+
+  - id: brookings_economic
+    name: Brookings Institution - Economic Studies
+    url: https://www.brookings.edu/topic/economy-budgets/feed/
+    type: rss
+    tags: [macro_research, policy, us]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Think tank policy research
+
+  - id: project_syndicate_econ
+    name: Project Syndicate - Economics
+    url: https://www.project-syndicate.org/rss
+    type: rss
+    tags: [macro_research, global]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Global expert commentary
+
+  - id: cfr_economics
+    name: Council on Foreign Relations - Economics
+    url: https://www.cfr.org/topic/economics/rss.xml
+    type: rss
+    tags: [macro_research, policy, global]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Geopolitics and economics
+
+  - id: oaktree_memos
+    name: Oaktree Capital - Howard Marks Memos
+    url: https://www.oaktreecapital.com/insights/memos
+    type: html
+    tags: [institutional_letter, credit, equity_risk]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: High-quality institutional investor perspective
+
+  - id: gmo_research
+    name: GMO - Research Library (Quarterly Letters)
+    url: https://www.gmo.com/americas/research-library/quarterly-letters/
+    type: html
+    tags: [institutional_letter, equity_risk, macro_research]
+    credibility_tier: 2
+    fetch_interval: quarterly
+    paywall_policy: full
+    notes: Long-term value investing perspective (PDFs)
+
+  - id: bridgewater_research
+    name: Bridgewater Associates - Research & Insights
+    url: https://www.bridgewater.com/research-and-insights
+    type: html
+    tags: [institutional_letter, macro_research, global]
+    credibility_tier: 2
+    fetch_interval: monthly
+    paywall_policy: full
+    notes: Macro hedge fund perspective (PDFs/HTML)
+
+  - id: aqr_perspectives
+    name: AQR Capital Management - Perspectives
+    url: https://www.aqr.com/Insights/Perspectives
+    type: html
+    tags: [institutional_letter, equity_risk, quantitative]
+    credibility_tier: 2
+    fetch_interval: monthly
+    paywall_policy: full
+    notes: Quantitative institutional research (PDFs)
+
+  - id: blackrock_institute
+    name: BlackRock Investment Institute - Global Outlook
+    url: https://www.blackrock.com/corporate/insights/blackrock-investment-institute
+    type: html
+    tags: [institutional_letter, macro_research, global]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Large asset manager perspective
+
+  - id: jpmorgan_am_research
+    name: J.P. Morgan Asset Management - Research
+    url: https://am.jpmorgan.com/us/en/asset-management/adv/insights/
+    type: html
+    tags: [institutional_letter, macro_research, equity_risk]
+    credibility_tier: 2
+    fetch_interval: monthly
+    paywall_policy: full
+    notes: Large bank asset management perspective
+
+  - id: nvidia_ir_rss
+    name: NVIDIA - Investor Relations Press Releases
+    url: https://investor.nvidia.com/rss/press-release-rss.xml
+    type: rss
+    tags: [earnings_ir, corporate_filings, tech, us]
+    credibility_tier: 2
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Example IR RSS for watchlist ticker filtering
+
+  - id: apple_ir_placeholder
+    name: Apple - Investor Relations
+    url: https://investor.apple.com/investor-relations/default.aspx
+    type: html
+    tags: [earnings_ir, corporate_filings, tech, us]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: metadata_only
+    notes: Placeholder for ticker-specific watchlist (no RSS, manual check or API)
+
+  - id: microsoft_ir_placeholder
+    name: Microsoft - Investor Relations
+    url: https://www.microsoft.com/en-us/Investor
+    type: html
+    tags: [earnings_ir, corporate_filings, tech, us]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: metadata_only
+    notes: Placeholder for ticker-specific watchlist (no RSS, manual check or API)
+
+  - id: tesla_ir_placeholder
+    name: Tesla - Investor Relations
+    url: https://ir.tesla.com/
+    type: html
+    tags: [earnings_ir, corporate_filings, auto, us]
+    credibility_tier: 2
+    fetch_interval: weekly
+    paywall_policy: metadata_only
+    notes: Placeholder for ticker-specific watchlist (no RSS, manual check or API)
+
+  # ============================================================================
+  # TIER 3: SECONDARY/SUPPLEMENTARY SOURCES
+  # ============================================================================
+
+  - id: ft_alphaville
+    name: FT Alphaville - Free Articles
+    url: https://www.ft.com/ft-alphaville
+    type: html
+    tags: [market_narrative, credit, equity_risk]
+    credibility_tier: 3
+    fetch_interval: daily
+    paywall_policy: full
+    notes: FT's free markets blog - alternative perspectives
+
+  - id: macrovoices
+    name: MacroVoices Podcast - Show Notes
+    url: https://www.macrovoices.com/
+    type: html
+    tags: [market_narrative, macro_research]
+    credibility_tier: 3
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Macro-focused podcast with institutional guests
+
+  - id: grants_observer
+    name: Grant's Interest Rate Observer - Public Articles
+    url: https://www.grantspub.com/
+    type: html
+    tags: [market_narrative, credit, rates]
+    credibility_tier: 3
+    fetch_interval: weekly
+    paywall_policy: metadata_only
+    notes: Contrarian fixed income perspective (mostly paywalled)
+
+  - id: realvision_free
+    name: Real Vision - Free Content
+    url: https://www.realvision.com/
+    type: html
+    tags: [market_narrative, macro_research]
+    credibility_tier: 3
+    fetch_interval: weekly
+    paywall_policy: metadata_only
+    notes: Macro video interviews (mostly paywalled, some free)
+
+  - id: citadel_insights
+    name: Citadel - Market Insights & News
+    url: https://www.citadel.com/news/insights/
+    type: html
+    tags: [institutional_pr, market_narrative]
+    credibility_tier: 3
+    fetch_interval: monthly
+    paywall_policy: full
+    notes: Hedge fund PR/thought leadership (not research letters)
+
+  # ============================================================================
+  # TIER 4: MONITOR-ONLY / LOW-TRUST NARRATIVE
+  # ============================================================================
+
+  - id: zerohedge
+    name: Zero Hedge - Markets
+    url: https://www.zerohedge.com/s/RSS
+    type: rss
+    tags: [market_narrative, contrarian]
+    credibility_tier: 4
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Monitor-only - alternative/contrarian narrative, low credibility, useful for minority views
+
+  - id: seekingalpha_news
+    name: Seeking Alpha - Market News
+    url: https://seekingalpha.com/market-news
+    type: html
+    tags: [market_narrative, equity_risk]
+    credibility_tier: 4
+    fetch_interval: daily
+    paywall_policy: full
+    notes: Monitor-only - user-generated content, mixed quality, useful for retail sentiment
+
+  - id: ray_dalio_linkedin
+    name: Ray Dalio - LinkedIn Posts
+    url: https://www.linkedin.com/in/raydalio/recent-activity/all/
+    type: html
+    tags: [market_narrative, macro_research]
+    credibility_tier: 4
+    fetch_interval: weekly
+    paywall_policy: metadata_only
+    notes: Monitor-only - public posts, may require login scraping, treat as low-trust narrative
