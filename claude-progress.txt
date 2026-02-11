@@ -31,3 +31,14 @@
 - Tags include: policy_centralbank, macro_data, macro_research, institutional_letter, institutional_pr, corporate_filings, earnings_ir, market_narrative, asia
 - Validation: 56 sources, all required fields present, tier 1-4 system implemented
 - Next recommended: Item B (data_model.md) — SQLite schema + FTS indexing plan
+
+[2026-02-11 Session 3] Completed item D: citation_contract.md ✓
+- Created: artifacts/modelling/citation_contract.md (442 lines)
+- Defines citation object format (id, source_id, url, title, published_at, chunk_id, quote_span)
+- Bullet-level rule: every bullet in Prevailing/Counter/Minority/Watch requires ≥1 citation
+- Validator behavior: missing citations → remove claim or mark "insufficient evidence"
+- Evidence-pack: max 30 chunks, diversity constraints (publisher <40%, tier-1/2 ≥50%), credibility weighting
+- Paywall rule: metadata-only citations for paywalled sources, no fabricated full text
+- Abstain language: explicit "insufficient evidence" markers when data unavailable
+- Includes: storage schema, example valid/invalid outputs, citation presentation format
+- Next recommended: Item B (data_model.md) or C (pipeline.md)

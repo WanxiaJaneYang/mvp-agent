@@ -7,7 +7,7 @@ Status: ✓ = PASSING, ✗ = FAILING, ⧖ = IN PROGRESS
 - [✓] **A) source_registry.yaml** — Source definitions with credibility tiers, fetch intervals, paywall policies
 - [✗] **B) data_model.md** — SQLite schema (sources/documents/chunks/citations/portfolio/alerts/runs) + FTS plan
 - [✗] **C) pipeline.md** — Daily pipeline stages (fetch → extract → normalize → chunk → index → retrieve → synthesize → validate → deliver)
-- [✗] **D) citation_contract.md** — Citation format, validation rules, abstain behavior
+- [✓] **D) citation_contract.md** — Citation format, validation rules, abstain behavior
 - [✗] **E) alert_scoring.md** — v1 thresholds, rate limits, bundling policy
 - [✗] **F) backlog.json** — Build tickets with acceptance criteria (valid JSON)
 
