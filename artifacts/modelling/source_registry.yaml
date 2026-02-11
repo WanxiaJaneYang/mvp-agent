@@ -127,6 +127,26 @@ sources:
     paywall_policy: full
     notes: CPI, jobs, wages data
 
+  - id: us_bls_schedule
+    name: U.S. Bureau of Labor Statistics - Economic Release Schedule
+    url: https://www.bls.gov/schedule/news_release/
+    type: html
+    tags: [macro_data, event_calendar, us]
+    credibility_tier: 1
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Official release schedule for CPI, jobs, PPI, and other key indicators. For event-risk alerts
+
+  - id: us_bea_schedule
+    name: U.S. Bureau of Economic Analysis - Release Schedule
+    url: https://www.bea.gov/news/schedule
+    type: html
+    tags: [macro_data, event_calendar, us]
+    credibility_tier: 1
+    fetch_interval: weekly
+    paywall_policy: full
+    notes: Official release schedule for GDP, personal income, trade balance. For event-risk alerts
+
   - id: imf_news
     name: International Monetary Fund - News
     url: https://www.imf.org/en/News/RSS
@@ -224,12 +244,12 @@ sources:
   - id: ft_markets
     name: Financial Times - Markets
     url: https://www.ft.com/markets
-    type: rss
+    type: html
     tags: [market_narrative, equity_risk, credit, global]
     credibility_tier: 2
     fetch_interval: daily
     paywall_policy: metadata_only
-    notes: Paywall - store metadata + snippet only
+    notes: Paywall - FT public RSS is not official; myFT RSS requires account. Store metadata + snippet only
 
   - id: wsj_markets
     name: Wall Street Journal - Markets
@@ -512,8 +532,8 @@ sources:
     tags: [market_narrative, credit, equity_risk]
     credibility_tier: 3
     fetch_interval: daily
-    paywall_policy: full
-    notes: FT's free markets blog - alternative perspectives
+    paywall_policy: metadata_only
+    notes: FT's free markets blog - alternative perspectives. Set metadata_only for reliability
 
   - id: macrovoices
     name: MacroVoices Podcast - Show Notes
@@ -576,8 +596,8 @@ sources:
     tags: [market_narrative, equity_risk]
     credibility_tier: 4
     fetch_interval: daily
-    paywall_policy: full
-    notes: Monitor-only - user-generated content, mixed quality, useful for retail sentiment
+    paywall_policy: metadata_only
+    notes: Monitor-only - user-generated content, mixed quality, likely blocked/requires login. Store metadata only
 
   - id: ray_dalio_linkedin
     name: Ray Dalio - LinkedIn Posts
