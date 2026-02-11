@@ -14,6 +14,7 @@ Every citation references a stored document/chunk with the following structure:
 {
   "id": "cite_<uuid>",
   "source_id": "fed_press_releases",
+  "publisher": "Federal Reserve",
   "doc_id": "doc_<uuid>",
   "chunk_id": "chunk_<uuid>",
   "url": "https://www.federalreserve.gov/newsevents/pressreleases/...",
@@ -24,6 +25,9 @@ Every citation references a stored document/chunk with the following structure:
     "start": 150,
     "end": 320,
     "text": "...actual quoted text snippet..."
+  },
+  "snippet_span": {
+    "text": "...headline or RSS snippet..."
   }
 }
 ```
@@ -31,6 +35,7 @@ Every citation references a stored document/chunk with the following structure:
 **Required fields:**
 - `id`: Unique citation identifier
 - `source_id`: Reference to source_registry.yaml entry
+- `publisher`: Publisher name (derived from sources table via source_id, stored for diversity checks)
 - `doc_id`: Document identifier in local store
 - `chunk_id`: Chunk identifier (if chunked retrieval used)
 - `url`: Canonical URL of source document
@@ -39,17 +44,48 @@ Every citation references a stored document/chunk with the following structure:
 - `fetched_at`: When we fetched/stored it (ISO 8601)
 
 **Optional fields:**
-- `quote_span`: Precise location + text excerpt from document (recommended for verification)
+- `quote_span`: Precise location + text excerpt from full document body (only for `paywall_policy: full` sources)
+- `snippet_span`: Headline/snippet from RSS/metadata (allowed for all sources, including `paywall_policy: metadata_only`)
 
 **Paywall-sourced citations:**
 - If `source_registry.yaml` marks source as `paywall_policy: metadata_only`:
-  - Citation MUST NOT include full-text quote_span
-  - Citation includes: title, url, published_at, snippet (if available from RSS/meta)
+  - Citation MUST NOT include `quote_span` (no full-text extraction)
+  - Citation MAY include `snippet_span` (headline/RSS snippet explicitly labeled)
   - System must NOT fabricate or extract paywalled full text
 
 ---
 
-## 2. Bullet-Level Citation Rule
+## 2. Compatibility with Claude API Structured Citations
+
+**When using Claude API with citations feature:**
+
+Claude's API returns structured citation metadata that includes:
+- Citation ranges (sentence/passage references within the model's response)
+- Source document identifiers
+- Extracted text spans
+
+**Integration approach:**
+
+1. **Store model-returned citation metadata as canonical evidence pointers:**
+   - Claude API citations map to our citation objects via `doc_id`/`chunk_id`
+   - The API's citation range becomes our `quote_span` (if full-text) or `snippet_span` (if metadata-only)
+   - Store the structured metadata (start/end offsets, extracted text) in our citations table
+
+2. **Presentation layer vs storage layer:**
+   - The rendered `[1][2]` numbering in output is a presentation layer convenience
+   - Underlying store maintains structured citation metadata (JSON objects as defined in §1)
+   - Citation validator operates on stored metadata, not presentation markup
+
+3. **Validator compatibility:**
+   - Claude API citations must still pass our validation rules (§3, §3.1)
+   - API-returned citations without valid `source_id`/`url`/`published_at` are rejected
+   - Paywall policy still applies: API cannot cite full-text from `metadata_only` sources
+
+**Implementation note:** If not using Claude API citations, the system generates citation objects manually during retrieval/synthesis and stores them with the same schema.
+
+---
+
+## 3. Bullet-Level Citation Rule
 
 **Absolute requirement:** Every claim bullet in synthesis output must cite ≥1 stored evidence chunk.
 
@@ -103,6 +139,99 @@ Before delivering any synthesis output, the system MUST run a citation validator
 
 ---
 
+## 3.1. Citation Quality Checks
+
+**Beyond basic presence, enforce quality constraints on citations:**
+
+### Numeric/Time Claims Rule
+
+If a bullet contains **numbers, percentages, or specific dates** (except purely scheduled dates from official calendars), it must satisfy ONE of:
+
+- **At least one Tier 1–2 citation** (credible source), OR
+- **At least two independent sources** (different `publisher` or `source_id`)
+
+**Examples:**
+
+✓ Valid:
+- "Q4 GDP grew 2.9%, slightly above expectations. [BEA] [Reuters]" — Tier 1 + Tier 2
+- "Oil prices rose 3% on supply concerns. [Bloomberg] [MarketWatch]" — Two independent Tier 2 sources
+
+✗ Invalid (fails quality check):
+- "Inflation is expected to reach 5.2% by Q3. [Zero Hedge only]" — Numeric claim with only Tier 4 source
+- "Markets fell 2% yesterday. [single Tier-3 source]" — Numeric claim needs corroboration
+
+**Validator action:** If numeric/time claim fails quality check, remove bullet or mark "[Insufficient credible evidence for this claim]".
+
+### Policy Claims Rule
+
+If a bullet is about **central bank policy** or **official macro releases** (identified by tags: `policy_centralbank`, `macro_data`), AND a Tier 1 source is available in the evidence pack:
+
+- **Require at least one Tier 1 citation**
+
+**Examples:**
+
+✓ Valid:
+- "The Fed held rates at 5.25-5.50%. [Fed Statement] [Reuters]" — Includes Tier 1 (Fed)
+
+✗ Invalid (fails quality check):
+- "The Fed held rates steady. [CNBC] [Bloomberg]" — Policy claim with no Tier 1 citation when Fed statement is available
+
+**Validator action:** If policy claim lacks Tier 1 citation and Tier 1 source exists in evidence pack, remove bullet or mark "[Cite official source directly for policy claims]".
+
+**Implementation note:** Quality checks run after basic citation validation. They access the evidence pack metadata to determine available sources.
+
+---
+
+## 3.2. Retry Policy (Cost Safety)
+
+**To prevent runaway costs from repeated synthesis attempts, enforce deterministic retry behavior:**
+
+### Decision Tree
+
+After validation completes, count removed bullets and check section completeness:
+
+| Scenario | Action |
+|----------|--------|
+| **≤3 bullets removed** AND all sections non-empty | **Deliver with removals** + log warnings in metadata |
+| **>3 bullets removed** OR any section (Prevailing/Counter/Minority/Watch) becomes empty | **Retry synthesis once** with explicit instruction to cite more evidence |
+| **Second attempt still fails** (>3 removed or section empty) | **Deliver abstaining report** (see below) |
+
+### Abstaining Report Format
+
+If synthesis cannot be salvaged after one retry:
+
+```markdown
+# Daily Brief - [Date]
+
+## Synthesis Status: Insufficient Evidence
+
+We were unable to generate a complete daily brief for [date] due to insufficient citeable evidence in available sources.
+
+## Available Evidence Summary
+
+[1-3 bullets summarizing what evidence WAS available, with citations]
+
+## Why Insufficient
+
+- [Specific reason: e.g., "No Tier 1 sources published policy statements today"]
+- [e.g., "Only contradictory Tier 4 sources available for key narrative"]
+- [e.g., "Paywalled sources dominate; insufficient full-text access"]
+
+## References
+
+[List all sources that WERE retrieved but couldn't support synthesis]
+```
+
+### Retry Cost Guards
+
+- **Max retries:** 1 (total 2 synthesis attempts per daily brief)
+- **Retry triggers logging:** Record retry reason, removed bullets count, evidence pack diversity stats
+- **Abort after 2nd failure:** Do not loop indefinitely; deliver abstaining report
+
+**Rationale:** This prevents scenarios where poor evidence packs cause repeated expensive synthesis calls. Better to abstain explicitly than burn budget retrying.
+
+---
+
 ## 4. Evidence-Pack Definition
 
 **Purpose:** Define how retrieval builds a bounded, diverse set of evidence chunks for synthesis.
@@ -118,7 +247,8 @@ Before delivering any synthesis output, the system MUST run a citation validator
 To avoid one-source dominance (per PROJECT_FACTS.md):
 
 1. **Publisher diversity:**
-   - No single publisher (e.g., Reuters) can dominate >40% of evidence pack
+   - No single publisher can dominate >40% of evidence pack
+   - Publisher is determined by the `publisher` field in citations (derived from sources table via `source_id`)
    - If retrieval returns >40% from one publisher, down-sample and retrieve more from others
 
 2. **Credibility tier diversity:**
@@ -313,48 +443,34 @@ At the end of each synthesis output, include a **References** section:
 
 ---
 
-## 8. Storage Schema (Reference)
+## 8. Storage Requirements
 
-**Citation table (SQLite):**
+**The data model must include the following storage capabilities:**
 
-```sql
-CREATE TABLE citations (
-    id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL,  -- FK to sources table
-    doc_id TEXT NOT NULL,     -- FK to documents table
-    chunk_id TEXT,            -- FK to chunks table (nullable if doc-level)
-    url TEXT NOT NULL,
-    title TEXT NOT NULL,
-    published_at TEXT NOT NULL,  -- ISO 8601 timestamp
-    fetched_at TEXT NOT NULL,    -- ISO 8601 timestamp
-    quote_span_start INTEGER,    -- Character offset start (nullable)
-    quote_span_end INTEGER,      -- Character offset end (nullable)
-    quote_text TEXT,             -- Extracted quote (nullable, null for paywalled)
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (source_id) REFERENCES sources(id),
-    FOREIGN KEY (doc_id) REFERENCES documents(id),
-    FOREIGN KEY (chunk_id) REFERENCES chunks(id)
-);
+### Citations Table
 
-CREATE INDEX idx_citations_source ON citations(source_id);
-CREATE INDEX idx_citations_doc ON citations(doc_id);
-CREATE INDEX idx_citations_published ON citations(published_at);
-```
+Store all fields from §1 citation object:
+- Required: `id`, `source_id`, `publisher`, `doc_id`, `chunk_id`, `url`, `title`, `published_at`, `fetched_at`
+- Optional: `quote_span` (start, end, text) for full-text sources
+- Optional: `snippet_span` (text) for metadata-only sources
+- Foreign keys to sources, documents, chunks tables
+- Indexes on: `source_id`, `doc_id`, `published_at`
 
-**Synthesis-citations junction table:**
+### Synthesis-Bullets Mapping
 
-```sql
-CREATE TABLE synthesis_citations (
-    synthesis_id TEXT NOT NULL,  -- FK to synthesis_runs table
-    citation_id TEXT NOT NULL,   -- FK to citations table
-    section TEXT NOT NULL,       -- 'prevailing', 'counter', 'minority', 'watch'
-    bullet_index INTEGER NOT NULL,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (synthesis_id, citation_id, section, bullet_index),
-    FOREIGN KEY (synthesis_id) REFERENCES synthesis_runs(id),
-    FOREIGN KEY (citation_id) REFERENCES citations(id)
-);
-```
+Junction table or embedded structure mapping:
+- `synthesis_id` → list of bullets → list of citation IDs
+- Store section (`prevailing`, `counter`, `minority`, `watch`) + bullet index
+- Enable retrieval: "Which citations support bullet N in section X of synthesis Y?"
+
+### Evidence-Pack Store
+
+Store evidence pack metadata (§4.4):
+- `pack_id`, `query`, `generated_at`
+- List of chunks with: `chunk_id`, `source_id`, `score`, `credibility_tier`
+- Diversity stats: `unique_publishers`, `tier_1_pct`, `tier_2_pct`, `tier_3_pct`, `tier_4_pct`, `max_publisher_pct`
+
+**Full schema DDL lives in:** `artifacts/modelling/data_model.md` (see that file for SQLite CREATE TABLE statements).
 
 ---
 

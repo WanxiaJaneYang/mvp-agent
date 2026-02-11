@@ -42,3 +42,14 @@
 - Abstain language: explicit "insufficient evidence" markers when data unavailable
 - Includes: storage schema, example valid/invalid outputs, citation presentation format
 - Next recommended: Item B (data_model.md) or C (pipeline.md)
+
+[2026-02-11 Session 4] Refined item D: citation_contract.md (remains PASSING)
+- Refined: artifacts/modelling/citation_contract.md (558 lines, was 442)
+- Added Claude API structured citations compatibility section (§2): API citations map to our schema, presentation vs storage layer
+- Split paywall spans: quote_span (full-text only) vs snippet_span (RSS/headline, allowed for metadata_only sources)
+- Added citation quality checks (§3.1): numeric/time claims require Tier 1-2 or 2+ independent sources; policy claims require Tier 1 when available
+- Added publisher field to citation object (derived from sources table, used for diversity checks)
+- Added retry policy (§3.2): ≤3 removals → deliver; >3 or empty section → retry once; 2nd failure → abstaining report
+- Replaced SQL DDL with storage requirements list (full schema deferred to data_model.md)
+- Cost safety: deterministic retry behavior prevents runaway synthesis attempts
+- Next recommended: Item B (data_model.md) or C (pipeline.md)
