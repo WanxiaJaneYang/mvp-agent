@@ -1,0 +1,13 @@
+[INIT] Created checklist + progress log. Next: complete exactly ONE FAILING item, validate it, then update this log.
+
+[2026-02-11 Session 1] Created CLAUDE.md
+- Created: CLAUDE.md (standard format with required header)
+- Removed: CLAUDE.custom.md (content integrated into CLAUDE.md)
+- CLAUDE.md includes:
+  - Setup commands (venv activation, running modelling)
+  - Repository structure and file map
+  - Architecture principles (5 absolute rules)
+  - Modelling deliverables (A-F requirements)
+  - Development workflow (explore→plan→execute→verify loop)
+  - RAG/retrieval guidance, budget safety, validation criteria
+- Next: Begin modelling phase deliverables per CLAUDE.md checklist
