@@ -1,61 +1,104 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
-Financial News & Macro Literature Review Assistant (MVP/v1).
-Local-first Python application that ingests macro/market sources (RSS/HTML/PDF) and produces citation-grounded daily briefs + major-event alerts for retail investors.
+**Financial News & Macro Literature Review Assistant (MVP/v1)**  
+Local-first Python app that ingests macro/market sources (RSS/HTML/PDF) and produces **citation-grounded** daily briefs + major-event alerts for retail investors.
 
 **Current Phase:** Modelling (designing system architecture, schemas, and pipelines before implementation)
 
-## Setup & Environment
+---
 
-### Initial Setup (Windows)
+## Non‑Negotiables
+1. **No uncited factual claims.** Every bullet/claim must have ≥1 valid citation (URL + published timestamp).
+2. **Local-first.** No cloud storage requirements for v1.
+3. **Paywall compliance.** If a source is `paywall_policy: metadata_only`, do **not** fabricate full text.
+4. **Budget safety.** Respect strict caps and stop when caps are reached (see Budget section).
+5. **Minimize context bloat.** Read only files needed for the current step.
+
+---
+
+## Cost & Context Discipline (Claude Code)
+Claude Code costs scale with context size; long sessions can degrade as context fills. Use the built-in commands intentionally.
+
+### Session Hygiene
+- Use `/cost` to inspect session token spend (API-billed usage); if you’re on a subscription, use `/stats` instead.
+- Use `/clear` between unrelated tasks to avoid stale context being repeatedly processed.
+- Use `/compact` only when needed; keep compaction instructions specific to the current objective.
+
+### Default Output Limits
+- Keep responses concise: **≤ 120 lines** unless explicitly requested.
+- Prefer checklists + diffs over long explanations.
+- Never paste full articles; store IDs/snippets only.
+
+---
+
+## Setup & Environment (Windows)
+
+### Activate venv
 ```cmd
-# Activate virtual environment
 .venv\Scripts\activate
+```
 
-# Install dependencies (once artifacts exist)
+### Install deps (once code exists)
+```cmd
 pip install -r requirements.txt
 ```
 
-### Running the Agent
-```cmd
-# Run modelling phase
-python -m apps.agent.main run_modelling --idea "..."
-```
+---
 
-## Repository Structure
+## Repository Structure (authoritative)
 
 ```
 artifacts/
-├── PRD.md                    # Authoritative requirements (frozen)
-├── PROJECT_FACT.md           # Constraints (budget, timezone, policies)
-├── modelling/                # Stable modelling outputs
-│   ├── source_registry.yaml  # Source definitions with credibility tiers
-│   ├── data_model.md         # SQLite schema + FTS indexing plan
-│   ├── pipeline.md           # Daily pipeline stages
-│   ├── citation_contract.md  # Citation validation rules
-│   ├── alert_scoring.md      # Alert thresholds & rate limits
-│   └── backlog.json          # Build tickets with acceptance criteria
-└── runs/<timestamp>/         # Per-run generated outputs + logs
+├── PRD.md                      # Authoritative requirements (frozen)
+├── PROJECT_FACT.md             # Constraints (budget, timezone, policies)
+└── modelling/
+    ├── source_registry.yaml
+    ├── data_model.md
+    ├── pipeline.md
+    ├── citation_contract.md
+    ├── alert_scoring.md
+    └── backlog.json
 
-apps/agent/                   # Agent runner, tools, RAG store, validators
-evals/                        # Regression checks for modelling outputs
-ops/                          # Operational scripts and utilities
-claude-progress.txt           # Durable progress log (append-only)
+apps/agent/                      # Future: agent runner, tools, RAG store, validators
+evals/                           # Future: regression checks for modelling outputs
+ops/                             # Future: operational scripts and utilities
+claude-progress.txt              # Durable progress log (append-only)
 ```
+
+---
+
+## Development Workflow (small, verifiable steps)
+Follow: **Explore → Plan → Execute → Verify → Log**
+
+1) **Explore**
+- Read only the artifact(s) needed for this step.
+
+2) **Plan**
+- State exactly which files will change (ideally 1–4).
+- Define a clear verification step (command/assertion/checklist).
+
+3) **Execute**
+- Make the smallest change that satisfies the step.
+
+4) **Verify**
+- Run the verification command(s) and report results.
+- If verification fails, fix the root cause (don’t suppress).
+
+5) **Log**
+- Append to `claude-progress.txt`:
+  - what changed
+  - files touched
+  - verification run + outcome
+  - the next single step
+
+---
 
 ## Architecture Principles
 
-### Absolute Rules (Non-Negotiable)
-1. **No uncited factual claims** - Every claim requires ≥1 citation with URL + timestamp
-2. **Local-first** - No cloud dependencies; all data stored locally
-3. **Budget safety** - Hard caps enforced (daily: $3, hourly: $0.10, monthly: $100)
-4. **Deterministic artifacts** - Every run writes to `artifacts/runs/<timestamp>/`
-5. **Minimize context bloat** - Just-in-time retrieval; load only relevant snippets/IDs
-
-### Daily Pipeline (Planned)
+### Daily Pipeline (planned)
 ```
 fetch → extract → normalize → chunk → index → retrieve → synthesize → validate citations → deliver
 ```
@@ -68,131 +111,93 @@ All synthesis outputs must include:
 - **What to watch** (falsification indicators)
 - **Citations per bullet** (mandatory, validated)
 
-## Development Workflow
-
-### Modelling Phase Loop
-1. **Explore** - Retrieve minimal evidence and PRD constraints
-2. **Plan** - Outline file changes and rationale
-3. **Execute** - Write/update artifacts
-4. **Verify** - Run validators (JSON schema + citation checks)
-5. **Update** `claude-progress.txt` with changes and test results
-
-### Progress Tracking
-Always update `claude-progress.txt` each session with:
-- What you changed
-- What files were created/modified
-- What remains to be done
-- What validators were run and their results
+---
 
 ## Modelling Deliverables (Definition of Done)
 
-The following files must exist and be consistent with PRD:
+A. `artifacts/modelling/source_registry.yaml` ✅  
+B. `artifacts/modelling/data_model.md` (SQLite schema + FTS plan + IDs + indices)  
+C. `artifacts/modelling/pipeline.md` (stages + failure handling + incremental runs)  
+D. `artifacts/modelling/citation_contract.md` ✅  
+E. `artifacts/modelling/alert_scoring.md` (thresholds + rate limits + bundling)  
+F. `artifacts/modelling/backlog.json` (tickets w/ acceptance criteria; valid JSON)
 
-A. `artifacts/modelling/source_registry.yaml`
-   - RSS/HTML/PDF sources with tags, credibility tiers, fetch cadence, paywall policy
-
-B. `artifacts/modelling/data_model.md`
-   - SQLite schema (sources/documents/chunks/citations/portfolio/alerts/runs)
-   - FTS (Full-Text Search) indexing plan
-   - Chunking strategy
-
-C. `artifacts/modelling/pipeline.md`
-   - Daily pipeline stages with error handling
-   - Incremental vs full refresh logic
-
-D. `artifacts/modelling/citation_contract.md`
-   - Valid citation format (chunk/doc ID + URL + timestamp)
-   - Abstain behavior when evidence is insufficient
-   - Citation validation rules
-
-E. `artifacts/modelling/alert_scoring.md`
-   - v1 thresholds for major events
-   - Rate limiting policy (max alerts/day)
-   - Alert bundling strategy
-
-F. `artifacts/modelling/backlog.json`
-   - Build tickets with acceptance criteria
-   - Must validate against schema
+---
 
 ## RAG & Retrieval Guidance
 
 ### Context Management
-- **Never paste long articles** - Store locally and reference by ID
-- **Retrieve selectively** - Top relevant chunks only
-- **Diversify sources** - Avoid single-publisher dominance
-- **Prefer credible sources** - Official/primary sources for policy content
-- **Include citations** - Reference stored evidence, not "memory"
+- Never paste long articles; store locally and reference by ID.
+- Retrieve selectively (top relevant chunks only).
+- Diversify sources (avoid single-publisher dominance).
+- Prefer credible sources (Tier 1/2 for policy/macro).
+- Cite stored evidence, not “memory”.
 
-### Retrieval Strategy (Planned)
+### Retrieval Strategy (planned)
 - Hybrid: keyword (FTS/BM25) + semantic (vector embeddings)
 - Recency weighting for time-sensitive content
 - Credibility tier weighting
 - Diversity constraints
 
+---
+
 ## Tooling Requirements
-
 All tools must be:
-- **Narrowly scoped** (no overlap between tools)
-- **Clearly named** (purpose obvious from name)
-- **Token-efficient** (return IDs, short snippets, metadata only)
-- **Robust** (handle timeouts, missing pages, paywalls gracefully)
+- Narrowly scoped (no overlapping responsibilities)
+- Clearly named (purpose obvious)
+- Token-efficient (return IDs + short snippets + metadata)
+- Robust (timeouts, missing pages, paywalls)
 
-## Budget & Safety
+---
 
-### Hard Limits (config.json)
-- Monthly: $100
-- Daily: $3.00
-- Hourly: $0.10
-- Per-call: max_output_tokens default 800-1200
+## Budget & Safety (two layers)
+
+### Layer 1: Claude Code interaction discipline
+- Keep tasks small + verifiable.
+- Avoid multi-agent “teams” unless necessary.
+- Check `/cost` periodically (API users) and `/clear` between tasks.
+
+### Layer 2: App runtime budget guard (local config)
+- Budget caps live in `.env` (local-only; never committed) and are enforced by the app/harness **before** any model call.
+- Guard should hard-fail when cap exceeded to prevent runaway loops.
+
+Recommended `.env` keys:
+- `BUDGET_MONTHLY_USD=100`
+- `BUDGET_DAILY_USD=3`
+- `BUDGET_HOURLY_USD=0.50`
+- `BUDGET_MODE=hard_fail`
+- `BUDGET_STATE_PATH=.budget_state.json`
 
 ### Safety Rules
-- Never run uncontrolled loops
-- Stop immediately when budget caps are reached
-- Enforce max tool calls per run
-- Enforce max pages fetched per run
+- Never run uncontrolled loops.
+- Enforce max tool calls per run.
+- Enforce max pages fetched per run.
+- Stop immediately when budget caps are reached.
+
+---
 
 ## Content Policy
-
-### Tone & Style
 - Calm, concise, evidence-based
 - No sensational phrasing
 - Balanced presentation of views
 - Explicit uncertainty markers
+- No investment instructions (scenarios + risks only)
+- Portfolio: relevance/risk flags only (no buy/sell signals)
 
-### Output Requirements
-- Every bullet includes citations
-- "Insufficient evidence" over hallucination
-- No investment instructions (present scenarios, not advice)
-- Portfolio risk flags only (no buy/sell signals)
-
-## Validation & Testing
-
-### Citation Validator
-- Every bullet has ≥1 valid citation
-- Citations reference actual ingested docs/chunks
-- URLs + timestamps included
-- Invalid citations trigger retry or removal
-
-### Modelling Validation
-Run before considering phase complete:
-- JSON schema validation for backlog.json
-- Citation contract compliance check
-- All required deliverables (A-F) exist
-- Budget guards implemented
+---
 
 ## Key Constraints
-
 - **User timezone:** Asia/Singapore
 - **Target user:** Retail long-term ETF holders
-- **Model provider:** Anthropic Claude (via Messages API with tools)
+- **Provider:** Anthropic Claude (Claude Code now; Messages API later)
 - **Storage:** SQLite (local)
-- **Secrets:** Use `.env` file (never commit)
-- **Platform:** Windows (local-first, cloud-ready architecture)
+- **Secrets:** `.env` (gitignored)
+
+---
 
 ## Phase Completion Criteria
-
 Modelling phase is complete when:
-- [ ] All deliverables (A-F) exist and validate
+- [ ] All deliverables (A–F) exist and validate
 - [ ] `backlog.json` validates with acceptance criteria
 - [ ] Citation validator passes
 - [ ] Budget guard implemented and enabled by default

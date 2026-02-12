@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd citation contract with validation rules and abstain behavior\n\nComplete modelling deliverable D: citation_contract.md defining evidence-grounding rules.\n\nKey components:\n- Citation object format \\(id, source_id, url, title, published_at, chunk_id, quote_span\\)\n- Bullet-level rule: every bullet requires ≥1 citation\n- Validator behavior: strips uncited claims or marks \"insufficient evidence\"\n- Evidence-pack constraints: max 30 chunks, diversity \\(publisher <40%, tier-1/2 ≥50%\\)\n- Credibility weighting in retrieval \\(tier-1: 1.0, tier-2: 0.8, tier-3: 0.6, tier-4: 0.3\\)\n- Paywall rule: metadata-only citations for paywalled sources, no full-text fabrication\n- Explicit abstain language when evidence is insufficient\n- Storage schema for citations table and synthesis-citations junction\n- Example valid/invalid outputs with validator actions\n\nEnsures \"no uncited factual claims\" absolute rule \\(CLAUDE.md\\).\nChecklist item D now PASSING.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}
