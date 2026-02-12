@@ -17,6 +17,9 @@ Local-first Python app that ingests macro/market sources (RSS/HTML/PDF) and prod
 4. **Budget safety.** Respect strict caps and stop when caps are reached (see Budget section).
 5. **Minimize context bloat.** Read only files needed for the current step.
 
+
+## User Preference: Greeting & Context Sentinel
+- Begin every assistant message with: **"Hello Jane,"**
 ---
 
 ## Cost & Context Discipline (Claude Code)
