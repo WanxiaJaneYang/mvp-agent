@@ -85,33 +85,63 @@ Claude's API returns structured citation metadata that includes:
 
 ---
 
-## 3. Bullet-Level Citation Rule
+## 3. Claim-Level Citation Binding (Bullets as Containers)
 
-**Absolute requirement:** Every claim bullet in synthesis output must cite ≥1 stored evidence chunk.
+**Goal:** Keep the UX readable (bullets), while making citation granularity closer to academic sentence-level citation.
 
-**Applies to sections:**
-- **Prevailing view** (mainstream narrative)
-- **Counterarguments** (alternative perspectives)
-- **Minority view** (dissenting/contrarian opinions)
-- **What to watch** (falsification indicators, watchlist)
+### 3.1 Definitions
 
-**Citation format in output:**
+- **Bullet**: A list item shown to the user.
+- **Claim span**: The smallest unit that asserts a fact, inference, or prediction that should be supported by evidence.  
+  In practice, a claim span is usually **one sentence** inside a bullet.
+
+### 3.2 Rule: Every claim span must be covered by citations
+
+**Absolute requirement:** Every claim span must have **≥ 1 citation**.
+
+You can satisfy this in two compliant ways:
+
+**A) Sentence-level citations (preferred, most explicit):**
 ```markdown
-- The Federal Reserve held rates steady at 5.25-5.50% citing persistent inflation concerns. [1][2]
+- Inflation remained elevated in January. [1]
+  The central bank reiterated it needs “more confidence” before cutting rates. [2]
 ```
 
-Where `[1]`, `[2]` are citation IDs that map to full citation objects stored with the output.
+**B) Shared citation for a consecutive multi-sentence span (allowed when sources do not change):**  
+If two (or more) consecutive sentences in the same bullet are supported by the **same citation set**, you may place citations **once at the end of the span** to avoid noisy repetition. This matches common academic guidance that repeating the same citation every sentence can be unnecessary when attribution remains clear. citeturn0search0turn0search17
 
-**Inline citation placement:**
-- Place citations immediately after the claim they support
-- Multiple citations per bullet are encouraged (corroboration)
-- Each citation must reference actual retrieved evidence
+```markdown
+- The report argues growth risks are rising while inflation is sticky.
+  It expects policy to remain restrictive for longer. [3]
+```
+
+**Not allowed:** A bullet containing multiple claim spans with **no clear citation coverage** for each span.
+
+### 3.3 Formatting constraints (so validation is deterministic)
+
+1. **Max 2 sentences per bullet** (recommended). If you need more, split into multiple bullets.
+2. **Citations must appear immediately after the sentence/span they support** (same line or the next line).
+3. If a bullet contains multiple claim spans supported by different sources, each claim span must carry its own citations (Option A).
+
+### 3.4 Applies to all synthesis sections
+
+Claim-level citation binding applies to:
+- **Prevailing view**
+- **Counterarguments**
+- **Minority view**
+- **What to watch / falsification indicators**
 
 ---
+
 
 ## 3. Validator Behavior
 
 **Pre-output validation (mandatory):**
+
+**Claim-span parsing (mandatory):**
+- Split each bullet into claim spans using sentence boundaries (`.`, `?`, `!`) and hard line breaks.
+- Treat semicolon-separated clauses as separate claim spans **if** they express different facts and only one side has citations.
+- If a multi-sentence bullet uses a single citation group, the citations must appear at the end of the last sentence of that span (Rule 3.2B).
 
 Before delivering any synthesis output, the system MUST run a citation validator that:
 
@@ -479,7 +509,7 @@ Store evidence pack metadata (§4.4):
 Before marking this deliverable as complete, ensure:
 
 - [ ] Citation object schema implemented in data_model.md
-- [ ] Bullet-level citation rule enforced in synthesis prompts
+- [ ] Claim-level (sentence/span) citation binding enforced in synthesis prompts (Section 3)
 - [ ] Citation validator implemented and tested
 - [ ] Evidence-pack retrieval respects diversity + credibility constraints
 - [ ] Paywall sources handled correctly (metadata-only, no full-text)

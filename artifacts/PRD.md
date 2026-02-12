@@ -1,229 +1,254 @@
-# Product Requirements Document (PRD) — Financial News & Macro Literature Review Assistant (MVP / v1)
+# PRD v1.1 — Financial News & Macro Literature Review Assistant (Local‑First)
+
+**Version:** v1.1 (clarified spec)  
+**Status:** Draft ready for modelling + implementation  
+**User timezone:** Asia/Singapore
 
 ## 1. Purpose
-Build a local-first application that automatically collects financial news and macro/policy commentary, then produces reliable, citation-grounded daily analysis and major-event alerts to help retail investors make better strategic decisions.
+Build a local‑first application that automatically collects financial news, macro/policy releases, and institutional commentary, then produces **citation‑grounded** daily analysis and **rate‑limited** major‑event alerts for retail investors.
 
-The product is designed to reduce the need for users to actively track markets, while still keeping them informed when meaningful changes occur.
+The product reduces the need to actively track markets while keeping users informed when meaningful changes occur.
 
 ## 2. Target Users
-**Primary users**
-- Normal retail investors (non-finance professionals).
-- Primarily long-term ETF holders investing spare funds.
+**Primary**
+- Retail investors (non‑finance professionals)
+- Primarily long‑term ETF holders investing spare funds
 
-**Secondary users (future)**
-- Users with more complex portfolios (stocks + ETFs + multi-asset) who want portfolio-aware relevance and risk flags.
+**Secondary (future)**
+- Users with more complex portfolios (stocks + ETFs + multi‑asset) who want portfolio‑aware relevance and risk flags
 
-## 3. Scope
-### In-scope (v1 / MVP)
-- **Daily brief**: once per day, generate a literature-review-style synthesis of macro + market narratives.
-- **Major event alerts**: notify users when significant events occur (e.g., major policy events, major macro releases, major market moves, major narrative shifts).
-- **Cite everything**: all claims in AI-generated content must include evidence citations.
-- **Local-first**: runs locally on the user’s machine.
+## 3. Product Principles
+1. **Reliability first:** no uncited factual claims; abstain if evidence is insufficient.
+2. **Evidence‑led outputs:** citations are attached at the bullet/claim level.
+3. **User autonomy:** scenarios and risks, not trade instructions.
+4. **Low‑anxiety UX:** concise digest by default; alerts are rare and bundled.
+5. **Local‑first, cloud‑ready:** architecture can later migrate to cloud.
+
+## 4. Scope
+
+### 4.1 In‑scope (v1 / MVP)
+- **Daily brief**: once per day, literature‑review‑style synthesis of macro + market narratives.
+- **Major event alerts**: notify on significant events with rate limiting.
+- **Cite everything**: every bullet must have ≥1 citation.
+- **Local‑first**: runs on the user’s machine; portfolio data stored locally.
 - **Lightweight UI**:
-  - A simple daily analysis page (local web page).
-  - Email delivery for daily brief and alerts.
+  - local daily analysis page (static HTML)
+  - email delivery for daily brief and alerts
 - **Portfolio input (manual)**:
-  - Simple UI form to input holdings (tickers + weights).
-  - Portfolio relevance scoring is included as “risk flags” (no explicit trade actions).
+  - tickers + weights
+  - relevance scoring as “risk flags” (no explicit buy/sell actions)
 
-### Out of scope (v1)
-- Brokerage integrations (e.g., Webull), OAuth linking, account syncing.
-- High-frequency/real-time trading signals.
-- Explicit buy/sell instructions.
-- Paid subscriptions, cloud deployment, multi-tenant hosting (planned later).
-- Full compliance framework (not-for-profit open-source positioning), beyond basic guardrails and disclaimers.
+### 4.2 Out of scope (v1)
+- Brokerage integrations / OAuth account linking / syncing
+- Real‑time trading signals and high‑frequency alerts
+- Explicit buy/sell instructions
+- Paid subscriptions, multi‑tenant hosting
+- Full compliance framework beyond basic guardrails and disclaimers
 
-## 4. Key Use Cases & User Stories
-### Daily brief
-1. As a user, I want a daily summary of important macro/policy and market narratives so I don’t need to continuously read news.
-2. As a user, I want the summary to show:
-   - prevailing view,
-   - counterarguments,
-   - minority view,
-   - and “what would falsify / what to watch” indicators,
-   so I understand uncertainty and can make my own decisions.
-3. As a user, I want every claim to be backed by citations so I can verify information quickly.
+## 5. MVP Defaults (Hard Numbers)
 
-### Major event alerts
-4. As a user, I want immediate alerts for major events so I can respond if needed.
-5. As a user, I want alerts to be rate-limited and concise to avoid stress and information overload.
+### 5.1 Daily brief
+- **Schedule:** 07:05 Asia/Singapore daily
+- **Sections (max bullets):**
+  - Prevailing view: 3–6
+  - Counterarguments: 2–5
+  - Minority view: 1–4
+  - What to watch / falsification indicators: 3–6
+  - What changed since yesterday: ≤3
+- **Max total bullets:** 24
+- **Max length:** ~1,200 words (or equivalent token cap)
+- **Citation rule:** every bullet includes ≥1 valid citation.
 
-### Portfolio-aware relevance (manual input)
-6. As a user, I want the system to flag which narratives are relevant to my portfolio exposures, so I can focus attention efficiently.
-7. As a user, I want risk flags and scenario impacts, not direct investment instructions.
+### 5.2 Alerts
+- **Max alerts/day:** 3
+- **Cooldown:** 60 minutes between alerts
+- **Max length:** ~400 words
+- **Format:** 3–6 bullets + “why it matters” + “what to watch next”
+- **Citation rule:** every bullet includes ≥1 valid citation.
 
-## 5. Product Principles
-1. **Reliability first**: no uncited claims; prefer abstaining over hallucinating.
-2. **Evidence-led outputs**: citations at the claim/bullet level (v1 minimum).
-3. **User autonomy**: present risks and opportunities; user decides.
-4. **Low anxiety UX**: concise, rate-limited alerts; daily digest as default.
-5. **Local-first, cloud-ready**: architecture should support migration to cloud later.
+### 5.3 Ingestion & retrieval caps
+- **Max new documents/day:** 200
+- **Default per‑source cap:** 10 docs/day (exceptions allowed for wires/SEC feeds)
+- **Evidence pack:** max 30 chunks per synthesis/alert query
+- **Publisher dominance cap:** ≤40% from any single publisher
+- **Tier mix requirement:** ≥50% Tier 1–2; Tier 4 ≤15%
+- **Recency bias:** prioritize last 7 days; include up to 30 days for context.
+
+### 5.4 Budget guard (runtime)
+- **Monthly:** $100
+- **Daily:** $3
+- **Hourly:** $0.50
+- On exceed: **hard stop** (no automatic retries).
 
 ## 6. Functional Requirements
 
 ### 6.1 Source ingestion
-- Support source types:
-  - RSS/Atom feeds (XML) → hydrate to HTML articles.
-  - HTML pages (direct).
-  - PDFs (e.g., reports, statements).
-  - Optional: JSON APIs for market/macro time series (v1 can start minimal).
-- Maintain a **Source Registry** (config file) defining:
-  - source URL(s), type, fetch interval, tags (macro/policy/markets), credibility tier, and parsing strategy.
-- Paywall handling:
-  - If full text cannot be extracted reliably or appears paywalled, store metadata + snippet + link out.
-- Deduplication:
-  - canonical URL + hash for exact duplicates;
-  - near-duplicate detection is optional in v1 (recommended).
+Supported source types:
+- RSS/Atom (preferred)
+- HTML pages
+- PDFs (reports, statements)
+
+Maintain a config‑driven **Source Registry** defining:
+- source URL(s), type, fetch interval, tags, credibility tier, parsing strategy, paywall policy
+
+Paywall handling:
+- if paywalled/blocked: store metadata + snippet + link; **do not** fabricate text
+
+Deduplication:
+- canonical URL + content hash (exact duplicates)
+- near‑duplicate detection: optional in v1 (recommended for later)
+
+Fair access / rate limiting:
+- respect source terms
+- implement global and per‑source request limits
+- for SEC EDGAR: moderate automated requests per SEC guidance
 
 ### 6.2 Normalization & enrichment
-- Clean text extraction from HTML/PDF into standardized document records.
-- Store document metadata:
-  - source, publisher, URL, published time, fetched time, title.
-- Tagging (v1 baseline):
-  - topics (macro, inflation, rates, growth, equity risk, credit, FX, commodities, etc.)
-  - entities/tickers (best-effort)
-  - doc_type classification (news / policy statement / minutes / speech / report / commentary)
+- Extract clean text from HTML/PDF into a standardized document record.
+- Store metadata: source, publisher, URL, title, published time, fetched time, paywall policy.
+- Baseline tagging:
+  - topics (macro, inflation, rates, growth, equity risk, credit, FX, commodities, tech, etc.)
+  - entities/tickers (best effort)
+  - doc type (news / policy statement / minutes / speech / report / commentary)
 
-### 6.3 Indexing & retrieval (grounded generation support)
+### 6.3 Indexing & retrieval (for grounded generation)
 - Hybrid retrieval:
-  - keyword search (FTS/BM25)
-  - semantic search (vector embeddings)
-- Retrieval must support:
+  - keyword search (SQLite FTS5)
+  - semantic search (vector embeddings) for non‑paywalled chunks
+- Retrieval supports:
   - recency weighting
   - credibility weighting
-  - diversity constraint (avoid one-publisher dominance)
+  - diversity constraint (avoid one‑publisher dominance)
 
-### 6.4 Literature-review synthesis (core)
-- Output format must include:
-  - **Prevailing view**
-  - **Counterarguments**
-  - **Minority view**
-  - **What to watch / falsification indicators**
-  - **Citations per bullet/claim**
-- “Cite everything” enforcement:
-  - System must validate that each output bullet has at least one citation referencing ingested evidence.
-  - If citations are missing/invalid, system must retry or remove the claim.
+### 6.4 Literature‑review synthesis (core)
+Required output sections:
+- Prevailing view
+- Counterarguments
+- Minority view
+- What to watch / falsification indicators
+- References (expanded citations list)
+
+Citation enforcement:
+- system validates that each bullet has ≥1 citation
+- on failure, remove bullet or replace with explicit abstain language
 
 ### 6.5 Daily brief delivery
-- Generate a daily brief once per day (user timezone).
+- Generate once per day in user timezone.
 - Deliver via:
-  - Email (preferred)
-  - Local “Daily Brief” page (HTML)
-- Include:
-  - a “what changed since yesterday” section (v1: lightweight heuristic acceptable)
+  - email
+  - local “Daily Brief” HTML page
+- Include a “what changed since yesterday” section (heuristic acceptable in v1).
 
 ### 6.6 Major event alerts
-- Trigger alerts based on a scoring framework (defined in spec later), considering:
-  - event importance,
-  - confidence/evidence,
-  - relevance (global + portfolio relevance if available),
-  - and rate limiting.
-- Alert format:
-  - short summary (3–6 bullets),
-  - why it matters,
-  - what to watch next,
-  - citations.
+Trigger categories (v1):
+- **Policy (Tier‑1):** new central bank statement/minutes/speech/press release
+- **Macro releases (Tier‑1):** CPI/jobs/GDP and other major official releases
+- **Corporate material events (Tier‑1 via SEC 8‑K / major IR):** material filings/events; focus on index‑relevant large caps or user watchlist
+- **Narrative shift (Tier‑2+):** heuristic based on topic distribution shift and/or contradiction rate vs trailing 7 days
+
+Alert scoring combines:
+- importance + evidence strength + confidence + relevance − noise risk
+
+Rate limiting:
+- enforce cooldown + daily cap
+- bundle minor items into next daily brief
 
 ### 6.7 Portfolio input & relevance
-- UI allows manual input:
-  - tickers + weights (required)
-  - optional: region/currency/risk preference (optional)
-- System maps narratives to exposures (v1: basic mapping):
-  - direct ticker match,
-  - sector/region inference where available,
-  - factor tags optional (deferred).
+UI allows manual input:
+- tickers + weights (required)
 
-## 7. Non-Functional Requirements
+Relevance mapping (v1):
+- direct ticker match
+- curated sector/theme tags mapping table shipped as defaults
+
+Outputs:
+- relevance tags and “risk flags” (no trade actions)
+
+## 7. Non‑Functional Requirements
 
 ### 7.1 Reliability & faithfulness
 - No uncited factual claims.
-- System must be able to show evidence references (URLs + timestamps) for every bullet.
-- Must handle insufficient evidence by abstaining or marking uncertainty.
+- Every bullet references stored evidence with URL + published timestamp.
+- Handle insufficient evidence by abstaining explicitly.
 
 ### 7.2 Performance
-- Local-first performance target:
-  - daily pipeline completes within a reasonable time on consumer hardware (exact SLA not required for v1).
-- Incremental ingestion recommended to avoid reprocessing everything daily.
+- Daily pipeline completes on consumer hardware (no strict SLA in v1).
+- Incremental ingestion to avoid reprocessing everything daily.
 
 ### 7.3 Privacy & security
-- Portfolio data stored locally.
-- No cloud storage required for v1.
-- API keys (if used) stored locally in environment variables or config file.
+- Portfolio stored locally.
+- API keys stored locally in environment variables / `.env` (never committed).
 
 ### 7.4 Maintainability
-- Source registry is config-driven.
-- Components are modular: ingestion, extraction, indexing, synthesis, delivery.
+- Source registry is config‑driven.
+- Modular components: ingestion, extraction, indexing, synthesis, delivery.
 
 ## 8. Content & UX Requirements
-- Tone: calm, concise, evidence-based.
-- No sensational phrasing.
-- Provide balanced views (prevailing/counter/minority).
-- Include explicit “what could prove this wrong” indicators.
+- Calm, concise, evidence‑based tone.
+- Balanced views (prevailing / counter / minority).
+- Explicit “what could prove this wrong” indicators.
+- Clear paywall transparency (headline/snippet only).
 
 ## 9. Success Criteria (MVP)
 1. Daily brief generated and delivered successfully every day.
-2. All bullets include valid citations (no uncited claims).
-3. Users can search and open cited sources from the report.
-4. Major alerts trigger for clearly major events with low noise (rate limiting prevents spam).
-5. Users can input holdings and see relevance/risk flags tied to their portfolio.
+2. All bullets include valid citations (validator passes).
+3. Users can open cited sources from the report.
+4. Major alerts trigger for clearly major events with low noise (rate limited).
+5. Users can input holdings and see portfolio relevance / risk flags.
 
 ## 10. Acceptance Criteria (Testable)
+
 ### Citation enforcement
-- Every bullet in “Prevailing / Counter / Minority / Watchlist” has ≥1 citation.
-- Citations reference actual ingested documents/chunks and include URL + published timestamp.
-- If evidence is insufficient, the system outputs “insufficient evidence” rather than inventing.
+- Every bullet has ≥1 citation.
+- Citations resolve to ingested docs/chunks and include URL + published timestamp.
+- If evidence is insufficient: output “insufficient evidence” rather than inventing.
 
 ### Paywall policy
-- For paywalled/blocked sources, the system stores:
-  - title, publisher, published time, link, snippet (if available),
-  - and does not fabricate full text.
+- Paywalled sources store metadata/snippet only.
+- No fabricated full‑text quotes from paywalled content.
 
 ### Daily brief
-- Produces stable structured output sections.
-- Includes at least one primary/official source when topic is policy-related (if available in sources).
+- Stable structured output.
+- Includes Tier‑1 sources when topic is policy‑related (if available).
 
 ### Alerts
-- Enforces a maximum alerts/day limit per user.
-- Alerts are short and cite evidence.
+- Max alerts/day enforced.
+- Cooldown enforced.
+- Alerts are concise and cite evidence.
 
 ### Portfolio
 - Users can input and update holdings.
-- System produces relevance tags / risk flags tied to holdings.
+- Relevance tags / risk flags tied to holdings.
 
 ## 11. Risks & Mitigations
-- **Hallucinations / uncited claims**
-  - Mitigation: strict evidence-pack generation + validator/retry loop + abstain policy.
-- **Paywalls / crawling restrictions**
-  - Mitigation: metadata/snippet + link-out policy; prefer RSS/official sources.
-- **Alert noise**
-  - Mitigation: scoring thresholds + rate limiting + bundling into daily brief.
-- **Source quality drift**
-  - Mitigation: credibility tiers and later a reviewed allowlist/blocklist.
+- **Hallucinations / uncited claims:** strict evidence packs + validator + abstain policy.
+- **Paywalls / crawling restrictions:** metadata/snippet + link‑out; prefer RSS and official sources.
+- **Alert noise:** thresholds + rate limiting + bundling.
+- **Source quality drift:** credibility tiers and allowlist/blocklist.
 
-## 12. Open Questions / TBD (to finalize during design)
-1. Daily brief template (sections, max length).
-2. Major alert triggers definition + thresholds.
-3. Initial source list and credibility tiering strategy.
-4. RAG tuning specifics (chunk size, overlap, retrieval weights, diversity constraints).
-5. Quality evaluation plan (gold query set, regression tests).
-6. ETF look-through and factor exposure modeling approach (v2).
+## 12. Phased Delivery Plan
 
-## 13. Phased Delivery Plan
 ### Phase 1: MVP core (local)
 - Source registry + ingestion + extraction
-- Indexing (keyword + vector)
+- Indexing (FTS5 + embeddings)
 - Daily brief synthesis with strict citations
 - Daily page + email delivery
-- Basic major event alert triggers + rate limiting
+- Major event triggers + rate limiting
 - Manual portfolio input + basic relevance scoring
 
-### Phase 2: Refinement (post-MVP)
+### Phase 2: Refinement
 - Narrative shift detection improvements
-- More robust source scoring and dynamic source proposals with validation gate
-- Better portfolio exposure mapping (sector/region/factor, ETF look-through)
-- Improved evaluation suite and monitoring
+- More robust source scoring and automatic source proposals with validation gate
+- Better portfolio exposure mapping (sector/region/factor; ETF look‑through)
+- Improved evaluation suite + monitoring
 
 ### Phase 3: Cloud/subscription (future)
-- Multi-user auth + hosting + billing
+- Multi‑user auth + hosting + billing
 - Push notifications
-- Shared global corpus + user-specific personalization layer
+- Shared global corpus + user personalization layer
+
+## 13. References for Implementation Notes (non‑requirements)
+- Agent harness patterns for long‑running, budget‑bounded workflows: https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents  
+- Claude citations feature (optional, still validate locally): https://platform.claude.com/docs/en/build-with-claude/citations  
+- SQLite FTS5 full‑text search: https://www.sqlite.org/fts5.html  
+- SEC EDGAR fair access guidance (rate limits / moderation): https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data

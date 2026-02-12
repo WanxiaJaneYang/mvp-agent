@@ -53,3 +53,17 @@
 - Replaced SQL DDL with storage requirements list (full schema deferred to data_model.md)
 - Cost safety: deterministic retry behavior prevents runaway synthesis attempts
 - Next recommended: Item B (data_model.md) or C (pipeline.md)
+
+[2026-02-12 Session 5] Updated spec & citation granularity (no checklist item completed)
+- Updated: CLAUDE.md
+  - Added greeting requirement: Claude must start with "Hello Jane,"
+  - Reinforced budget/cost controls + session restart expectations
+- Updated: PRD v1.1
+  - Clarified MVP defaults + alert limits + ingestion caps + budget guard behavior
+- Updated: citation_contract.md → v1.1
+  - Changed from bullet-level to claim-level binding (sentence/span coverage)
+  - Added formatting constraint: prefer 1 claim per bullet, max 2 sentences; split if sources differ
+  - Updated validator guidance to parse claim spans
+- Checklist impact: D remains PASSING; no new deliverable marked complete
+- Next: Complete Item B (data_model.md) with SQLite schema + FTS plan (must align with v1.1 citation rules)
+
