@@ -86,15 +86,3 @@
 - Next single step:
   - Complete item C: `artifacts/modelling/pipeline.md` with stage-by-stage flow, failure handling, and incremental-run logic
 
-[2026-02-17 Session 7] Synced checklist status for data modelling item B
-- Updated: artifacts/modelling/MODELLING_CHECKLIST.md
-  - Marked item B (`data_model.md`) from FAILING to PASSING to match completed deliverable
-- Updated: claude-progress.txt
-  - Logged checklist status sync for modelling traceability
-- Verification run + outcome:
-  - Confirmed checklist line now reads `[✓] B) data_model.md`
-  - Confirmed `artifacts/modelling/data_model.md` remains present
-  - Outcome: PASS
-- Next single step:
-  - Complete item C: `artifacts/modelling/pipeline.md` with failure handling + incremental logic
-
