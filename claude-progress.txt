@@ -67,3 +67,22 @@
 - Checklist impact: D remains PASSING; no new deliverable marked complete
 - Next: Complete Item B (data_model.md) with SQLite schema + FTS plan (must align with v1.1 citation rules)
 
+[2026-02-17 Session 6] Completed item B: data_model.md ✅
+- Created: artifacts/modelling/data_model.md
+- Data model includes:
+  - SQLite schema for: sources, documents, tags/entities, chunks, evidence_packs, syntheses, synthesis_bullets, citations, bullet_citations, alerts, portfolio_positions, relevance_flags, runs, budget_ledger
+  - ID/timestamp conventions and SQLite pragma recommendations
+  - FTS5 plan (`chunks_fts`) for keyword retrieval with hybrid re-ranking hooks
+  - Index plan for published-time, source/publisher, citations, alerts, runs, budget windows
+  - Validation SQL for: uncited bullets, paywall quote violations, publisher-dominance violations
+  - Explicit mapping to PRD/PROJECT_FACT constraints (citation binding, paywall policy, diversity, budget hard-stop)
+- Files touched:
+  - artifacts/modelling/data_model.md
+  - claude-progress.txt
+- Verification run + outcome:
+  - Verified file exists and is readable
+  - Verified required table coverage against checklist item B and citation contract storage requirements
+  - Outcome: PASS (modelling artifact created and aligned)
+- Next single step:
+  - Complete item C: `artifacts/modelling/pipeline.md` with stage-by-stage flow, failure handling, and incremental-run logic
+
