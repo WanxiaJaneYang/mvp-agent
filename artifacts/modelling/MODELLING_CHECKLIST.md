@@ -13,9 +13,9 @@ Status: `PASSING`, `FAILING`, `IN_PROGRESS`
 
 ## Validation & Testing
 
-- [FAILING] **G) Citation validator** - Validate every bullet has >=1 citation
-- [FAILING] **H) Budget guard** - Enforce daily/hourly/monthly caps
-- [FAILING] **I) Eval cases** - At least 10 golden test cases in `evals/`
+- [PASSING] **G) Citation validator** - Validate every bullet has >=1 citation
+- [PASSING] **H) Budget guard** - Enforce daily/hourly/monthly caps
+- [PASSING] **I) Eval cases** - At least 10 golden test cases in `evals/`
 
 ## Definition of Done
 
@@ -33,4 +33,8 @@ Modelling phase complete when:
 - [FAILING] **S4) Pre-delivery gate hardening** - Enforce deterministic fail/abstain gates for citation/paywall/diversity/budget
 - [FAILING] **S5) Operational report templates** - Standardize daily brief, event-risk brief, and portfolio-delta outputs
 - [FAILING] **S6) Reliability metrics** - Track citation failure, retry, abstain, budget-per-report, and latency-to-delivery
+
+## Known Gaps
+
+- Eval fixture drift exists in `evals/run_eval_suite.py` expectations for several citation cases (`partial` vs `retry`), even though the required 10 golden cases are present.
 
