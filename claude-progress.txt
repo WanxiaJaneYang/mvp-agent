@@ -234,3 +234,20 @@
   - Outcome: PASS (incremental MCP adoption plan ready for execution)
 - Next single step:
   - Open MR for `docs/mcp-incremental-adoption-plan` and request review before implementation
+
+[2026-02-19 Session 15] Updated CI PR with maintainability and workflow-review fixes
+- Updated: `.github/workflows/ci.yml`
+  - Removed `push` trigger to avoid duplicate runs in the PR workflow
+  - Switched artifact validation step to reusable script execution
+- Created: `scripts/validate_artifacts.py`
+  - Validates `artifacts/modelling/backlog.json` and `artifacts/modelling/source_registry.yaml`
+  - Reusable for local and CI checks
+- Updated: `claude-progress.txt`
+  - Recorded CI infrastructure progress per repo convention
+- Verification run + outcome:
+  - `python scripts/validate_artifacts.py` -> PASS
+  - `python -m compileall -q apps tests scripts` -> PASS
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (30 tests)
+  - Outcome: PASS (PR comments addressed with passing validation)
+- Next single step:
+  - Resolve PR #13 review threads and re-request approval
