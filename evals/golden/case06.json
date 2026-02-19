@@ -1,0 +1,70 @@
+{
+    "expected":  {
+                     "status":  "partial",
+                     "removed_bullets":  1
+                 },
+    "citation_store":  {
+                           "c3":  {
+                                      "url":  "u3",
+                                      "paywall_policy":  "full",
+                                      "id":  "c3",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  },
+                           "c2":  {
+                                      "url":  "u2",
+                                      "paywall_policy":  "full",
+                                      "id":  "c2",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  },
+                           "c4":  {
+                                      "url":  "u4",
+                                      "paywall_policy":  "full",
+                                      "id":  "c4",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  }
+                       },
+    "id":  "CIT-006",
+    "type":  "citation",
+    "synthesis":  {
+                      "counter":  [
+                                      {
+                                          "text":  "Counter.",
+                                          "citation_ids":  [
+                                                               "c2"
+                                                           ]
+                                      }
+                                  ],
+                      "changed":  [
+                                      {
+                                          "text":  "Changed today",
+                                          "citation_ids":  [
+
+                                                           ]
+                                      }
+                                  ],
+                      "prevailing":  [
+                                         {
+                                             "text":  "No cite",
+                                             "citation_ids":  [
+
+                                                              ]
+                                         }
+                                     ],
+                      "minority":  [
+                                       {
+                                           "text":  "Minority.",
+                                           "citation_ids":  [
+                                                                "c3"
+                                                            ]
+                                       }
+                                   ],
+                      "watch":  [
+                                    {
+                                        "text":  "Watch.",
+                                        "citation_ids":  [
+                                                             "c4"
+                                                         ]
+                                    }
+                                ]
+                  }
+}

@@ -1,0 +1,45 @@
+{
+    "expected":  {
+                     "status":  "retry",
+                     "removed_bullets":  4
+                 },
+    "citation_store":  {
+
+                       },
+    "id":  "CIT-003",
+    "type":  "citation",
+    "synthesis":  {
+                      "counter":  [
+                                      {
+                                          "text":  "B",
+                                          "citation_ids":  [
+
+                                                           ]
+                                      }
+                                  ],
+                      "prevailing":  [
+                                         {
+                                             "text":  "A",
+                                             "citation_ids":  [
+
+                                                              ]
+                                         }
+                                     ],
+                      "minority":  [
+                                       {
+                                           "text":  "C",
+                                           "citation_ids":  [
+
+                                                            ]
+                                       }
+                                   ],
+                      "watch":  [
+                                    {
+                                        "text":  "D",
+                                        "citation_ids":  [
+
+                                                         ]
+                                    }
+                                ]
+                  }
+}
