@@ -1,0 +1,69 @@
+{
+    "expected":  {
+                     "status":  "ok",
+                     "removed_bullets":  0
+                 },
+    "citation_store":  {
+                           "c3":  {
+                                      "url":  "u3",
+                                      "paywall_policy":  "full",
+                                      "id":  "c3",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  },
+                           "c4":  {
+                                      "url":  "u4",
+                                      "paywall_policy":  "full",
+                                      "id":  "c4",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  },
+                           "c2":  {
+                                      "url":  "u2",
+                                      "paywall_policy":  "full",
+                                      "id":  "c2",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  },
+                           "c1":  {
+                                      "url":  "u1",
+                                      "paywall_policy":  "full",
+                                      "id":  "c1",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  }
+                       },
+    "id":  "CIT-007",
+    "type":  "citation",
+    "synthesis":  {
+                      "counter":  [
+                                      {
+                                          "text":  "Counter.",
+                                          "citation_ids":  [
+                                                               "c2"
+                                                           ]
+                                      }
+                                  ],
+                      "prevailing":  [
+                                         {
+                                             "text":  "Multi cite",
+                                             "citation_ids":  [
+                                                                  "c1",
+                                                                  "c2"
+                                                              ]
+                                         }
+                                     ],
+                      "minority":  [
+                                       {
+                                           "text":  "Minority.",
+                                           "citation_ids":  [
+                                                                "c3"
+                                                            ]
+                                       }
+                                   ],
+                      "watch":  [
+                                    {
+                                        "text":  "Watch.",
+                                        "citation_ids":  [
+                                                             "c4"
+                                                         ]
+                                    }
+                                ]
+                  }
+}

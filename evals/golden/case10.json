@@ -1,0 +1,57 @@
+{
+    "expected":  {
+                     "status":  "retry",
+                     "removed_bullets":  0
+                 },
+    "citation_store":  {
+                           "c3":  {
+                                      "url":  "u3",
+                                      "paywall_policy":  "full",
+                                      "id":  "c3",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  },
+                           "c4":  {
+                                      "url":  "u4",
+                                      "paywall_policy":  "full",
+                                      "id":  "c4",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  },
+                           "c1":  {
+                                      "url":  "u1",
+                                      "paywall_policy":  "full",
+                                      "id":  "c1",
+                                      "published_at":  "2026-02-19T00:00:00Z"
+                                  }
+                       },
+    "id":  "CIT-010",
+    "type":  "citation",
+    "synthesis":  {
+                      "counter":  [
+
+                                  ],
+                      "prevailing":  [
+                                         {
+                                             "text":  "Only prevailing",
+                                             "citation_ids":  [
+                                                                  "c1"
+                                                              ]
+                                         }
+                                     ],
+                      "minority":  [
+                                       {
+                                           "text":  "m",
+                                           "citation_ids":  [
+                                                                "c3"
+                                                            ]
+                                       }
+                                   ],
+                      "watch":  [
+                                    {
+                                        "text":  "w",
+                                        "citation_ids":  [
+                                                             "c4"
+                                                         ]
+                                    }
+                                ]
+                  }
+}
