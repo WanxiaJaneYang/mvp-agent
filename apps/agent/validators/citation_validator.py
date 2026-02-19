@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 import re
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping
+from typing import Any, Dict, Iterable, List, Mapping
 from urllib.parse import urlparse
 
 CORE_SECTIONS = ("prevailing", "counter", "minority", "watch")
@@ -123,7 +123,7 @@ def validate_synthesis(
             continue
 
         section_out: List[Dict[str, Any]] = []
-        for raw_bullet in list(raw_bullets):
+        for raw_bullet in raw_bullets:
             bullet = _normalize_bullet(raw_bullet)
 
             total_bullets += 1
