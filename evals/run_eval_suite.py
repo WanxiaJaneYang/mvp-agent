@@ -35,7 +35,7 @@ def _run_citation_case(case: Dict[str, Any]) -> List[str]:
 
 
 def main() -> int:
-    golden_dir = Path("evals") / "golden"
+    golden_dir = ROOT / "evals" / "golden"
     cases = _load_cases(golden_dir)
 
     if len(cases) < 10:
