@@ -253,3 +253,24 @@ Outputs:
 - SQLite FTS5 full‑text search: https://www.sqlite.org/fts5.html  
 - SEC EDGAR fair access guidance (rate limits / moderation): https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
 
+
+## 14. In-Scope Strengthening Backlog (2026-02-19)
+These improvements are inspired by peer financial AI product patterns and constrained to this PRD's local-first, citation-grounded, and non-advisory scope.
+
+1. Decision record per run
+- Persist run artifacts with claims, citations used, rejected alternatives, risk flags, budget usage, and final rationale.
+
+2. Retrieval memory from validated historical outputs
+- Embed/index only approved historical syntheses and retrieve similar prior cases before synthesis.
+
+3. Internal role-lane orchestration in one runtime
+- Add explicit phases: research (evidence), risk (guardrails), editorial (structure), reviewer (adversarial checks).
+
+4. Stronger pre-delivery quality gates
+- Hard-fail or abstain on citation coverage, paywall policy, source-diversity, and budget violations.
+
+5. Operational templates
+- Add fixed templates for daily brief, event-risk brief, and portfolio-delta review with section-level checks.
+
+6. Feedback-loop metrics
+- Track citation failure rate, retry rate, abstain rate, budget per successful report, and time to delivery.
