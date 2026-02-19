@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from scripts.validate_decision_record_schema import validate_decision_record, validate_example_file
 
@@ -6,6 +7,12 @@ from scripts.validate_decision_record_schema import validate_decision_record, va
 class DecisionRecordSchemaValidationTests(unittest.TestCase):
     def test_valid_example_passes(self):
         errors = validate_example_file()
+        self.assertEqual(errors, [])
+
+    def test_pipeline_fixture_passes(self):
+        errors = validate_example_file(
+            Path("artifacts/modelling/examples/decision_record_pipeline_fixture.json")
+        )
         self.assertEqual(errors, [])
 
     def test_supported_claim_requires_citation(self):

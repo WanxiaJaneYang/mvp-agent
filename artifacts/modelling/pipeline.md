@@ -149,6 +149,8 @@ Actions:
 - Write daily HTML output locally.
 - Send email for daily brief and approved alerts.
 - Store run metrics, costs, and output lineage.
+- Persist `decision_record` JSON at `artifacts/decision_records/<YYYY-MM-DD>/<run_id>.json`.
+- Include decision rationale, claim/citation coverage, rejected alternatives, risk flags, and guardrail/budget snapshots.
 
 Failure handling:
 - Email send error -> keep local deliverable, queue retry in next run.
