@@ -1,4 +1,4 @@
-# PRD v1.1 �?Financial News & Macro Literature Review Assistant (Local‑First)
+﻿# PRD v1.1 — Financial News & Macro Literature Review Assistant (Local‑First)
 
 **Version:** v1.1 (clarified spec)  
 **Status:** Draft ready for modelling + implementation  
@@ -29,14 +29,14 @@ The product reduces the need to actively track markets while keeping users infor
 ### 4.1 In‑scope (v1 / MVP)
 - **Daily brief**: once per day, literature‑review‑style synthesis of macro + market narratives.
 - **Major event alerts**: notify on significant events with rate limiting.
-- **Cite everything**: every bullet must have �? citation.
+- **Cite everything**: every bullet must have ≥1 citation.
 - **Local‑first**: runs on the user’s machine; portfolio data stored locally.
 - **Lightweight UI**:
   - local daily analysis page (static HTML)
   - email delivery for daily brief and alerts
 - **Portfolio input (manual)**:
   - tickers + weights
-  - relevance scoring as “risk flags�?(no explicit buy/sell actions)
+  - relevance scoring as “risk flags” (no explicit buy/sell actions)
 
 ### 4.2 Out of scope (v1)
 - Brokerage integrations / OAuth account linking / syncing
@@ -50,28 +50,28 @@ The product reduces the need to actively track markets while keeping users infor
 ### 5.1 Daily brief
 - **Schedule:** 07:05 Asia/Singapore daily
 - **Sections (max bullets):**
-  - Prevailing view: 3�?
-  - Counterarguments: 2�?
-  - Minority view: 1�?
-  - What to watch / falsification indicators: 3�?
-  - What changed since yesterday: �?
+  - Prevailing view: 3–6
+  - Counterarguments: 2–5
+  - Minority view: 1–4
+  - What to watch / falsification indicators: 3–6
+  - What changed since yesterday: ≤3
 - **Max total bullets:** 24
 - **Max length:** ~1,200 words (or equivalent token cap)
-- **Citation rule:** every bullet includes �? valid citation.
+- **Citation rule:** every bullet includes ≥1 valid citation.
 
 ### 5.2 Alerts
 - **Max alerts/day:** 3
 - **Cooldown:** 60 minutes between alerts
 - **Max length:** ~400 words
-- **Format:** 3�? bullets + “why it matters�?+ “what to watch next�?
-- **Citation rule:** every bullet includes �? valid citation.
+- **Format:** 3–6 bullets + “why it matters” + “what to watch next”
+- **Citation rule:** every bullet includes ≥1 valid citation.
 
 ### 5.3 Ingestion & retrieval caps
 - **Max new documents/day:** 200
 - **Default per‑source cap:** 10 docs/day (exceptions allowed for wires/SEC feeds)
 - **Evidence pack:** max 30 chunks per synthesis/alert query
-- **Publisher dominance cap:** �?0% from any single publisher
-- **Tier mix requirement:** �?0% Tier 1�?; Tier 4 �?5%
+- **Publisher dominance cap:** ≤40% from any single publisher
+- **Tier mix requirement:** ≥50% Tier 1–2; Tier 4 ≤15%
 - **Recency bias:** prioritize last 7 days; include up to 30 days for context.
 
 ### 5.4 Budget guard (runtime)
@@ -129,25 +129,25 @@ Required output sections:
 - References (expanded citations list)
 
 Citation enforcement:
-- system validates that each bullet has �? citation
+- system validates that each bullet has ≥1 citation
 - on failure, remove bullet or replace with explicit abstain language
 
 ### 6.5 Daily brief delivery
 - Generate once per day in user timezone.
 - Deliver via:
   - email
-  - local “Daily Brief�?HTML page
-- Include a “what changed since yesterday�?section (heuristic acceptable in v1).
+  - local “Daily Brief” HTML page
+- Include a “what changed since yesterday” section (heuristic acceptable in v1).
 
 ### 6.6 Major event alerts
 Trigger categories (v1):
-- **Policy (Tier�?):** new central bank statement/minutes/speech/press release
-- **Macro releases (Tier�?):** CPI/jobs/GDP and other major official releases
-- **Corporate material events (Tier�? via SEC 8‑K / major IR):** material filings/events; focus on index‑relevant large caps or user watchlist
-- **Narrative shift (Tier�?+):** heuristic based on topic distribution shift and/or contradiction rate vs trailing 7 days
+- **Policy (Tier‑1):** new central bank statement/minutes/speech/press release
+- **Macro releases (Tier‑1):** CPI/jobs/GDP and other major official releases
+- **Corporate material events (Tier‑1 via SEC 8‑K / major IR):** material filings/events; focus on index‑relevant large caps or user watchlist
+- **Narrative shift (Tier‑2+):** heuristic based on topic distribution shift and/or contradiction rate vs trailing 7 days
 
 Alert scoring combines:
-- importance + evidence strength + confidence + relevance �?noise risk
+- importance + evidence strength + confidence + relevance − noise risk
 
 Rate limiting:
 - enforce cooldown + daily cap
@@ -162,7 +162,7 @@ Relevance mapping (v1):
 - curated sector/theme tags mapping table shipped as defaults
 
 Outputs:
-- relevance tags and “risk flags�?(no trade actions)
+- relevance tags and “risk flags” (no trade actions)
 
 ## 7. Non‑Functional Requirements
 
@@ -186,7 +186,7 @@ Outputs:
 ## 8. Content & UX Requirements
 - Calm, concise, evidence‑based tone.
 - Balanced views (prevailing / counter / minority).
-- Explicit “what could prove this wrong�?indicators.
+- Explicit “what could prove this wrong” indicators.
 - Clear paywall transparency (headline/snippet only).
 
 ## 9. Success Criteria (MVP)
@@ -199,9 +199,9 @@ Outputs:
 ## 10. Acceptance Criteria (Testable)
 
 ### Citation enforcement
-- Every bullet has �? citation.
+- Every bullet has ≥1 citation.
 - Citations resolve to ingested docs/chunks and include URL + published timestamp.
-- If evidence is insufficient: output “insufficient evidence�?rather than inventing.
+- If evidence is insufficient: output “insufficient evidence” rather than inventing.
 
 ### Paywall policy
 - Paywalled sources store metadata/snippet only.
@@ -209,7 +209,7 @@ Outputs:
 
 ### Daily brief
 - Stable structured output.
-- Includes Tier�? sources when topic is policy‑related (if available).
+- Includes Tier‑1 sources when topic is policy‑related (if available).
 
 ### Alerts
 - Max alerts/day enforced.

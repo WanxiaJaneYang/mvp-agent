@@ -1,4 +1,4 @@
-# Modelling Phase Checklist
+﻿# Modelling Phase Checklist
 
 Status: `PASSING`, `FAILING`, `IN_PROGRESS`
 
@@ -13,9 +13,9 @@ Status: `PASSING`, `FAILING`, `IN_PROGRESS`
 
 ## Validation & Testing
 
-- [PASSING] **G) Citation validator** - Validate every bullet has >=1 citation
-- [PASSING] **H) Budget guard** - Enforce daily/hourly/monthly caps
-- [PASSING] **I) Eval cases** - At least 10 golden test cases in `evals/`
+- [FAILING] **G) Citation validator** - Validate every bullet has >=1 citation
+- [FAILING] **H) Budget guard** - Enforce daily/hourly/monthly caps
+- [FAILING] **I) Eval cases** - At least 10 golden test cases in `evals/`
 
 ## Definition of Done
 
@@ -24,3 +24,4 @@ Modelling phase complete when:
 - `backlog.json` validates with acceptance criteria
 - Citation validator passes
 - Budget guard implemented and enabled by default
+
