@@ -167,7 +167,7 @@ All tools must be:
 Recommended `.env` keys:
 - `BUDGET_MONTHLY_USD=100`
 - `BUDGET_DAILY_USD=3`
-- `BUDGET_HOURLY_USD=0.50`
+- `BUDGET_HOURLY_USD=0.10`
 - `BUDGET_MODE=hard_fail`
 - `BUDGET_STATE_PATH=.budget_state.json`
 
@@ -205,3 +205,4 @@ Modelling phase is complete when:
 - [ ] Citation validator passes
 - [ ] Budget guard implemented and enabled by default
 - [ ] At least 10 golden test cases in `evals/`
+

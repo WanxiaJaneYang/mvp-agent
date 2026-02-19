@@ -77,7 +77,7 @@ The product reduces the need to actively track markets while keeping users infor
 ### 5.4 Budget guard (runtime)
 - **Monthly:** $100
 - **Daily:** $3
-- **Hourly:** $0.50
+- **Hourly:** $0.10
 - On exceed: **hard stop** (no automatic retries).
 
 ## 6. Functional Requirements
@@ -252,3 +252,4 @@ Outputs:
 - Claude citations feature (optional, still validate locally): https://platform.claude.com/docs/en/build-with-claude/citations  
 - SQLite FTS5 full‑text search: https://www.sqlite.org/fts5.html  
 - SEC EDGAR fair access guidance (rate limits / moderation): https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data
+
