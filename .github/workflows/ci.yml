@@ -24,6 +24,9 @@ jobs:
       - name: Validate modelling artifacts
         run: python scripts/validate_artifacts.py
 
+      - name: Validate decision record schema example
+        run: python scripts/validate_decision_record_schema.py
+
       - name: Bytecode compile check
         run: python -m compileall -q apps tests scripts
 
