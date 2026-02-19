@@ -133,6 +133,18 @@ class BudgetGuardTests(unittest.TestCase):
                 caps=BudgetCaps(hourly_usd=0.0, daily_usd=3.0, monthly_usd=100.0),
             )
 
+    def test_uses_unrounded_values_for_blocking_decision(self):
+        caps = BudgetCaps(hourly_usd=0.10, daily_usd=3.0, monthly_usd=100.0)
+        decision = evaluate_budget_guard(
+            hourly_spend_usd=0.094,
+            daily_spend_usd=1.0,
+            monthly_spend_usd=20.0,
+            next_estimated_cost_usd=0.005,
+            caps=caps,
+        )
+        # Raw projected hourly spend is 0.099 (< 0.10), so this should not hard-stop.
+        self.assertTrue(decision.allowed)
+
 
 if __name__ == "__main__":
     unittest.main()
