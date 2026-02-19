@@ -196,9 +196,10 @@ class CitationValidatorTests(unittest.TestCase):
             "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z"},
         }
         report = validate_synthesis(synthesis, store)
+        self.assertEqual(report.removed_bullets, 0)
         self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], ["c_valid"])
 
-    def test_multisentence_bullet_requires_claim_span_citation_mapping(self):
+    def test_multisentence_bullet_allows_shared_citation_ids_without_span_mapping(self):
         synthesis = {
             "prevailing": [{"text": "Claim one. Claim two.", "citation_ids": ["c1"]}],
             "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
@@ -214,8 +215,73 @@ class CitationValidatorTests(unittest.TestCase):
 
         report = validate_synthesis(synthesis, store)
 
+        self.assertEqual(report.removed_bullets, 0)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], ["c1"])
+
+    def test_missing_citation_id_in_store_is_removed(self):
+        synthesis = {
+            "prevailing": [{"text": "Claim.", "citation_ids": ["c_missing"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z"},
+        }
+
+        report = validate_synthesis(synthesis, store)
+
         self.assertEqual(report.removed_bullets, 1)
         self.assertIn("Insufficient evidence", report.synthesis["prevailing"][0]["text"])
+
+    def test_placeholder_only_core_section_triggers_retry(self):
+        synthesis = {
+            "prevailing": [{"text": "Bad.", "citation_ids": []}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c1"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c2"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c3"]}],
+        }
+        store = {
+            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z"},
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+        }
+
+        report = validate_synthesis(synthesis, store, replace_with_placeholder=True)
+
+        self.assertTrue(report.should_retry)
+        self.assertIn("prevailing", report.empty_core_sections)
+        self.assertEqual(report.synthesis["prevailing"][0]["text"], "[Insufficient evidence to support this claim]")
+
+    def test_source_registry_missing_source_id_skips_registry_matching(self):
+        synthesis = {
+            "prevailing": [{"text": "Claim.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": {
+                "id": "c1",
+                "url": "https://federalreserve.gov/newsevents/some-path",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
+            "c2": {"id": "c2", "url": "https://source2.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "https://source3.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+            "c4": {"id": "c4", "url": "https://source4.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+        }
+        source_registry = {
+            "fed": {"base_url": "https://federalreserve.gov/newsevents"},
+            "src2": {"base_url": "https://source2.example"},
+            "src3": {"base_url": "https://source3.example"},
+            "src4": {"base_url": "https://source4.example"},
+        }
+
+        report = validate_synthesis(synthesis, store, source_registry=source_registry)
+
+        self.assertEqual(report.removed_bullets, 0)
 
     def test_source_registry_url_mismatch_invalidates_citation(self):
         synthesis = {

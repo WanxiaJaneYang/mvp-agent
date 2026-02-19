@@ -51,6 +51,12 @@ def _normalize_bullet(raw_bullet: Any) -> Dict[str, Any]:
 
 
 def _extract_claim_spans(text: str) -> List[str]:
+    """
+    Split a bullet into approximate claim spans.
+
+    Heuristic-only splitter: sentence punctuation + newline boundaries.
+    Known limitations include abbreviations, decimals, and ellipses.
+    """
     spans = [segment.strip() for segment in re.split(r"(?<=[.!?])\s+|\n+", text) if segment.strip()]
     return spans or [text.strip()]
 
@@ -64,7 +70,8 @@ def _citation_matches_source_registry(
 
     source_id = citation.get("source_id")
     if not source_id:
-        return False
+        # If no source_id is available, skip registry-based URL matching.
+        return True
 
     source_meta = source_registry.get(str(source_id))
     if not source_meta:
@@ -74,9 +81,19 @@ def _citation_matches_source_registry(
     if not expected_base:
         return False
 
-    citation_host = urlparse(str(citation.get("url", ""))).netloc.lower()
-    expected_host = urlparse(str(expected_base)).netloc.lower()
-    return bool(citation_host and expected_host and citation_host == expected_host)
+    citation_parsed = urlparse(str(citation.get("url", "")))
+    expected_parsed = urlparse(str(expected_base))
+
+    citation_host = (citation_parsed.hostname or "").lower()
+    expected_host = (expected_parsed.hostname or "").lower()
+    if not citation_host or not expected_host:
+        return False
+
+    host_matches = citation_host == expected_host or citation_host.endswith("." + expected_host)
+    expected_scheme = (expected_parsed.scheme or "").lower()
+    citation_scheme = (citation_parsed.scheme or "").lower()
+    scheme_matches = not expected_scheme or expected_scheme == citation_scheme
+    return bool(host_matches and scheme_matches)
 
 
 def _has_claim_span_coverage(bullet: Mapping[str, Any], valid_ids: List[str]) -> bool:
@@ -85,6 +102,10 @@ def _has_claim_span_coverage(bullet: Mapping[str, Any], valid_ids: List[str]) ->
         return bool(valid_ids)
 
     span_citations = bullet.get("claim_span_citations")
+    # Allow shared citation groups across a multi-sentence span (contract 3.2B).
+    if span_citations is None:
+        return bool(valid_ids)
+
     if not isinstance(span_citations, list) or len(span_citations) < len(spans):
         return False
 
@@ -97,6 +118,10 @@ def _has_claim_span_coverage(bullet: Mapping[str, Any], valid_ids: List[str]) ->
         if not mapped_ids:
             return False
     return True
+
+
+def _is_placeholder_bullet(bullet: Mapping[str, Any]) -> bool:
+    return str(bullet.get("text", "")) == INSUFFICIENT_EVIDENCE_TEXT
 
 
 def validate_synthesis(
@@ -162,9 +187,14 @@ def validate_synthesis(
     for section in CORE_SECTIONS:
         normalized_synthesis.setdefault(section, [])
 
-    empty_core_sections = [
-        section for section in CORE_SECTIONS if len(normalized_synthesis.get(section, [])) == 0
-    ]
+    empty_core_sections: List[str] = []
+    for section in CORE_SECTIONS:
+        section_bullets = normalized_synthesis.get(section, [])
+        if len(section_bullets) == 0:
+            empty_core_sections.append(section)
+            continue
+        if all(isinstance(b, Mapping) and _is_placeholder_bullet(b) for b in section_bullets):
+            empty_core_sections.append(section)
     should_retry = removed_bullets > max_removed_without_retry or bool(empty_core_sections)
     validation_passed = not should_retry
 
