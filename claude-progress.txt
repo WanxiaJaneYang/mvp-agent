@@ -251,3 +251,20 @@
   - Outcome: PASS (PR comments addressed with passing validation)
 - Next single step:
   - Resolve PR #13 review threads and re-request approval
+
+[2026-02-19 Session 17] Aligned eval fixtures with current citation validator contract
+- Updated golden eval fixtures:
+  - `evals/golden/case02.json`
+  - `evals/golden/case05.json`
+  - `evals/golden/case06.json`
+  - `evals/golden/case08.json`
+  - `evals/golden/case09.json`
+  - Changed expected status from `partial` -> `retry` where a core section becomes placeholder-only.
+- Updated: `artifacts/modelling/MODELLING_CHECKLIST.md`
+  - Removed stale eval drift note after fixture alignment.
+- Verification run + outcome:
+  - `python evals/run_eval_suite.py` -> PASS (10 golden cases)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (30 tests)
+  - Outcome: PASS (eval suite is now consistent with current validator behavior)
+- Next single step:
+  - Open MR for `chore/fix-eval-suite-drift`
