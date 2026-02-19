@@ -25,3 +25,12 @@ Modelling phase complete when:
 - Citation validator passes
 - Budget guard implemented and enabled by default
 
+## Strengthening Tracks (Prophet Benchmark Review - 2026-02-19)
+
+- [IN_PROGRESS] **S1) Decision record schema** - Define persisted per-run rationale artifact (claims, citations, rejected alternatives, risk flags, budget usage)
+- [FAILING] **S2) Retrieval memory for validated outputs** - Add embedding + retrieval flow for approved historical syntheses
+- [FAILING] **S3) Role-lane orchestration** - Add phased prompts/checks (research, risk, editorial, reviewer) in one runtime
+- [FAILING] **S4) Pre-delivery gate hardening** - Enforce deterministic fail/abstain gates for citation/paywall/diversity/budget
+- [FAILING] **S5) Operational report templates** - Standardize daily brief, event-risk brief, and portfolio-delta outputs
+- [FAILING] **S6) Reliability metrics** - Track citation failure, retry, abstain, budget-per-report, and latency-to-delivery
+

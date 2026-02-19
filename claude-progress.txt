@@ -166,3 +166,26 @@
   - Next MR step after push: identify/open PR tied to current branch and continue standard review/check flow
 - Next single step:
   - Push `chore/update-progress-log` with commits for skills import and this progress update
+
+[2026-02-19 Session 10] Recorded Prophet benchmark recommendations into scoped planning docs
+- External benchmark reviewed:
+  - https://github.com/JakeNesler/Claude_Prophet (architecture, MCP tools, agent role split, logging, memory patterns)
+- Updated docs within project scope:
+  - `artifacts/PRD.md`
+    - Added section `14. In-Scope Strengthening Backlog (2026-02-19)` with six scoped enhancements:
+      - per-run decision records
+      - validated-output retrieval memory
+      - role-lane orchestration
+      - stronger pre-delivery gates
+      - operational templates
+      - reliability metrics
+  - `artifacts/modelling/MODELLING_CHECKLIST.md`
+    - Added `Strengthening Tracks (Prophet Benchmark Review - 2026-02-19)` with S1-S6 status tracking
+  - `artifacts/modelling/TODO.md`
+    - Created prioritized implementation queue (P0/P1/P2) and acceptance criteria
+- Verification run + outcome:
+  - Verified new/updated files are present and readable
+  - Verified checklist and todo entries align with PRD constraints (local-first, paywall-safe, budget hard-stop, citation-grounded)
+  - Outcome: PASS (recommendations recorded and converted into actionable tracked work)
+- Next single step:
+  - Open MR for `chore/prophet-inspired-strengthening-plan` and request review on docs scope
