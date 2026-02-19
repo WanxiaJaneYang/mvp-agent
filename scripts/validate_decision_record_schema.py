@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,13 @@ CLAIM_SECTIONS = {"prevailing", "counter", "minority", "watch", "changed"}
 COVERAGE_STATUSES = {"supported", "insufficient_evidence", "removed"}
 GUARDRAIL_LEVELS = {"pass", "warn", "fail"}
 CONFIDENCE_LABELS = {"high", "medium", "low"}
+REJECTED_REASON_CODES = {
+    "insufficient_evidence",
+    "policy_violation",
+    "low_confidence",
+    "out_of_scope",
+    "duplicate_narrative",
+}
 
 EXAMPLE_PATH = Path("artifacts/modelling/examples/decision_record_v1.example.json")
 
@@ -125,10 +133,20 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
             errors.append("guardrail_checks.notes must be an array of strings")
 
     artifacts = _require(record, "artifacts", dict, errors) or {}
+    if artifacts:
+        synthesis_id = artifacts.get("synthesis_id")
+        if synthesis_id is not None and not isinstance(synthesis_id, str):
+            errors.append("artifacts.synthesis_id must be a string when present")
+        output_path = artifacts.get("output_path")
+        if output_path is not None and not isinstance(output_path, str):
+            errors.append("artifacts.output_path must be a string when present")
+
     if status != "failed":
         output_sha = artifacts.get("output_sha256")
         if not isinstance(output_sha, str) or not output_sha:
             errors.append("artifacts.output_sha256 is required when status != failed")
+        elif re.fullmatch(r"[0-9a-f]{64}", output_sha) is None:
+            errors.append("artifacts.output_sha256 must be a 64-character lowercase hex SHA256")
 
     rationale = _require(record, "decision_rationale", dict, errors) or {}
     if rationale:
@@ -156,6 +174,9 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
             reason_code = item.get("reason_code")
             if not isinstance(reason_code, str) or not reason_code:
                 errors.append("rejected_alternatives[].reason_code must be a non-empty string")
+            elif reason_code not in REJECTED_REASON_CODES:
+                allowed = ", ".join(sorted(REJECTED_REASON_CODES))
+                errors.append(f"rejected_alternatives[].reason_code must be one of: {allowed}")
 
     _require(record, "risk_flags", list, errors)
 

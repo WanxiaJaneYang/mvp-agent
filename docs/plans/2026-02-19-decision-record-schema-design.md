@@ -100,7 +100,7 @@ Each `rejected_alternatives[]` item:
 
 1. `run_type` must be `daily_brief` or `alert`.
 2. `generated_at_utc` must be valid UTC ISO-8601.
-3. If `status` is `ok` or `partial`, each claim with `coverage_status = supported` must have `len(citation_ids) >= 1`.
+3. For every claim with `coverage_status = supported`, `len(citation_ids) >= 1` must hold regardless of `status`.
 4. If `status = abstained`, `decision_rationale.uncertainties` must be non-empty.
 5. `budget_snapshot.allowed` must be `false` if any spend >= cap.
 6. No raw prompt/completion fields are allowed in schema v1.
