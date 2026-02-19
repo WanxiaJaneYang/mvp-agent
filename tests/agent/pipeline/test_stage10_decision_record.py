@@ -61,6 +61,75 @@ class Stage10DecisionRecordTests(unittest.TestCase):
             self.assertTrue(persisted["artifacts"]["output_sha256"])
             self.assertEqual(validate_decision_record(persisted), [])
 
+    def test_missing_output_artifact_downgrades_to_failed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = build_and_persist_decision_record(
+                base_dir=Path(tmpdir),
+                run_id="run_missing_output",
+                run_type="daily_brief",
+                stage8_status="ok",
+                synthesis={"prevailing": [{"text": "Claim", "citation_ids": ["c1"]}]},
+                removed_bullets=0,
+                budget_snapshot={
+                    "hourly_spend_usd": 0.03,
+                    "hourly_cap_usd": 0.10,
+                    "daily_spend_usd": 0.8,
+                    "daily_cap_usd": 3.0,
+                    "monthly_spend_usd": 12.4,
+                    "monthly_cap_usd": 100.0,
+                    "allowed": True,
+                },
+                guardrail_checks={
+                    "citation_check": "pass",
+                    "paywall_check": "pass",
+                    "diversity_check": "pass",
+                    "budget_check": "pass",
+                    "notes": [],
+                },
+                output_path=None,
+            )
+
+            persisted = result["decision_record"]
+            self.assertEqual(persisted["status"], "failed")
+            self.assertEqual(validate_decision_record(persisted), [])
+
+    def test_counterarguments_section_is_normalized_to_counter(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "daily" / "2026-02-19" / "brief.html"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("<html>brief</html>", encoding="utf-8")
+
+            result = build_and_persist_decision_record(
+                base_dir=Path(tmpdir),
+                run_id="run_section_norm",
+                run_type="daily_brief",
+                stage8_status="ok",
+                synthesis={"counterarguments": [{"text": "Counter claim", "citation_ids": ["c2"]}]},
+                removed_bullets=0,
+                budget_snapshot={
+                    "hourly_spend_usd": 0.03,
+                    "hourly_cap_usd": 0.10,
+                    "daily_spend_usd": 0.8,
+                    "daily_cap_usd": 3.0,
+                    "monthly_spend_usd": 12.4,
+                    "monthly_cap_usd": 100.0,
+                    "allowed": True,
+                },
+                guardrail_checks={
+                    "citation_check": "pass",
+                    "paywall_check": "pass",
+                    "diversity_check": "pass",
+                    "budget_check": "pass",
+                    "notes": [],
+                },
+                output_path=output_path,
+            )
+
+            sections = [claim["section"] for claim in result["decision_record"]["claims"]]
+            self.assertIn("counter", sections)
+            self.assertNotIn("counterarguments", sections)
+            self.assertEqual(validate_decision_record(result["decision_record"]), [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,6 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+SECTION_ALIASES = {
+    "counterarguments": "counter",
+    "what_to_watch": "watch",
+    "what to watch": "watch",
+}
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -28,6 +34,10 @@ def _normalize_status(stage8_status: str) -> str:
     if stage8_status in {"ok", "partial", "failed", "abstained"}:
         return stage8_status
     return "failed"
+
+
+def _normalize_section(section: str) -> str:
+    return SECTION_ALIASES.get(section, section)
 
 
 def build_and_persist_decision_record(
@@ -60,7 +70,7 @@ def build_and_persist_decision_record(
                 citation_ids = []
             claim = {
                 "claim_id": f"c_{claim_counter:03d}",
-                "section": str(section),
+                "section": _normalize_section(str(section)),
                 "text": str(bullet.get("text", "")),
                 "citation_ids": citation_ids,
                 "coverage_status": "supported" if len(citation_ids) >= 1 else "insufficient_evidence",
@@ -90,7 +100,14 @@ def build_and_persist_decision_record(
             artifacts["output_sha256"] = _hash_file(output_path)
             artifacts["synthesis_id"] = f"syn_{run_id}"
     if status != "failed" and "output_sha256" not in artifacts:
-        artifacts["output_sha256"] = ""
+        status = "failed"
+        guardrail_notes = guardrail_checks.get("notes")
+        if isinstance(guardrail_notes, list):
+            guardrail_notes = list(guardrail_notes)
+        else:
+            guardrail_notes = []
+        guardrail_notes.append("Missing output artifact/hash; decision record downgraded to failed.")
+        guardrail_checks = {**dict(guardrail_checks), "notes": guardrail_notes}
 
     uncertainties: list[str] = []
     if status == "abstained":
