@@ -87,6 +87,52 @@ class BudgetGuardTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertIn("monthly", decision.exceeded_windows)
 
+    def test_blocks_when_multiple_caps_would_be_exceeded(self):
+        caps = BudgetCaps(monthly_usd=100.0, daily_usd=3.0, hourly_usd=0.10)
+        decision = evaluate_budget_guard(
+            hourly_spend_usd=0.095,
+            daily_spend_usd=2.99,
+            monthly_spend_usd=20.0,
+            next_estimated_cost_usd=0.02,
+            caps=caps,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertIn("hourly", decision.exceeded_windows)
+        self.assertIn("daily", decision.exceeded_windows)
+
+    def test_negative_next_estimated_cost_treated_as_zero(self):
+        caps = BudgetCaps(monthly_usd=100.0, daily_usd=3.0, hourly_usd=0.10)
+        decision = evaluate_budget_guard(
+            hourly_spend_usd=0.05,
+            daily_spend_usd=1.5,
+            monthly_spend_usd=30.0,
+            next_estimated_cost_usd=-1.0,
+            caps=caps,
+        )
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.exceeded_windows, [])
+
+    def test_negative_spend_values_raise_error(self):
+        caps = BudgetCaps()
+        with self.assertRaises(ValueError):
+            evaluate_budget_guard(
+                hourly_spend_usd=-0.01,
+                daily_spend_usd=0.0,
+                monthly_spend_usd=0.0,
+                next_estimated_cost_usd=0.0,
+                caps=caps,
+            )
+
+    def test_non_positive_caps_raise_error(self):
+        with self.assertRaises(ValueError):
+            evaluate_budget_guard(
+                hourly_spend_usd=0.0,
+                daily_spend_usd=0.0,
+                monthly_spend_usd=0.0,
+                next_estimated_cost_usd=0.0,
+                caps=BudgetCaps(hourly_usd=0.0, daily_usd=3.0, monthly_usd=100.0),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

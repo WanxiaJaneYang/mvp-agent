@@ -6,9 +6,9 @@ from typing import Dict, List, Optional
 
 @dataclass(frozen=True)
 class BudgetCaps:
-    monthly_usd: float = 100.0
-    daily_usd: float = 3.0
     hourly_usd: float = 0.10
+    daily_usd: float = 3.0
+    monthly_usd: float = 100.0
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,19 @@ def evaluate_budget_guard(
     next_estimated_cost_usd: float,
     caps: BudgetCaps = BudgetCaps(),
 ) -> BudgetDecision:
+    if hourly_spend_usd < 0.0:
+        raise ValueError("hourly_spend_usd must be non-negative")
+    if daily_spend_usd < 0.0:
+        raise ValueError("daily_spend_usd must be non-negative")
+    if monthly_spend_usd < 0.0:
+        raise ValueError("monthly_spend_usd must be non-negative")
+    if caps.hourly_usd <= 0.0:
+        raise ValueError("caps.hourly_usd must be positive")
+    if caps.daily_usd <= 0.0:
+        raise ValueError("caps.daily_usd must be positive")
+    if caps.monthly_usd <= 0.0:
+        raise ValueError("caps.monthly_usd must be positive")
+
     projected = {
         "hourly": round(hourly_spend_usd + max(next_estimated_cost_usd, 0.0), 6),
         "daily": round(daily_spend_usd + max(next_estimated_cost_usd, 0.0), 6),
