@@ -234,3 +234,14 @@
   - Outcome: PASS (incremental MCP adoption plan ready for execution)
 - Next single step:
   - Open MR for `docs/mcp-incremental-adoption-plan` and request review before implementation
+
+[2026-02-19 Session 16] Updated modelling dashboard status for current repo reality
+- Updated: `artifacts/modelling/MODELLING_CHECKLIST.md`
+  - Changed item I (Eval cases) from PASSING -> IN_PROGRESS because golden files exist but eval suite currently fails on status expectation drift.
+  - Added operational status section noting CI baseline workflow is still pending merge in PR #13.
+- Verification run + outcome:
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (30 tests)
+  - `python evals/run_eval_suite.py` -> FAIL (known and reflected in checklist)
+  - Outcome: PASS (dashboard now reflects true implementation + operational state)
+- Next single step:
+  - Merge PR #13, then align eval fixture expectations with current validator contract

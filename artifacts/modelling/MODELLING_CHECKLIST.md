@@ -15,7 +15,7 @@ Status: `PASSING`, `FAILING`, `IN_PROGRESS`
 
 - [PASSING] **G) Citation validator** - Validate every bullet has >=1 citation
 - [PASSING] **H) Budget guard** - Enforce daily/hourly/monthly caps
-- [PASSING] **I) Eval cases** - At least 10 golden test cases in `evals/`
+- [IN_PROGRESS] **I) Eval cases** - 10 golden cases exist, but `evals/run_eval_suite.py` is failing on citation status expectation drift
 
 ## Definition of Done
 
@@ -37,4 +37,8 @@ Modelling phase complete when:
 ## Known Gaps
 
 - Eval fixture drift exists in `evals/run_eval_suite.py` expectations for several citation cases (`partial` vs `retry`), even though the required 10 golden cases are present.
+
+## Operational Gate Status
+
+- [IN_PROGRESS] CI workflow merge pending in PR #13 (`chore/add-ci-baseline`); branch protection already expects `validate-and-test`.
 
