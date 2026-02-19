@@ -120,7 +120,6 @@
   - Outcome: PASS (changes merged and branch protection restored)
 - Next single step:
   - Continue modelling deliverables from checklist: complete item C (`artifacts/modelling/pipeline.md`)
-
 [2026-02-17 Session 8] Synced progress log and merged follow-up documentation PR
 - Updated: claude-progress.txt
   - Added missing Session 7 record for policy/skills adoption and PR #3 merge details
