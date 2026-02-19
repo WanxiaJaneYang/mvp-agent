@@ -167,6 +167,18 @@
 - Next single step:
   - Push `chore/update-progress-log` with commits for skills import and this progress update
 
+[2026-02-19 Session 12] Added top-level repository README
+- Created: `README.md`
+  - Added project overview and current phase status
+  - Added completed modelling artifact list
+  - Added non-negotiables summary aligned with PRD/PROJECT_FACT
+  - Added repository structure, quick-start validation commands, and working conventions
+- Verification run + outcome:
+  - Verified `README.md` renders and references existing files/paths
+  - Outcome: PASS (repo now has a clear entry-point document for contributors)
+- Next single step:
+  - Open MR for `docs/add-overall-readme`
+
 [2026-02-19 Session 10] Recorded Prophet benchmark recommendations into scoped planning docs
 - External benchmark reviewed:
   - https://github.com/JakeNesler/Claude_Prophet (architecture, MCP tools, agent role split, logging, memory patterns)
