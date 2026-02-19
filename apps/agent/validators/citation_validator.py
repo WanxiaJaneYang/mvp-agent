@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import asdict, dataclass
+import re
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping
+from urllib.parse import urlparse
 
 CORE_SECTIONS = ("prevailing", "counter", "minority", "watch")
 INSUFFICIENT_EVIDENCE_TEXT = "[Insufficient evidence to support this claim]"
@@ -48,10 +50,60 @@ def _normalize_bullet(raw_bullet: Any) -> Dict[str, Any]:
     return bullet
 
 
+def _extract_claim_spans(text: str) -> List[str]:
+    spans = [segment.strip() for segment in re.split(r"(?<=[.!?])\s+|\n+", text) if segment.strip()]
+    return spans or [text.strip()]
+
+
+def _citation_matches_source_registry(
+    citation: Mapping[str, Any],
+    source_registry: Mapping[str, Mapping[str, Any]] | None,
+) -> bool:
+    if source_registry is None:
+        return True
+
+    source_id = citation.get("source_id")
+    if not source_id:
+        return False
+
+    source_meta = source_registry.get(str(source_id))
+    if not source_meta:
+        return False
+
+    expected_base = source_meta.get("base_url") or source_meta.get("url")
+    if not expected_base:
+        return False
+
+    citation_host = urlparse(str(citation.get("url", ""))).netloc.lower()
+    expected_host = urlparse(str(expected_base)).netloc.lower()
+    return bool(citation_host and expected_host and citation_host == expected_host)
+
+
+def _has_claim_span_coverage(bullet: Mapping[str, Any], valid_ids: List[str]) -> bool:
+    spans = _extract_claim_spans(str(bullet.get("text", "")))
+    if len(spans) <= 1:
+        return bool(valid_ids)
+
+    span_citations = bullet.get("claim_span_citations")
+    if not isinstance(span_citations, list) or len(span_citations) < len(spans):
+        return False
+
+    valid_set = set(valid_ids)
+    for i in range(len(spans)):
+        mapped = span_citations[i]
+        if not isinstance(mapped, list):
+            return False
+        mapped_ids = [str(cid) for cid in mapped if str(cid) in valid_set]
+        if not mapped_ids:
+            return False
+    return True
+
+
 def validate_synthesis(
     synthesis: Mapping[str, Iterable[Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
     *,
+    source_registry: Mapping[str, Mapping[str, Any]] | None = None,
     replace_with_placeholder: bool = True,
     max_removed_without_retry: int = 3,
 ) -> ValidationReport:
@@ -77,10 +129,16 @@ def validate_synthesis(
             for citation_id in bullet["citation_ids"]:
                 cid = str(citation_id)
                 citation = sanitized_store.get(cid)
-                if citation and _is_valid_citation(citation):
+                if (
+                    citation
+                    and _is_valid_citation(citation)
+                    and _citation_matches_source_registry(citation, source_registry)
+                ):
                     valid_ids.append(cid)
 
-            if section in CORE_SECTIONS and not valid_ids:
+            if section in CORE_SECTIONS and (
+                not valid_ids or not _has_claim_span_coverage(bullet, valid_ids)
+            ):
                 removed_bullets += 1
                 if replace_with_placeholder:
                     section_out.append(

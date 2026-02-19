@@ -105,6 +105,70 @@ class CitationValidatorTests(unittest.TestCase):
         self.assertTrue(report.should_retry)
         self.assertFalse(report.validation_passed)
 
+    def test_multisentence_bullet_requires_claim_span_citation_mapping(self):
+        synthesis = {
+            "prevailing": [{"text": "Claim one. Claim two.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": {"id": "c1", "url": "https://source1.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+            "c2": {"id": "c2", "url": "https://source2.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "https://source3.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+            "c4": {"id": "c4", "url": "https://source4.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+        }
+
+        report = validate_synthesis(synthesis, store)
+
+        self.assertEqual(report.removed_bullets, 1)
+        self.assertIn("Insufficient evidence", report.synthesis["prevailing"][0]["text"])
+
+    def test_source_registry_url_mismatch_invalidates_citation(self):
+        synthesis = {
+            "prevailing": [{"text": "Claim.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": {
+                "id": "c1",
+                "url": "https://wrong.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "fed",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "https://source2.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "src2",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "https://source3.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "src3",
+            },
+            "c4": {
+                "id": "c4",
+                "url": "https://source4.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "src4",
+            },
+        }
+        source_registry = {
+            "fed": {"base_url": "https://federalreserve.gov/newsevents"},
+            "src2": {"base_url": "https://source2.example"},
+            "src3": {"base_url": "https://source3.example"},
+            "src4": {"base_url": "https://source4.example"},
+        }
+
+        report = validate_synthesis(synthesis, store, source_registry=source_registry)
+
+        self.assertEqual(report.removed_bullets, 1)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

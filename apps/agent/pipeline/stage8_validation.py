@@ -9,12 +9,14 @@ def run_stage8_citation_validation(
     synthesis: Mapping[str, Iterable[Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
     *,
+    source_registry: Mapping[str, Mapping[str, Any]] | None = None,
     replace_with_placeholder: bool = True,
     max_removed_without_retry: int = 3,
 ) -> Dict[str, Any]:
     report = validate_synthesis(
         synthesis,
         citation_store,
+        source_registry=source_registry,
         replace_with_placeholder=replace_with_placeholder,
         max_removed_without_retry=max_removed_without_retry,
     )
