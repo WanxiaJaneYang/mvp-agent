@@ -1,0 +1,155 @@
+{
+  "version": "1.0",
+  "generated_on": "2026-02-19",
+  "phase": "modelling",
+  "tickets": [
+    {
+      "id": "M001",
+      "title": "Implement run orchestrator and pipeline stage framework",
+      "status": "planned",
+      "priority": "P0",
+      "depends_on": [],
+      "files": [
+        "apps/agent/orchestrator.py",
+        "apps/agent/pipeline/stages.py",
+        "apps/agent/pipeline/types.py"
+      ],
+      "acceptance_criteria": [
+        "Supports run types: ingestion, daily_brief, alert_scan, alert_dispatch, maintenance",
+        "Persists run lifecycle fields in runs table",
+        "Enforces bounded retries and no uncontrolled loops"
+      ]
+    },
+    {
+      "id": "M002",
+      "title": "Implement ingestion, extraction, normalization, and dedup stages",
+      "status": "planned",
+      "priority": "P0",
+      "depends_on": ["M001"],
+      "files": [
+        "apps/agent/ingest/fetch.py",
+        "apps/agent/ingest/extract.py",
+        "apps/agent/ingest/normalize.py",
+        "apps/agent/ingest/dedup.py"
+      ],
+      "acceptance_criteria": [
+        "Respects per-source and global document caps",
+        "Handles metadata_only paywall policy without fabricated full text",
+        "Writes normalized records compatible with data_model.md"
+      ]
+    },
+    {
+      "id": "M003",
+      "title": "Implement chunking and FTS indexing pipeline",
+      "status": "planned",
+      "priority": "P0",
+      "depends_on": ["M002"],
+      "files": [
+        "apps/agent/retrieval/chunker.py",
+        "apps/agent/retrieval/fts_index.py"
+      ],
+      "acceptance_criteria": [
+        "Chunks are persisted with stable chunk_index ordering",
+        "FTS table is populated and queryable for keyword retrieval",
+        "Index write failure hard-fails the run"
+      ]
+    },
+    {
+      "id": "M004",
+      "title": "Implement citation validator and abstain fallback",
+      "status": "planned",
+      "priority": "P0",
+      "depends_on": ["M001", "M003"],
+      "files": [
+        "apps/agent/validators/citation_validator.py",
+        "apps/agent/synthesis/postprocess.py"
+      ],
+      "acceptance_criteria": [
+        "Every output bullet/claim has at least one citation",
+        "Paywall citations never include fabricated quote text",
+        "On validation failure, system removes invalid claims or outputs explicit insufficient evidence"
+      ]
+    },
+    {
+      "id": "M005",
+      "title": "Implement runtime budget guard",
+      "status": "planned",
+      "priority": "P0",
+      "depends_on": ["M001"],
+      "files": [
+        "apps/agent/runtime/budget_guard.py",
+        "apps/agent/runtime/cost_ledger.py"
+      ],
+      "acceptance_criteria": [
+        "Enforces monthly=100, daily=3, hourly=0.10 USD caps",
+        "Stops run before new model/tool call if cap exceeded",
+        "Persists budget windows and exceed flags in budget_ledger"
+      ]
+    },
+    {
+      "id": "M006",
+      "title": "Implement alert scoring and policy gates",
+      "status": "planned",
+      "priority": "P1",
+      "depends_on": ["M003", "M004", "M005"],
+      "files": [
+        "apps/agent/alerts/scoring.py",
+        "apps/agent/alerts/policy_gate.py"
+      ],
+      "acceptance_criteria": [
+        "Computes weighted score from alert_scoring.md",
+        "Applies quality gates, cooldown, and max alerts/day",
+        "Stores suppression reason for non-delivered alerts"
+      ]
+    },
+    {
+      "id": "M007",
+      "title": "Implement daily brief and alert delivery",
+      "status": "planned",
+      "priority": "P1",
+      "depends_on": ["M004", "M006"],
+      "files": [
+        "apps/agent/delivery/html_report.py",
+        "apps/agent/delivery/email_sender.py"
+      ],
+      "acceptance_criteria": [
+        "Daily brief local HTML output generated in stable structure",
+        "Alert output follows 3-6 bullet format with citations",
+        "Delivery failures are logged and retry-eligible next run"
+      ]
+    },
+    {
+      "id": "M008",
+      "title": "Add eval harness and 10 golden cases",
+      "status": "planned",
+      "priority": "P1",
+      "depends_on": ["M004", "M005", "M007"],
+      "files": [
+        "evals/golden/",
+        "evals/run_eval_suite.py",
+        "evals/README.md"
+      ],
+      "acceptance_criteria": [
+        "At least 10 golden cases exist and run locally",
+        "Eval suite checks citation validity and abstain behavior",
+        "Eval suite checks budget stop behavior"
+      ]
+    },
+    {
+      "id": "M009",
+      "title": "Implement manual portfolio relevance mapping",
+      "status": "planned",
+      "priority": "P2",
+      "depends_on": ["M007"],
+      "files": [
+        "apps/agent/portfolio/input_store.py",
+        "apps/agent/portfolio/relevance.py"
+      ],
+      "acceptance_criteria": [
+        "Users can input and update ticker + weight locally",
+        "Outputs relevance tags and risk flags without buy/sell guidance",
+        "Relevance is included in daily brief and alert context"
+      ]
+    }
+  ]
+}
