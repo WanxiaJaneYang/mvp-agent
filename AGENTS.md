@@ -11,6 +11,7 @@ Use `explore -> plan -> code -> verify -> commit` for implementation tasks.
 3. Run relevant validation for touched areas.
 4. Update docs when behavior, commands, or workflow changes.
 5. Summarize what changed, what was validated, and any residual risk.
+6. When a step is finalized, commit it and include it in a new MR (or the active MR) without leaving completed local-only work unpushed.
 
 ### Repo-specific non-negotiables
 1. No uncited factual claims in generated analysis outputs.
