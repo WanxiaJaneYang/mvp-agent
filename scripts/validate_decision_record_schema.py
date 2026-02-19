@@ -65,6 +65,11 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
             errors.append("claims entries must be objects")
             continue
 
+        for key in ("claim_id", "text"):
+            value = claim.get(key)
+            if not isinstance(value, str) or not value:
+                errors.append(f"claims[].{key} must be a non-empty string")
+
         coverage = claim.get("coverage_status")
         if coverage not in COVERAGE_STATUSES:
             errors.append("claim coverage_status must be supported|insufficient_evidence|removed")
@@ -139,7 +144,28 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
             errors.append("abstained status requires non-empty decision_rationale.uncertainties")
 
     _require(record, "rejected_alternatives", list, errors)
+    rejected = record.get("rejected_alternatives")
+    if isinstance(rejected, list):
+        for item in rejected:
+            if not isinstance(item, dict):
+                errors.append("rejected_alternatives entries must be objects")
+                continue
+            candidate_summary = item.get("candidate_summary")
+            if not isinstance(candidate_summary, str) or not candidate_summary:
+                errors.append("rejected_alternatives[].candidate_summary must be a non-empty string")
+            reason_code = item.get("reason_code")
+            if not isinstance(reason_code, str) or not reason_code:
+                errors.append("rejected_alternatives[].reason_code must be a non-empty string")
+
     _require(record, "risk_flags", list, errors)
+
+    if rationale:
+        summary = rationale.get("summary")
+        if not isinstance(summary, str) or not summary:
+            errors.append("decision_rationale.summary must be a non-empty string")
+        key_drivers = rationale.get("key_drivers")
+        if not isinstance(key_drivers, list) or not all(isinstance(v, str) for v in key_drivers):
+            errors.append("decision_rationale.key_drivers must be an array of strings")
 
     return errors
 

@@ -102,6 +102,92 @@ class DecisionRecordSchemaValidationTests(unittest.TestCase):
         errors = validate_decision_record(record)
         self.assertTrue(any("budget_snapshot.allowed" in error for error in errors))
 
+    def test_missing_required_claim_fields_fail(self):
+        record = {
+            "schema_version": "decision_record.v1",
+            "record_id": "dr_1",
+            "run_id": "run_1",
+            "run_type": "daily_brief",
+            "generated_at_utc": "2026-02-19T12:35:00Z",
+            "status": "ok",
+            "claims": [
+                {
+                    "section": "prevailing",
+                    "citation_ids": ["c1"],
+                    "coverage_status": "supported",
+                }
+            ],
+            "rejected_alternatives": [],
+            "risk_flags": [],
+            "budget_snapshot": {
+                "hourly_spend_usd": 0.01,
+                "hourly_cap_usd": 0.1,
+                "daily_spend_usd": 0.01,
+                "daily_cap_usd": 3.0,
+                "monthly_spend_usd": 0.01,
+                "monthly_cap_usd": 100.0,
+                "allowed": True,
+            },
+            "guardrail_checks": {
+                "citation_check": "pass",
+                "paywall_check": "pass",
+                "diversity_check": "pass",
+                "budget_check": "pass",
+                "notes": [],
+            },
+            "artifacts": {"output_sha256": "a" * 64},
+            "decision_rationale": {
+                "summary": "ok",
+                "confidence_label": "high",
+                "key_drivers": [],
+                "uncertainties": [],
+            },
+        }
+
+        errors = validate_decision_record(record)
+        self.assertTrue(any("claim_id" in error for error in errors))
+        self.assertTrue(any("text" in error for error in errors))
+
+    def test_missing_required_rationale_and_rejected_fields_fail(self):
+        record = {
+            "schema_version": "decision_record.v1",
+            "record_id": "dr_1",
+            "run_id": "run_1",
+            "run_type": "daily_brief",
+            "generated_at_utc": "2026-02-19T12:35:00Z",
+            "status": "ok",
+            "claims": [],
+            "rejected_alternatives": [{"notes": "x"}],
+            "risk_flags": [],
+            "budget_snapshot": {
+                "hourly_spend_usd": 0.01,
+                "hourly_cap_usd": 0.1,
+                "daily_spend_usd": 0.01,
+                "daily_cap_usd": 3.0,
+                "monthly_spend_usd": 0.01,
+                "monthly_cap_usd": 100.0,
+                "allowed": True,
+            },
+            "guardrail_checks": {
+                "citation_check": "pass",
+                "paywall_check": "pass",
+                "diversity_check": "pass",
+                "budget_check": "pass",
+                "notes": [],
+            },
+            "artifacts": {"output_sha256": "a" * 64},
+            "decision_rationale": {
+                "confidence_label": "high",
+                "uncertainties": [],
+            },
+        }
+
+        errors = validate_decision_record(record)
+        self.assertTrue(any("decision_rationale.summary" in error for error in errors))
+        self.assertTrue(any("decision_rationale.key_drivers" in error for error in errors))
+        self.assertTrue(any("rejected_alternatives[].candidate_summary" in error for error in errors))
+        self.assertTrue(any("rejected_alternatives[].reason_code" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
