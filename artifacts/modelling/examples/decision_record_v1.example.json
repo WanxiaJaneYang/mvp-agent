@@ -1,0 +1,72 @@
+{
+  "schema_version": "decision_record.v1",
+  "record_id": "dr_01K2NEXAMPLE9T6H1Y5X4",
+  "run_id": "run_01K2NEXAMPLE8J3D4Q2C1",
+  "run_type": "daily_brief",
+  "generated_at_utc": "2026-02-19T12:35:00Z",
+  "status": "partial",
+  "claims": [
+    {
+      "claim_id": "c_prev_001",
+      "section": "prevailing",
+      "text": "Policy-sensitive sectors remain volatile after the latest central bank hold.",
+      "citation_ids": [
+        "cite_001",
+        "cite_014"
+      ],
+      "coverage_status": "supported"
+    },
+    {
+      "claim_id": "c_watch_002",
+      "section": "watch",
+      "text": "[Insufficient evidence to support this claim]",
+      "citation_ids": [],
+      "coverage_status": "insufficient_evidence"
+    }
+  ],
+  "rejected_alternatives": [
+    {
+      "candidate_summary": "Immediate disinflation trend confirmation",
+      "reason_code": "insufficient_evidence",
+      "notes": "Conflicting source coverage across tiers."
+    }
+  ],
+  "risk_flags": [
+    "macro_release_volatility",
+    "policy_uncertainty"
+  ],
+  "budget_snapshot": {
+    "hourly_spend_usd": 0.07,
+    "hourly_cap_usd": 0.1,
+    "daily_spend_usd": 1.42,
+    "daily_cap_usd": 3.0,
+    "monthly_spend_usd": 27.31,
+    "monthly_cap_usd": 100.0,
+    "allowed": true
+  },
+  "guardrail_checks": {
+    "citation_check": "warn",
+    "paywall_check": "pass",
+    "diversity_check": "pass",
+    "budget_check": "pass",
+    "notes": [
+      "1 claim replaced with insufficient evidence placeholder."
+    ]
+  },
+  "artifacts": {
+    "synthesis_id": "syn_01K2NEXAMPLE7B6A5P4Z3",
+    "output_path": "artifacts/daily/2026-02-19/brief.html",
+    "output_sha256": "9f77f572c4f3c8c4e2f8f8592df1d6f0f2f6a8a3cfd2d0e8c9d8f7a6b5c4d3e2"
+  },
+  "decision_rationale": {
+    "summary": "Delivered partial brief with explicit abstention where evidence quality was insufficient.",
+    "confidence_label": "medium",
+    "key_drivers": [
+      "tier-1 policy releases",
+      "broadly corroborated macro commentary"
+    ],
+    "uncertainties": [
+      "mixed near-term labor signal interpretation"
+    ]
+  }
+}

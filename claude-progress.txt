@@ -268,3 +268,21 @@
   - Outcome: PASS (eval suite is now consistent with current validator behavior)
 - Next single step:
   - Open MR for `chore/fix-eval-suite-drift`
+
+[2026-02-19 Session 18] Completed P0 decision record schema definition and validation wiring
+- Created:
+  - `artifacts/modelling/decision_record_schema.md`
+  - `artifacts/modelling/examples/decision_record_v1.example.json`
+  - `scripts/validate_decision_record_schema.py`
+  - `tests/agent/test_decision_record_schema_validation.py`
+- Updated:
+  - `.github/workflows/ci.yml` (added decision-record schema validation step)
+  - `artifacts/modelling/TODO.md` (marked P0 schema task complete)
+  - `artifacts/modelling/MODELLING_CHECKLIST.md` (S1 -> PASSING)
+- Verification run + outcome:
+  - `python scripts/validate_decision_record_schema.py` -> PASS
+  - `python -m unittest tests.agent.test_decision_record_schema_validation -v` -> PASS (3 tests)
+  - `python -m compileall -q scripts tests` -> PASS
+  - Outcome: PASS (decision record schema is now defined, validated, and enforced in CI)
+- Next single step:
+  - Implement remaining P0 task: wire `decision_record` generation into synthesis pipeline output with one fixture

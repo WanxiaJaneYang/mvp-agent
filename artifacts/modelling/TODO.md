@@ -4,7 +4,7 @@ Last updated: 2026-02-19
 
 ## Priority Queue
 
-- [ ] P0: Define `decision_record` artifact schema and storage location
+- [x] P0: Define `decision_record` artifact schema and storage location
   - Acceptance: markdown spec + JSON example + field-level validation rules.
 
 - [ ] P0: Wire `decision_record` generation into synthesis pipeline output
