@@ -27,7 +27,7 @@ Modelling phase complete when:
 
 ## Strengthening Tracks (Prophet Benchmark Review - 2026-02-19)
 
-- [IN_PROGRESS] **S1) Decision record schema** - Define persisted per-run rationale artifact (claims, citations, rejected alternatives, risk flags, budget usage)
+- [PASSING] **S1) Decision record schema** - Define persisted per-run rationale artifact (claims, citations, rejected alternatives, risk flags, budget usage)
 - [FAILING] **S2) Retrieval memory for validated outputs** - Add embedding + retrieval flow for approved historical syntheses
 - [FAILING] **S3) Role-lane orchestration** - Add phased prompts/checks (research, risk, editorial, reviewer) in one runtime
 - [FAILING] **S4) Pre-delivery gate hardening** - Enforce deterministic fail/abstain gates for citation/paywall/diversity/budget
