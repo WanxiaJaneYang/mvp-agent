@@ -1,0 +1,70 @@
+{
+  "schema_version": "decision_record.v1",
+  "record_id": "dr_run_fixture_2026_02_19",
+  "run_id": "run_fixture_2026_02_19",
+  "run_type": "daily_brief",
+  "generated_at_utc": "2026-02-19T18:00:00Z",
+  "status": "partial",
+  "claims": [
+    {
+      "claim_id": "c_001",
+      "section": "prevailing",
+      "text": "Growth-sensitive sectors remain volatile into policy week.",
+      "citation_ids": [
+        "cite_001"
+      ],
+      "coverage_status": "supported"
+    },
+    {
+      "claim_id": "c_002",
+      "section": "watch",
+      "text": "[Insufficient evidence to support this claim]",
+      "citation_ids": [],
+      "coverage_status": "insufficient_evidence"
+    }
+  ],
+  "rejected_alternatives": [
+    {
+      "candidate_summary": "High-conviction disinflation call",
+      "reason_code": "insufficient_evidence",
+      "notes": "Removed by stage8 citation validation"
+    }
+  ],
+  "risk_flags": [
+    "citation"
+  ],
+  "budget_snapshot": {
+    "hourly_spend_usd": 0.03,
+    "hourly_cap_usd": 0.1,
+    "daily_spend_usd": 1.2,
+    "daily_cap_usd": 3.0,
+    "monthly_spend_usd": 24.5,
+    "monthly_cap_usd": 100.0,
+    "allowed": true
+  },
+  "guardrail_checks": {
+    "citation_check": "warn",
+    "paywall_check": "pass",
+    "diversity_check": "pass",
+    "budget_check": "pass",
+    "notes": [
+      "1 claim downgraded for insufficient evidence."
+    ]
+  },
+  "artifacts": {
+    "synthesis_id": "syn_run_fixture_2026_02_19",
+    "output_path": "artifacts/daily/2026-02-19/brief.html",
+    "output_sha256": "d9f3668f67a4a493ee26ea7075ee2e95d59e47fd4ce5f8b8cc4a8b755f2d38f8"
+  },
+  "decision_rationale": {
+    "summary": "Partial report was delivered with one unsupported claim downgraded.",
+    "confidence_label": "medium",
+    "key_drivers": [
+      "citation_validation",
+      "budget_guard"
+    ],
+    "uncertainties": [
+      "One watchlist claim lacked sufficient corroboration."
+    ]
+  }
+}

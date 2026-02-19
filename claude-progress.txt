@@ -286,3 +286,21 @@
   - Outcome: PASS (decision record schema is now defined, validated, and enforced in CI)
 - Next single step:
   - Implement remaining P0 task: wire `decision_record` generation into synthesis pipeline output with one fixture
+
+[2026-02-19 Session 19] Implemented P0 decision record pipeline persistence slice
+- Created:
+  - `apps/agent/pipeline/stage10_decision_record.py` (build + persist decision record JSON artifact)
+  - `tests/agent/pipeline/test_stage10_decision_record.py` (pipeline persistence coverage)
+  - `artifacts/modelling/examples/decision_record_pipeline_fixture.json` (fixture for persisted output shape)
+- Updated:
+  - `artifacts/modelling/pipeline.md` (Stage 10 contract now includes decision record persistence details)
+  - `tests/agent/test_decision_record_schema_validation.py` (validates fixture against schema rules)
+  - `artifacts/modelling/TODO.md` (marked second P0 task complete)
+- Verification run + outcome:
+  - `python -m unittest tests.agent.pipeline.test_stage10_decision_record -v` -> PASS
+  - `python -m unittest tests.agent.test_decision_record_schema_validation -v` -> PASS
+  - `python -m unittest tests.agent.pipeline.test_stage8_validation -v` -> PASS
+  - `python -m compileall -q apps tests scripts` -> PASS
+  - Outcome: PASS (decision record persistence path is implemented and covered by tests)
+- Next single step:
+  - Add a minimal pipeline integration wrapper that calls stage 8 and stage 10 together for one end-to-end fixture run
