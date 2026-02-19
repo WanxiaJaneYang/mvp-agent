@@ -18,7 +18,7 @@ class ValidationReport:
     validation_passed: bool
     should_retry: bool
     empty_core_sections: List[str]
-    synthesis: Dict[str, List[Dict[str, Any]]]
+    synthesis: Dict[str, Any]
     citation_store: Dict[str, Dict[str, Any]]
 
     def to_dict(self) -> Dict[str, Any]:
@@ -37,7 +37,7 @@ def _is_valid_citation(citation: Mapping[str, Any]) -> bool:
 
 
 def _normalize_bullet(raw_bullet: Any) -> Dict[str, Any]:
-    if isinstance(raw_bullet, MutableMapping):
+    if isinstance(raw_bullet, Mapping):
         bullet = dict(raw_bullet)
     else:
         bullet = {"text": str(raw_bullet), "citation_ids": []}
@@ -112,18 +112,21 @@ def validate_synthesis(
         for cid, citation in citation_store.items()
     }
 
-    normalized_synthesis: Dict[str, List[Dict[str, Any]]] = {}
+    normalized_synthesis: Dict[str, Any] = {}
     total_bullets = 0
     cited_bullets = 0
     removed_bullets = 0
 
     for section, raw_bullets in synthesis.items():
+        if section not in CORE_SECTIONS:
+            normalized_synthesis[section] = deepcopy(raw_bullets)
+            continue
+
         section_out: List[Dict[str, Any]] = []
         for raw_bullet in list(raw_bullets):
             bullet = _normalize_bullet(raw_bullet)
 
-            if section in CORE_SECTIONS:
-                total_bullets += 1
+            total_bullets += 1
 
             valid_ids: List[str] = []
             for citation_id in bullet["citation_ids"]:
@@ -136,9 +139,7 @@ def validate_synthesis(
                 ):
                     valid_ids.append(cid)
 
-            if section in CORE_SECTIONS and (
-                not valid_ids or not _has_claim_span_coverage(bullet, valid_ids)
-            ):
+            if not valid_ids or not _has_claim_span_coverage(bullet, valid_ids):
                 removed_bullets += 1
                 if replace_with_placeholder:
                     section_out.append(
@@ -152,8 +153,7 @@ def validate_synthesis(
                 continue
 
             bullet["citation_ids"] = valid_ids
-            if section in CORE_SECTIONS:
-                cited_bullets += 1
+            cited_bullets += 1
             section_out.append(bullet)
 
         normalized_synthesis[section] = section_out

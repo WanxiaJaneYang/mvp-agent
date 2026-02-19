@@ -41,6 +41,8 @@ class CitationValidatorTests(unittest.TestCase):
 
         self.assertEqual(report.removed_bullets, 1)
         self.assertIn("Insufficient evidence", report.synthesis["prevailing"][0]["text"])
+        self.assertEqual(report.total_bullets, 4)
+        self.assertEqual(report.cited_bullets, 3)
 
     def test_invalid_citation_fields_are_removed(self):
         synthesis = {
@@ -60,6 +62,7 @@ class CitationValidatorTests(unittest.TestCase):
 
         self.assertEqual(report.removed_bullets, 1)
         self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
+        self.assertIn("Insufficient evidence", report.synthesis["prevailing"][0]["text"])
 
     def test_paywalled_quote_span_is_stripped(self):
         synthesis = {
@@ -104,6 +107,96 @@ class CitationValidatorTests(unittest.TestCase):
 
         self.assertTrue(report.should_retry)
         self.assertFalse(report.validation_passed)
+
+    def test_non_core_sections_pass_through_unchanged(self):
+        synthesis = {
+            "prevailing": [{"text": "Fed held rates.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+            "other": [{"text": "Analyst note", "extra_field": "x"}],
+            "metadata": {"author": "Analyst", "version": 1},
+        }
+        store = {
+            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z"},
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z"},
+        }
+        report = validate_synthesis(synthesis, store)
+        self.assertEqual(report.synthesis["other"], synthesis["other"])
+        self.assertEqual(report.synthesis["metadata"], synthesis["metadata"])
+
+    def test_retry_triggered_when_removed_bullets_exceed_threshold(self):
+        synthesis = {
+            "prevailing": [
+                {"text": "Bad 1.", "citation_ids": []},
+                {"text": "Bad 2.", "citation_ids": []},
+                {"text": "Bad 3.", "citation_ids": []},
+                {"text": "Bad 4.", "citation_ids": []},
+            ],
+            "counter": [{"text": "Counter.", "citation_ids": ["c1"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c2"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c3"]}],
+        }
+        store = {
+            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z"},
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+        }
+        report = validate_synthesis(
+            synthesis, store, replace_with_placeholder=False, max_removed_without_retry=3
+        )
+        self.assertTrue(report.should_retry)
+        self.assertFalse(report.validation_passed)
+
+    def test_citation_ids_not_list_becomes_uncited_and_removed(self):
+        synthesis = {
+            "prevailing": [{"text": "Claim.", "citation_ids": "c1"}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z"},
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z"},
+        }
+        report = validate_synthesis(synthesis, store)
+        self.assertEqual(report.removed_bullets, 1)
+
+    def test_non_dict_bullet_is_normalized_and_removed_when_uncited(self):
+        synthesis = {
+            "prevailing": ["not a dict bullet"],
+            "counter": [{"text": "Counter.", "citation_ids": ["c1"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c2"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c3"]}],
+        }
+        store = {
+            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z"},
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+        }
+        report = validate_synthesis(synthesis, store)
+        self.assertEqual(report.removed_bullets, 1)
+
+    def test_mixed_valid_and_invalid_citations_keeps_valid_ones(self):
+        synthesis = {
+            "prevailing": [{"text": "Claim.", "citation_ids": ["c_valid", "c_missing"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c_valid": {"id": "c_valid", "url": "u1", "published_at": "2026-02-19T00:00:00Z"},
+            "c_missing": {"id": "c_missing", "url": "", "published_at": None},
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z"},
+        }
+        report = validate_synthesis(synthesis, store)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], ["c_valid"])
 
     def test_multisentence_bullet_requires_claim_span_citation_mapping(self):
         synthesis = {
