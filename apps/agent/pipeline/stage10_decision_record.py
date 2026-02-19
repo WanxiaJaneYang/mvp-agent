@@ -6,11 +6,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from scripts.validate_decision_record_schema import validate_decision_record
+
 SECTION_ALIASES = {
     "counterarguments": "counter",
     "what_to_watch": "watch",
     "what to watch": "watch",
 }
+ALLOWED_CLAIM_SECTIONS = {"prevailing", "counter", "minority", "watch", "changed"}
 
 
 def _utc_now_iso() -> str:
@@ -75,6 +78,8 @@ def build_and_persist_decision_record(
                 "citation_ids": citation_ids,
                 "coverage_status": "supported" if len(citation_ids) >= 1 else "insufficient_evidence",
             }
+            if claim["section"] not in ALLOWED_CLAIM_SECTIONS:
+                continue
             claims.append(claim)
             claim_counter += 1
 
@@ -139,6 +144,10 @@ def build_and_persist_decision_record(
     records_dir = base_dir / "artifacts" / "decision_records" / date_partition
     records_dir.mkdir(parents=True, exist_ok=True)
     record_path = records_dir / f"{run_id}.json"
+    validation_errors = validate_decision_record(decision_record)
+    if validation_errors:
+        joined = "; ".join(validation_errors)
+        raise ValueError(f"Invalid decision record for run {run_id}: {joined}")
     record_path.write_text(json.dumps(decision_record, indent=2), encoding="utf-8")
 
     return {"record_path": str(record_path), "decision_record": decision_record}
