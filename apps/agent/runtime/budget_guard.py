@@ -44,7 +44,7 @@ def evaluate_budget_guard(
 
     exceeded: List[str] = []
     for window in ("hourly", "daily", "monthly"):
-        if projected[window] > cap_map[window]:
+        if projected[window] >= cap_map[window]:
             exceeded.append(window)
 
     if exceeded:

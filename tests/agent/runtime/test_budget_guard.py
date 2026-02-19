@@ -51,6 +51,42 @@ class BudgetGuardTests(unittest.TestCase):
         self.assertEqual(decision.caps["daily"], 3.0)
         self.assertEqual(decision.caps["monthly"], 100.0)
 
+    def test_blocks_when_hourly_cap_is_reached_exactly(self):
+        caps = BudgetCaps(monthly_usd=100.0, daily_usd=3.0, hourly_usd=0.10)
+        decision = evaluate_budget_guard(
+            hourly_spend_usd=0.09,
+            daily_spend_usd=1.0,
+            monthly_spend_usd=20.0,
+            next_estimated_cost_usd=0.01,
+            caps=caps,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertIn("hourly", decision.exceeded_windows)
+
+    def test_blocks_when_daily_cap_is_reached_exactly(self):
+        caps = BudgetCaps(monthly_usd=100.0, daily_usd=3.0, hourly_usd=0.10)
+        decision = evaluate_budget_guard(
+            hourly_spend_usd=0.01,
+            daily_spend_usd=2.99,
+            monthly_spend_usd=20.0,
+            next_estimated_cost_usd=0.01,
+            caps=caps,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertIn("daily", decision.exceeded_windows)
+
+    def test_blocks_when_monthly_cap_is_reached_exactly(self):
+        caps = BudgetCaps(monthly_usd=100.0, daily_usd=3.0, hourly_usd=0.10)
+        decision = evaluate_budget_guard(
+            hourly_spend_usd=0.01,
+            daily_spend_usd=1.0,
+            monthly_spend_usd=99.99,
+            next_estimated_cost_usd=0.01,
+            caps=caps,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertIn("monthly", decision.exceeded_windows)
+
 
 if __name__ == "__main__":
     unittest.main()
