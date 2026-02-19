@@ -1,0 +1,16 @@
+{
+    "expected":  {
+                     "exceeded_windows":  [
+                                              "monthly"
+                                          ],
+                     "allowed":  false
+                 },
+    "inputs":  {
+                   "monthly_spend_usd":  99.99,
+                   "next_estimated_cost_usd":  0.02,
+                   "hourly_spend_usd":  0.01,
+                   "daily_spend_usd":  1
+               },
+    "id":  "BUD-004",
+    "type":  "budget"
+}

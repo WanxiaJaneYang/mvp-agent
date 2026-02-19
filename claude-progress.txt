@@ -235,3 +235,22 @@
   - Outcome: PASS (budget hard-stop checks implemented and validated)
 - Next single step:
   - Implement item I eval harness + at least 10 golden cases under `evals/`
+
+[2026-02-19 Session 13] Implemented item I: eval harness + 10 golden cases
+- Created: evals/run_eval_suite.py
+  - Loads and executes golden cases for citation stage and budget guard
+  - Fails if fewer than 10 cases are present
+  - Returns non-zero on mismatches
+- Created: evals/README.md
+  - Documents eval run command and case format
+- Created: evals/golden/case01.json ... case10.json
+  - 6 citation-behavior golden cases
+  - 4 budget hard-stop golden cases
+- Updated: artifacts/modelling/MODELLING_CHECKLIST.md
+  - Marked item I as PASSING
+- Verification run + outcome:
+  - Ran: `python evals/run_eval_suite.py` -> `PASS: 10 golden cases`
+  - Ran: `python -m unittest discover -s tests -t . -p "test_*.py"` -> `Ran 10 tests ... OK`
+  - Outcome: PASS (eval harness + golden cases operational)
+- Next single step:
+  - Refresh MR #6 status, then move to review/merge flow
