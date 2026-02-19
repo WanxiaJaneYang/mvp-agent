@@ -216,3 +216,21 @@
   - Outcome: PASS for checklist consistency update; eval fixture alignment remains a follow-up task
 - Next single step:
   - Open MR for `docs/fix-checklist-status` and then create follow-up task to align eval expected statuses with current validator contract
+
+[2026-02-19 Session 14] Researched MCP adoption and created incremental rollout plan
+- Research performed:
+  - Reviewed MCP primary docs and SDK sources (official MCP docs + official Python/TypeScript SDK repos + Anthropic MCP docs)
+  - Assessed fit against current local-first runtime and validation modules
+- Created:
+  - `docs/plans/2026-02-19-incremental-mcp-adoption-plan.md`
+    - rationale and constraints
+    - phased rollout (Phase 0-4)
+    - deliverables and exit criteria per phase
+    - risks/mitigations
+    - first implementation slice and success metrics
+- Verification run + outcome:
+  - Verified plan references existing repo modules and modelling artifacts
+  - Verified plan keeps non-negotiables intact (citation, paywall, budget hard-stop, local-first)
+  - Outcome: PASS (incremental MCP adoption plan ready for execution)
+- Next single step:
+  - Open MR for `docs/mcp-incremental-adoption-plan` and request review before implementation
