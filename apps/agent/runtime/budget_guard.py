@@ -45,9 +45,9 @@ def evaluate_budget_guard(
         raise ValueError("caps.monthly_usd must be positive")
 
     projected = {
-        "hourly": round(hourly_spend_usd + max(next_estimated_cost_usd, 0.0), 6),
-        "daily": round(daily_spend_usd + max(next_estimated_cost_usd, 0.0), 6),
-        "monthly": round(monthly_spend_usd + max(next_estimated_cost_usd, 0.0), 6),
+        "hourly": round(hourly_spend_usd + max(next_estimated_cost_usd, 0.0), 2),
+        "daily": round(daily_spend_usd + max(next_estimated_cost_usd, 0.0), 2),
+        "monthly": round(monthly_spend_usd + max(next_estimated_cost_usd, 0.0), 2),
     }
     cap_map = {
         "hourly": caps.hourly_usd,
@@ -81,3 +81,4 @@ def evaluate_budget_guard(
         projected_spend=projected,
         caps=cap_map,
     )
+
