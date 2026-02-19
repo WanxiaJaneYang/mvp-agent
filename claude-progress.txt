@@ -166,3 +166,28 @@
   - Next MR step after push: identify/open PR tied to current branch and continue standard review/check flow
 - Next single step:
   - Push `chore/update-progress-log` with commits for skills import and this progress update
+
+[2026-02-19 Session 10] Resolved modelling doc drift and completed remaining modelling artifacts
+- Updated: artifacts/modelling/MODELLING_CHECKLIST.md
+  - Corrected stale status for item B (data_model) to PASSING
+  - Marked C/E/F as PASSING after creating required artifacts
+  - Kept G/H/I as FAILING (implementation/test work still pending)
+- Updated: artifacts/PRD.md
+  - Aligned hourly budget cap to USD 0.10 to match PROJECT_FACT hard limits
+- Updated: CLAUDE.md
+  - Aligned `BUDGET_HOURLY_USD` recommended value to `0.10`
+- Created: artifacts/modelling/pipeline.md
+  - Defined stage-by-stage pipeline, failure handling, incremental run logic, retries, and hard stop behavior
+- Created: artifacts/modelling/alert_scoring.md
+  - Defined scoring formula, quality gates, thresholds, cooldown/daily cap enforcement, and bundling rules
+- Created: artifacts/modelling/backlog.json
+  - Added prioritized build tickets (`M001`-`M009`) with dependencies, target files, and acceptance criteria
+- Created: docs/plans/2026-02-19-modelling-phase-next-plan.md
+  - Saved execution plan used for this update
+- Verification run + outcome:
+  - Confirmed all required modelling files A-F exist
+  - Confirmed `artifacts/modelling/backlog.json` parses as valid JSON
+  - Confirmed budget cap consistency for hourly limit across PRD/CLAUDE/PROJECT_FACT
+  - Outcome: PASS (modelling docs aligned; ready to implement G/H/I)
+- Next single step:
+  - Implement item G (`apps/agent/validators/citation_validator.py`) with tests and integrate into pipeline stage 8

@@ -11,7 +11,7 @@ Local-first Python app that ingests macro/market sources (RSS/HTML/PDF) and prod
 ---
 
 ## Non‚ÄëNegotiables
-1. **No uncited factual claims.** Every bullet/claim must have ‚â•1 valid citation (URL + published timestamp).
+1. **No uncited factual claims.** Every bullet/claim must have ‚â? valid citation (URL + published timestamp).
 2. **Local-first.** No cloud storage requirements for v1.
 3. **Paywall compliance.** If a source is `paywall_policy: metadata_only`, do **not** fabricate full text.
 4. **Budget safety.** Respect strict caps and stop when caps are reached (see Budget section).
@@ -31,7 +31,7 @@ Claude Code costs scale with context size; long sessions can degrade as context 
 - Use `/compact` only when needed; keep compaction instructions specific to the current objective.
 
 ### Default Output Limits
-- Keep responses concise: **‚â§ 120 lines** unless explicitly requested.
+- Keep responses concise: **‚â?120 lines** unless explicitly requested.
 - Prefer checklists + diffs over long explanations.
 - Never paste full articles; store IDs/snippets only.
 
@@ -74,13 +74,13 @@ claude-progress.txt              # Durable progress log (append-only)
 ---
 
 ## Development Workflow (small, verifiable steps)
-Follow: **Explore ‚Üí Plan ‚Üí Execute ‚Üí Verify ‚Üí Log**
+Follow: **Explore ‚Ü?Plan ‚Ü?Execute ‚Ü?Verify ‚Ü?Log**
 
 1) **Explore**
 - Read only the artifact(s) needed for this step.
 
 2) **Plan**
-- State exactly which files will change (ideally 1‚Äì4).
+- State exactly which files will change (ideally 1‚Ä?).
 - Define a clear verification step (command/assertion/checklist).
 
 3) **Execute**
@@ -103,7 +103,7 @@ Follow: **Explore ‚Üí Plan ‚Üí Execute ‚Üí Verify ‚Üí Log**
 
 ### Daily Pipeline (planned)
 ```
-fetch ‚Üí extract ‚Üí normalize ‚Üí chunk ‚Üí index ‚Üí retrieve ‚Üí synthesize ‚Üí validate citations ‚Üí deliver
+fetch ‚Ü?extract ‚Ü?normalize ‚Ü?chunk ‚Ü?index ‚Ü?retrieve ‚Ü?synthesize ‚Ü?validate citations ‚Ü?deliver
 ```
 
 ### Output Structure Requirements
@@ -118,10 +118,10 @@ All synthesis outputs must include:
 
 ## Modelling Deliverables (Definition of Done)
 
-A. `artifacts/modelling/source_registry.yaml` ‚úÖ  
+A. `artifacts/modelling/source_registry.yaml` ‚ú? 
 B. `artifacts/modelling/data_model.md` (SQLite schema + FTS plan + IDs + indices)  
 C. `artifacts/modelling/pipeline.md` (stages + failure handling + incremental runs)  
-D. `artifacts/modelling/citation_contract.md` ‚úÖ  
+D. `artifacts/modelling/citation_contract.md` ‚ú? 
 E. `artifacts/modelling/alert_scoring.md` (thresholds + rate limits + bundling)  
 F. `artifacts/modelling/backlog.json` (tickets w/ acceptance criteria; valid JSON)
 
@@ -134,7 +134,7 @@ F. `artifacts/modelling/backlog.json` (tickets w/ acceptance criteria; valid JSO
 - Retrieve selectively (top relevant chunks only).
 - Diversify sources (avoid single-publisher dominance).
 - Prefer credible sources (Tier 1/2 for policy/macro).
-- Cite stored evidence, not ‚Äúmemory‚Äù.
+- Cite stored evidence, not ‚Äúmemory‚Ä?
 
 ### Retrieval Strategy (planned)
 - Hybrid: keyword (FTS/BM25) + semantic (vector embeddings)
@@ -157,7 +157,7 @@ All tools must be:
 
 ### Layer 1: Claude Code interaction discipline
 - Keep tasks small + verifiable.
-- Avoid multi-agent ‚Äúteams‚Äù unless necessary.
+- Avoid multi-agent ‚Äúteams‚Ä?unless necessary.
 - Check `/cost` periodically (API users) and `/clear` between tasks.
 
 ### Layer 2: App runtime budget guard (local config)
@@ -167,7 +167,7 @@ All tools must be:
 Recommended `.env` keys:
 - `BUDGET_MONTHLY_USD=100`
 - `BUDGET_DAILY_USD=3`
-- `BUDGET_HOURLY_USD=0.50`
+- `BUDGET_HOURLY_USD=0.10`
 - `BUDGET_MODE=hard_fail`
 - `BUDGET_STATE_PATH=.budget_state.json`
 
@@ -205,3 +205,4 @@ Modelling phase is complete when:
 - [ ] Citation validator passes
 - [ ] Budget guard implemented and enabled by default
 - [ ] At least 10 golden test cases in `evals/`
+
