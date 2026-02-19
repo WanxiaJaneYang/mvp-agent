@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install validation dependency
+        run: python -m pip install --upgrade pip pyyaml
+
+      - name: Validate modelling artifacts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import yaml
+
+          json_paths = [
+              Path("artifacts/modelling/backlog.json"),
+          ]
+          yaml_paths = [
+              Path("artifacts/modelling/source_registry.yaml"),
+          ]
+
+          for p in json_paths:
+              with p.open("r", encoding="utf-8") as f:
+                  json.load(f)
+          for p in yaml_paths:
+              with p.open("r", encoding="utf-8") as f:
+                  yaml.safe_load(f)
+
+          print("Artifact validation passed.")
+          PY
+
+      - name: Bytecode compile check
+        run: python -m compileall -q apps tests
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
