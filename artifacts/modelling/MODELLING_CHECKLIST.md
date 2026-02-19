@@ -34,7 +34,4 @@ Modelling phase complete when:
 - [FAILING] **S5) Operational report templates** - Standardize daily brief, event-risk brief, and portfolio-delta outputs
 - [FAILING] **S6) Reliability metrics** - Track citation failure, retry, abstain, budget-per-report, and latency-to-delivery
 
-## Known Gaps
-
-- Eval fixture drift exists in `evals/run_eval_suite.py` expectations for several citation cases (`partial` vs `retry`), even though the required 10 golden cases are present.
 

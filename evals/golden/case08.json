@@ -1,6 +1,6 @@
 {
     "expected":  {
-                     "status":  "partial",
+                     "status":  "retry",
                      "removed_bullets":  1
                  },
     "citation_store":  {
