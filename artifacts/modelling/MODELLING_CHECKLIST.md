@@ -1,4 +1,4 @@
-﻿# Modelling Phase Checklist
+# Modelling Phase Checklist
 
 Status: `PASSING`, `FAILING`, `IN_PROGRESS`
 

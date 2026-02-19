@@ -1,4 +1,4 @@
-﻿# PRD v1.1 — Financial News & Macro Literature Review Assistant (Local‑First)
+# PRD v1.1 — Financial News & Macro Literature Review Assistant (Local‑First)
 
 **Version:** v1.1 (clarified spec)  
 **Status:** Draft ready for modelling + implementation  
