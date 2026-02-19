@@ -191,3 +191,29 @@
   - Outcome: PASS (modelling docs aligned; ready to implement G/H/I)
 - Next single step:
   - Implement item G (`apps/agent/validators/citation_validator.py`) with tests and integrate into pipeline stage 8
+
+[2026-02-19 Session 11] Implemented item G: citation validator + Stage 8 integration scaffold
+- Created: apps/agent/validators/citation_validator.py
+  - Added `validate_synthesis(...)` with report object and deterministic retry decisioning
+  - Enforces bullet citation presence for core sections (prevailing/counter/minority/watch)
+  - Drops invalid citations (missing url/published_at)
+  - Strips `quote_span` for `metadata_only` paywall citations
+  - Replaces unsupported bullets with `[Insufficient evidence to support this claim]` (or removes when configured)
+- Created: apps/agent/pipeline/stage8_validation.py
+  - Added `run_stage8_citation_validation(...)` wrapper returning `ok`/`partial`/`retry` status
+- Created test scaffolding:
+  - tests/__init__.py
+  - tests/agent/__init__.py
+  - tests/agent/validators/__init__.py
+  - tests/agent/pipeline/__init__.py
+- Created tests:
+  - tests/agent/validators/test_citation_validator.py
+  - tests/agent/pipeline/test_stage8_validation.py
+- Updated: artifacts/modelling/MODELLING_CHECKLIST.md
+  - Marked item G as PASSING
+- Verification run + outcome:
+  - Ran: `python -m unittest discover -s tests -t . -p "test_*.py"`
+  - Result: `Ran 6 tests ... OK`
+  - Outcome: PASS (citation validator implemented and Stage 8 wrapper validated)
+- Next single step:
+  - Implement item H runtime budget guard (`apps/agent/runtime/budget_guard.py`) with tests and hard-stop checks
