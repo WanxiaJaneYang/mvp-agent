@@ -14,7 +14,7 @@ Status: `PASSING`, `FAILING`, `IN_PROGRESS`
 ## Validation & Testing
 
 - [PASSING] **G) Citation validator** - Validate every bullet has >=1 citation
-- [FAILING] **H) Budget guard** - Enforce daily/hourly/monthly caps
+- [PASSING] **H) Budget guard** - Enforce daily/hourly/monthly caps
 - [FAILING] **I) Eval cases** - At least 10 golden test cases in `evals/`
 
 ## Definition of Done

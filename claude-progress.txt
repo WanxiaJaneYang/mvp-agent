@@ -217,3 +217,21 @@
   - Outcome: PASS (citation validator implemented and Stage 8 wrapper validated)
 - Next single step:
   - Implement item H runtime budget guard (`apps/agent/runtime/budget_guard.py`) with tests and hard-stop checks
+
+[2026-02-19 Session 12] Implemented item H: runtime budget guard with hard-stop checks
+- Created: apps/agent/runtime/budget_guard.py
+  - Added `BudgetCaps` defaults aligned to project constraints (monthly=100, daily=3, hourly=0.10)
+  - Added `evaluate_budget_guard(...)` to project spend with next call cost and hard-stop when any cap would be exceeded
+  - Added decision payload with `allowed`, exceeded windows, projected spend, and reason
+- Created: apps/agent/runtime/__init__.py
+- Created tests:
+  - tests/agent/runtime/__init__.py
+  - tests/agent/runtime/test_budget_guard.py
+- Updated: artifacts/modelling/MODELLING_CHECKLIST.md
+  - Marked item H as PASSING
+- Verification run + outcome:
+  - Ran: `python -m unittest tests.agent.runtime.test_budget_guard -v` (4 tests, OK)
+  - Ran: `python -m unittest discover -s tests -t . -p "test_*.py"` (10 tests, OK)
+  - Outcome: PASS (budget hard-stop checks implemented and validated)
+- Next single step:
+  - Implement item I eval harness + at least 10 golden cases under `evals/`
