@@ -3,46 +3,52 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable
 
+from apps.agent.pipeline.stages import PipelineStage
+from apps.agent.pipeline.types import RunContext, RunStatus, RunType, StageResult
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _make_snapshot(*, run_id: str, run_type: str, started_at: str, status: str, ended_at: str | None = None) -> dict[str, Any]:
-    return {
-        "run_id": run_id,
-        "run_type": run_type,
-        "started_at": started_at,
-        "ended_at": ended_at,
-        "status": status,
-    }
+def _normalize_run_type(run_type: str | RunType) -> RunType:
+    if isinstance(run_type, RunType):
+        return run_type
+    try:
+        return RunType(run_type)
+    except ValueError as exc:
+        raise ValueError(f"Unsupported run_type: {run_type}") from exc
 
 
 def run_pipeline(
     *,
     run_id: str,
-    run_type: str,
-    stages: Iterable[Callable[[dict[str, Any]], dict[str, Any]]],
+    run_type: str | RunType,
+    stages: Iterable[PipelineStage],
     recorder: Callable[[dict[str, Any]], None],
 ) -> dict[str, Any]:
     started_at = _utc_now_iso()
-    context = {"run_id": run_id, "run_type": run_type, "started_at": started_at, "status": "running"}
-    recorder(_make_snapshot(run_id=run_id, run_type=run_type, started_at=started_at, status="running"))
+    normalized_run_type = _normalize_run_type(run_type)
+    context = RunContext(
+        run_id=run_id,
+        run_type=normalized_run_type,
+        started_at=started_at,
+        status=RunStatus.RUNNING,
+    )
+    recorder(context.to_dict())
 
-    final_status = "ok"
+    final_status = RunStatus.OK
     for stage in stages:
         stage_result = stage(context)
-        final_status = stage_result.get("status", "ok")
-        context.update(stage_result)
+        if isinstance(stage_result, dict):
+            stage_result = StageResult(
+                status=RunStatus(stage_result.get("status", RunStatus.OK)),
+                error_summary=stage_result.get("error_summary"),
+            )
+        final_status = stage_result.status
+        if stage_result.error_summary is not None:
+            context.error_summary = stage_result.error_summary
 
-    context["status"] = final_status
-    recorder(
-        _make_snapshot(
-            run_id=run_id,
-            run_type=run_type,
-            started_at=started_at,
-            ended_at=_utc_now_iso(),
-            status=final_status,
-        )
-    )
-    return context
+    context.status = final_status
+    context.ended_at = _utc_now_iso()
+    recorder(context.to_dict())
+    return context.to_dict()
