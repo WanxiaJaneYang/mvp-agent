@@ -308,3 +308,23 @@
   - Outcome: PASS (stage10 decision-record persistence is restored with coverage and modelling docs aligned)
 - Next single step:
   - Commit fix branch changes, open PR against `master`, and link it back to issue `#22`
+
+[2026-03-10 Session 20] Implemented M001 orchestrator skeleton with shared runtime contracts
+- Created:
+  - `apps/agent/orchestrator.py`
+  - `apps/agent/pipeline/types.py`
+  - `apps/agent/pipeline/stages.py`
+  - `tests/agent/test_orchestrator.py`
+- Implemented:
+  - shared `RunType`, `RunStatus`, `RunCounters`, `RunContext`, and `StageResult` contracts
+  - minimal `run_pipeline(...)` orchestration entry point
+  - lifecycle recorder snapshots aligned to the `runs` table shape
+  - bounded per-stage retry handling for retryable failures
+  - final-status propagation for `ok`, `partial`, `failed`, and `stopped_budget`
+- Verification run + outcome:
+  - `python -m unittest tests.agent.test_orchestrator -v` -> PASS (7 tests)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (49 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+  - Outcome: PASS (M001 now has an executable orchestration contract layer with regression coverage)
+- Next single step:
+  - Open PR for issue `#21`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
