@@ -41,7 +41,7 @@
     {
       "id": "M003",
       "title": "Implement chunking and FTS indexing pipeline",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P0",
       "depends_on": ["M002"],
       "files": [
