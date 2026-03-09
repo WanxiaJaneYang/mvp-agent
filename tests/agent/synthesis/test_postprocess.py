@@ -1,6 +1,6 @@
 import unittest
 
-from apps.agent.synthesis.postprocess import build_abstain_synthesis
+from apps.agent.synthesis.postprocess import build_abstain_synthesis, finalize_validation_outcome
 
 
 class SynthesisPostprocessTests(unittest.TestCase):
@@ -45,6 +45,55 @@ class SynthesisPostprocessTests(unittest.TestCase):
                     "reason": "citation validation failed after retry budget was exhausted",
                 },
             },
+        )
+
+    def test_finalize_validation_outcome_passes_ok_through_unchanged(self):
+        validation_result = {
+            "status": "ok",
+            "synthesis": {"prevailing": [{"text": "Validated claim", "citation_ids": ["c1"]}]},
+            "report": {"removed_bullets": 0},
+        }
+
+        result = finalize_validation_outcome(validation_result=validation_result)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["synthesis"], validation_result["synthesis"])
+        self.assertIsNone(result["abstain_reason"])
+
+    def test_finalize_validation_outcome_preserves_partial_synthesis(self):
+        validation_result = {
+            "status": "partial",
+            "synthesis": {
+                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+            },
+            "report": {"removed_bullets": 1},
+        }
+
+        result = finalize_validation_outcome(validation_result=validation_result)
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["synthesis"], validation_result["synthesis"])
+        self.assertIsNone(result["abstain_reason"])
+
+    def test_finalize_validation_outcome_maps_retry_to_abstained_output(self):
+        validation_result = {
+            "status": "retry",
+            "synthesis": {
+                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+            },
+            "report": {
+                "removed_bullets": 4,
+                "empty_core_sections": ["prevailing", "counter"],
+            },
+        }
+
+        result = finalize_validation_outcome(validation_result=validation_result)
+
+        self.assertEqual(result["status"], "abstained")
+        self.assertEqual(result["abstain_reason"], "validation_retry_exhausted")
+        self.assertEqual(
+            result["synthesis"]["meta"]["reason"],
+            "validation_retry_exhausted",
         )
 
 
