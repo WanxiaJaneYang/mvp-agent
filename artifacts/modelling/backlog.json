@@ -41,7 +41,7 @@
     {
       "id": "M003",
       "title": "Implement chunking and FTS indexing pipeline",
-      "status": "implemented",
+      "status": "planned",
       "priority": "P0",
       "depends_on": ["M002"],
       "files": [
@@ -73,7 +73,7 @@
     {
       "id": "M005",
       "title": "Implement runtime budget guard",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P0",
       "depends_on": ["M001"],
       "files": [
