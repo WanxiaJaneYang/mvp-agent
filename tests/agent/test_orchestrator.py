@@ -94,6 +94,50 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(result["error_summary"], "still failing")
         self.assertEqual(attempts["count"], 2)
 
+    def test_budget_stop_sets_stopped_budget_status(self):
+        attempts = {"next_stage_calls": 0}
+
+        def budget_stop_stage(context):
+            return StageResult(
+                status=RunStatus.STOPPED_BUDGET,
+                error_summary="budget hard-stop triggered",
+            )
+
+        def should_not_run(context):
+            attempts["next_stage_calls"] += 1
+            return StageResult(status=RunStatus.OK)
+
+        result = run_pipeline(
+            run_id="run_budget_stop",
+            run_type=RunType.DAILY_BRIEF,
+            stages=[budget_stop_stage, should_not_run],
+            recorder=lambda snapshot: None,
+        )
+
+        self.assertEqual(result["status"], "stopped_budget")
+        self.assertEqual(result["error_summary"], "budget hard-stop triggered")
+        self.assertEqual(attempts["next_stage_calls"], 0)
+
+    def test_partial_stage_result_sets_partial_status(self):
+        def partial_stage(context):
+            return StageResult(
+                status=RunStatus.PARTIAL,
+                error_summary="one stage completed with degradation",
+            )
+
+        def later_ok_stage(context):
+            return StageResult(status=RunStatus.OK)
+
+        result = run_pipeline(
+            run_id="run_partial",
+            run_type=RunType.DAILY_BRIEF,
+            stages=[partial_stage, later_ok_stage],
+            recorder=lambda snapshot: None,
+        )
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["error_summary"], "one stage completed with degradation")
+
 
 if __name__ == "__main__":
     unittest.main()

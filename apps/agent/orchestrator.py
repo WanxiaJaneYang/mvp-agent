@@ -49,12 +49,21 @@ def run_pipeline(
                     error_summary=stage_result.get("error_summary"),
                     retryable=stage_result.get("retryable", False),
                 )
-            final_status = stage_result.status
             if stage_result.error_summary is not None:
                 context.error_summary = stage_result.error_summary
             if should_retry(stage_result) and attempts < max_stage_attempts:
                 continue
             break
+
+        if stage_result.status == RunStatus.PARTIAL:
+            final_status = RunStatus.PARTIAL
+            continue
+
+        if stage_result.status == RunStatus.OK:
+            continue
+
+        final_status = stage_result.status
+        break
 
     context.status = final_status
     context.ended_at = _utc_now_iso()
