@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Mapping
 
 from apps.agent.pipeline.stages import PipelineStage, should_retry
 from apps.agent.pipeline.types import RunContext, RunStatus, RunType, StageResult
+from apps.agent.runtime.budget_guard import evaluate_budget_guard
+from apps.agent.runtime.cost_ledger import build_budget_ledger_rows
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -26,6 +28,7 @@ def run_pipeline(
     stages: Iterable[PipelineStage],
     recorder: Callable[[dict[str, Any]], None],
     max_stage_attempts: int = 1,
+    budget_preflight: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     started_at = _utc_now_iso()
     normalized_run_type = _normalize_run_type(run_type)
@@ -36,6 +39,29 @@ def run_pipeline(
         status=RunStatus.RUNNING,
     )
     recorder(context.to_dict())
+
+    if budget_preflight is not None:
+        decision = evaluate_budget_guard(
+            hourly_spend_usd=budget_preflight["hourly_spend_usd"],
+            daily_spend_usd=budget_preflight["daily_spend_usd"],
+            monthly_spend_usd=budget_preflight["monthly_spend_usd"],
+            next_estimated_cost_usd=budget_preflight["next_estimated_cost_usd"],
+            caps=budget_preflight["caps"],
+        )
+        budget_ledger_rows = build_budget_ledger_rows(
+            run_id=run_id,
+            recorded_at=started_at,
+            decision=decision,
+            windows=budget_preflight["windows"],
+        )
+        if not decision.allowed:
+            context.status = RunStatus.STOPPED_BUDGET
+            context.ended_at = _utc_now_iso()
+            context.error_summary = decision.reason
+            stopped_result = context.to_dict()
+            stopped_result["budget_ledger_rows"] = budget_ledger_rows
+            recorder(stopped_result)
+            return stopped_result
 
     final_status = RunStatus.OK
     for stage in stages:

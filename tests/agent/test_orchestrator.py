@@ -1,6 +1,8 @@
 import unittest
 
 from apps.agent.orchestrator import run_pipeline
+from apps.agent.runtime.budget_guard import BudgetCaps
+from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 from apps.agent.pipeline.types import RunStatus, RunType, StageResult
 
 
@@ -137,6 +139,51 @@ class OrchestratorTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "partial")
         self.assertEqual(result["error_summary"], "one stage completed with degradation")
+
+    def test_budget_preflight_stops_run_before_stage_execution(self):
+        stage_calls = {"count": 0}
+        lifecycle_events = []
+
+        def stage(context):
+            stage_calls["count"] += 1
+            return StageResult(status=RunStatus.OK)
+
+        result = run_pipeline(
+            run_id="run_preflight_stop",
+            run_type=RunType.DAILY_BRIEF,
+            stages=[stage],
+            recorder=lifecycle_events.append,
+            budget_preflight={
+                "hourly_spend_usd": 0.09,
+                "daily_spend_usd": 0.50,
+                "monthly_spend_usd": 20.0,
+                "next_estimated_cost_usd": 0.02,
+                "caps": BudgetCaps(),
+                "windows": {
+                    "hourly": BudgetWindowSnapshot(
+                        window_start="2026-03-10T09:00:00Z",
+                        window_end="2026-03-10T09:59:59Z",
+                        cost_usd=0.09,
+                    ),
+                    "daily": BudgetWindowSnapshot(
+                        window_start="2026-03-10T00:00:00Z",
+                        window_end="2026-03-10T23:59:59Z",
+                        cost_usd=0.50,
+                    ),
+                    "monthly": BudgetWindowSnapshot(
+                        window_start="2026-03-01T00:00:00Z",
+                        window_end="2026-03-31T23:59:59Z",
+                        cost_usd=20.0,
+                    ),
+                },
+            },
+        )
+
+        self.assertEqual(stage_calls["count"], 0)
+        self.assertEqual(result["status"], "stopped_budget")
+        self.assertEqual(lifecycle_events[0]["status"], "running")
+        self.assertEqual(lifecycle_events[-1]["status"], "stopped_budget")
+        self.assertEqual(len(result["budget_ledger_rows"]), 3)
 
 
 if __name__ == "__main__":
