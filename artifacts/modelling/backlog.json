@@ -6,7 +6,7 @@
     {
       "id": "M001",
       "title": "Implement run orchestrator and pipeline stage framework",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P0",
       "depends_on": [],
       "files": [
@@ -23,7 +23,7 @@
     {
       "id": "M002",
       "title": "Implement ingestion, extraction, normalization, and dedup stages",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P0",
       "depends_on": ["M001"],
       "files": [
@@ -41,7 +41,7 @@
     {
       "id": "M003",
       "title": "Implement chunking and FTS indexing pipeline",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P0",
       "depends_on": ["M002"],
       "files": [
