@@ -346,6 +346,37 @@
   - `python -m unittest tests.agent.test_orchestrator -v` -> PASS (8 tests)
   - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (52 tests)
   - `python -m compileall -q apps tests scripts evals` -> PASS
-  - Outcome: PASS (budget guard now has a persistence-shaped ledger layer and orchestrator preflight integration)
+- Outcome: PASS (budget guard now has a persistence-shaped ledger layer and orchestrator preflight integration)
 - Next single step:
   - Open PR for issue `#25`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 22] Implemented M002 ingestion fetch/extract/normalize/dedup skeleton
+- Created:
+  - `apps/agent/ingest/__init__.py`
+  - `apps/agent/ingest/fetch.py`
+  - `apps/agent/ingest/extract.py`
+  - `apps/agent/ingest/normalize.py`
+  - `apps/agent/ingest/dedup.py`
+  - `tests/agent/ingest/__init__.py`
+  - `tests/agent/ingest/test_fetch.py`
+  - `tests/agent/ingest/test_extract.py`
+  - `tests/agent/ingest/test_normalize.py`
+  - `tests/agent/ingest/test_dedup.py`
+- Updated:
+  - `artifacts/modelling/backlog.json`
+  - `claude-progress.txt`
+- Implemented:
+  - source-driven fetch planning with per-source and global cap enforcement
+  - payload extraction helpers for `rss` and `html` sources into a shared intermediate shape
+  - paywall-safe document normalization with `metadata_only` enforcement and deterministic content hashes
+  - exact dedup classification by canonical URL and content hash
+- Verification run + outcome:
+  - `python -m unittest tests.agent.ingest.test_fetch -v` -> PASS (2 tests)
+  - `python -m unittest tests.agent.ingest.test_extract -v` -> PASS (2 tests)
+  - `python -m unittest tests.agent.ingest.test_normalize -v` -> PASS (2 tests)
+  - `python -m unittest tests.agent.ingest.test_dedup -v` -> PASS (3 tests)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (61 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (M002 now has an executable ingestion skeleton that unblocks chunking/indexing work)
+- Next single step:
+  - Open PR for issue `#27`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
