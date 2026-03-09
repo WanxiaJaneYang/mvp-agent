@@ -66,3 +66,4 @@ class RunContext:
 class StageResult:
     status: RunStatus = RunStatus.OK
     error_summary: str | None = None
+    retryable: bool = False
