@@ -380,3 +380,30 @@
 - Outcome: PASS (M002 now has an executable ingestion skeleton that unblocks chunking/indexing work)
 - Next single step:
   - Open PR for issue `#27`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 23] Implemented M003 chunking and FTS indexing skeleton
+- Created:
+  - `apps/agent/retrieval/__init__.py`
+  - `apps/agent/retrieval/chunker.py`
+  - `apps/agent/retrieval/fts_index.py`
+  - `tests/agent/retrieval/__init__.py`
+  - `tests/agent/retrieval/test_chunker.py`
+  - `tests/agent/retrieval/test_fts_index.py`
+- Updated:
+  - `artifacts/modelling/backlog.json`
+  - `claude-progress.txt`
+- Implemented:
+  - deterministic word-boundary chunk splitting for full-text documents
+  - metadata-only skip behavior for retrieval chunking
+  - `chunks`-compatible row builders with stable `chunk_index`, char spans, and token counts
+  - `chunks_fts`-compatible row builders plus a minimal in-memory keyword search helper
+  - explicit hard-fail validation for invalid index rows
+- Verification run + outcome:
+  - `python -m unittest tests.agent.retrieval.test_chunker -v` -> PASS (3 tests)
+  - `python -m unittest tests.agent.retrieval.test_fts_index -v` -> PASS (3 tests)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (67 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+  - `python scripts/validate_artifacts.py` -> PASS
+- Outcome: PASS (M003 now has an executable retrieval skeleton that unblocks validator-first synthesis work)
+- Next single step:
+  - Open PR for issue `#31`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
