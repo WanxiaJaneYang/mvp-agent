@@ -37,6 +37,25 @@ def chunk_document(*, document: Mapping[str, Any], max_chars: int = 800) -> list
     return chunks
 
 
+def build_chunk_rows(*, document: Mapping[str, Any], max_chars: int = 800) -> list[dict[str, Any]]:
+    chunk_rows: list[dict[str, Any]] = []
+    for chunk in chunk_document(document=document, max_chars=max_chars):
+        chunk_index = int(chunk["chunk_index"])
+        chunk_rows.append(
+            {
+                "chunk_id": f"{document['doc_id']}_chunk_{chunk_index:03d}",
+                "doc_id": document["doc_id"],
+                "chunk_index": chunk_index,
+                "text": chunk["text"],
+                "token_count": len(str(chunk["text"]).split()),
+                "char_start": chunk["char_start"],
+                "char_end": chunk["char_end"],
+                "created_at": document["fetched_at"],
+            }
+        )
+    return chunk_rows
+
+
 def _build_chunk(
     *,
     body_text: str,
