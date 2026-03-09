@@ -407,3 +407,25 @@
 - Outcome: PASS (M003 now has an executable retrieval skeleton that unblocks validator-first synthesis work)
 - Next single step:
   - Open PR for issue `#31`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 24] Implemented M004 deterministic validation postprocess slice
+- Created:
+  - `apps/agent/synthesis/__init__.py`
+  - `apps/agent/synthesis/postprocess.py`
+  - `tests/agent/synthesis/__init__.py`
+  - `tests/agent/synthesis/test_postprocess.py`
+- Updated:
+  - `artifacts/modelling/backlog.json`
+  - `claude-progress.txt`
+- Implemented:
+  - deterministic abstain synthesis builder for core evidence-bearing sections
+  - validation outcome finalizer that preserves `ok` and `partial` payloads
+  - explicit `abstained` output path for unrecoverable validation failures
+- Verification run + outcome:
+  - `python -m unittest tests.agent.synthesis.test_postprocess -v` -> PASS (4 tests)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (71 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+  - `python scripts/validate_artifacts.py` -> PASS
+- Outcome: PASS (M004 now has the missing deterministic abstain postprocess needed for downstream delivery contracts)
+- Next single step:
+  - Open PR for issue `#39`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
