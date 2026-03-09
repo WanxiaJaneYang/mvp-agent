@@ -328,3 +328,24 @@
   - Outcome: PASS (M001 now has an executable orchestration contract layer with regression coverage)
 - Next single step:
   - Open PR for issue `#21`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 21] Added budget ledger rows and preflight budget-stop orchestration
+- Created:
+  - `apps/agent/runtime/cost_ledger.py`
+  - `tests/agent/runtime/test_cost_ledger.py`
+- Updated:
+  - `apps/agent/orchestrator.py`
+  - `tests/agent/test_orchestrator.py`
+- Implemented:
+  - `BudgetWindowSnapshot` plus `build_budget_ledger_rows(...)` for `budget_ledger`-shaped records
+  - exceeded-window row flags based on `BudgetDecision`
+  - optional orchestrator budget preflight that evaluates caps before stage execution
+  - `stopped_budget` short-circuit with emitted budget ledger rows
+- Verification run + outcome:
+  - `python -m unittest tests.agent.runtime.test_cost_ledger -v` -> PASS (2 tests)
+  - `python -m unittest tests.agent.test_orchestrator -v` -> PASS (8 tests)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (52 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+  - Outcome: PASS (budget guard now has a persistence-shaped ledger layer and orchestrator preflight integration)
+- Next single step:
+  - Open PR for issue `#25`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
