@@ -57,7 +57,7 @@
     {
       "id": "M004",
       "title": "Implement citation validator and abstain fallback",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P0",
       "depends_on": ["M001", "M003"],
       "files": [
