@@ -88,6 +88,23 @@ class FtsIndexTests(unittest.TestCase):
             ],
         )
 
+    def test_invalid_chunk_row_raises_value_error(self):
+        document = {
+            "doc_id": "doc_010",
+            "source_id": "fed_press_releases",
+            "publisher": "Federal Reserve",
+            "published_at": "2026-03-10T10:00:00Z",
+        }
+        invalid_chunk_rows = [
+            {
+                "doc_id": "doc_010",
+                "text": "Rates remain restrictive",
+            }
+        ]
+
+        with self.assertRaises(ValueError):
+            build_fts_rows(document=document, chunk_rows=invalid_chunk_rows)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,7 @@ from typing import Any
 def build_fts_rows(*, document: Mapping[str, Any], chunk_rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for chunk_row in chunk_rows:
+        _validate_chunk_row(chunk_row)
         rows.append(
             {
                 "text": chunk_row["text"],
@@ -44,3 +45,10 @@ def search_fts_rows(
 
     matches.sort(key=lambda item: (-item["score"], item["chunk_id"]))
     return matches[:limit]
+
+
+def _validate_chunk_row(chunk_row: Mapping[str, Any]) -> None:
+    required_fields = ("chunk_id", "doc_id", "text")
+    missing_fields = [field for field in required_fields if field not in chunk_row or chunk_row[field] in (None, "")]
+    if missing_fields:
+        raise ValueError(f"Invalid chunk row for FTS indexing: missing {', '.join(missing_fields)}")
