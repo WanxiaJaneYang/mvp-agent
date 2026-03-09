@@ -7,7 +7,7 @@ Last updated: 2026-02-19
 - [x] P0: Define `decision_record` artifact schema and storage location
   - Acceptance: markdown spec + JSON example + field-level validation rules.
 
-- [ ] P0: Wire `decision_record` generation into synthesis pipeline output
+- [x] P0: Wire `decision_record` generation into synthesis pipeline output
   - Acceptance: stage contract updated and one fixture demonstrating persisted output.
 
 - [ ] P1: Add validated-synthesis memory retrieval design

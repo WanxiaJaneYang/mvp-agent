@@ -283,6 +283,28 @@
   - `python scripts/validate_decision_record_schema.py` -> PASS
   - `python -m unittest tests.agent.test_decision_record_schema_validation -v` -> PASS (3 tests)
   - `python -m compileall -q scripts tests` -> PASS
-  - Outcome: PASS (decision record schema is now defined, validated, and enforced in CI)
+- Outcome: PASS (decision record schema is now defined, validated, and enforced in CI)
 - Next single step:
   - Implement remaining P0 task: wire `decision_record` generation into synthesis pipeline output with one fixture
+
+[2026-03-09 Session 19] Re-landed missing stage10 decision-record persistence onto default-branch fix branch
+- Root cause investigated:
+  - Confirmed PR `#20` was marked merged on GitHub but its stage10 implementation never landed on `master`
+  - Verified the stacked PR had been merged on top of `feat/decision-record-schema`, leaving `master` without the stage10 files
+- Created:
+  - `apps/agent/pipeline/stage10_decision_record.py`
+  - `tests/agent/pipeline/test_stage10_decision_record.py`
+  - `artifacts/modelling/examples/decision_record_pipeline_fixture.json`
+- Updated:
+  - `tests/agent/test_decision_record_schema_validation.py`
+  - `artifacts/modelling/TODO.md`
+  - `artifacts/modelling/pipeline.md`
+- Verification run + outcome:
+  - `python -m unittest tests.agent.pipeline.test_stage10_decision_record -v` -> PASS (4 tests)
+  - `python -m unittest tests.agent.test_decision_record_schema_validation -v` -> PASS (8 tests)
+  - `python scripts/validate_decision_record_schema.py` -> PASS
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (42 tests)
+  - Outcome: PASS (stage10 decision-record persistence is restored with coverage and modelling docs aligned)
+- Next single step:
+  - Commit fix branch changes, open PR against `master`, and link it back to issue `#22`
