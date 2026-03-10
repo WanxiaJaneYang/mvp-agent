@@ -173,7 +173,7 @@ python ./.trellis/scripts/get_context.py --mode record
 # Task management
 python ./.trellis/scripts/task.py list
 python ./.trellis/scripts/task.py create "<title>" --slug <name>
-python ./.trellis/scripts/task.py archive <name>
+python ./.trellis/scripts/task.py archive <name> --no-commit
 
 # Session recording
 python ./.trellis/scripts/add_session.py --title "..." --commit "-" --summary "..."
@@ -184,6 +184,8 @@ python scripts/validate_decision_record_schema.py
 python -m compileall -q apps tests scripts
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
+
+Note: `task.py archive <name>` still auto-commits `.trellis/tasks` by default. Use `--no-commit` when the current workflow should not create a git commit.
 
 ---
 

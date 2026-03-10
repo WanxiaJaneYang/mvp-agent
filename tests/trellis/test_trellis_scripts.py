@@ -13,6 +13,7 @@ if str(TRELLIS_SCRIPTS) not in sys.path:
 
 import task  # type: ignore[import-not-found]
 from common.cli_adapter import CLIAdapter  # type: ignore[import-not-found]
+from common.worktree import get_worktree_base_dir  # type: ignore[import-not-found]
 
 
 class TaskScriptTests(unittest.TestCase):
@@ -68,6 +69,23 @@ class CLIAdapterTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             adapter.build_run_command(agent="plan", prompt="hello")
+
+
+class WorktreeConfigTests(unittest.TestCase):
+    def test_non_absolute_worktree_dir_is_repo_relative(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo_root = Path(tmp)
+            config_dir = repo_root / ".trellis"
+            config_dir.mkdir(parents=True)
+            (config_dir / "worktree.yaml").write_text(
+                "worktree_dir: .worktrees\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                get_worktree_base_dir(repo_root),
+                repo_root / ".worktrees",
+            )
 
 
 if __name__ == "__main__":

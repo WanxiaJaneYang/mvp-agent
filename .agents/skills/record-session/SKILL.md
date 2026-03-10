@@ -25,7 +25,11 @@ python ./.trellis/scripts/get_context.py --mode record
 
 ```bash
 python ./.trellis/scripts/task.py archive <task-name>
+python ./.trellis/scripts/task.py archive <task-name> --no-commit
 ```
+
+`task.py archive` still auto-commits `.trellis/tasks` by default.
+Use `--no-commit` when the current workflow should not mutate git state.
 
 ### Step 2: Add the Session Entry
 
@@ -66,5 +70,6 @@ python ./.trellis/scripts/add_session.py \
 | `python ./.trellis/scripts/get_context.py --mode record` | Get context for record-session |
 | `python ./.trellis/scripts/add_session.py --title "..." --commit "-"` | Record planning/audit work |
 | `python ./.trellis/scripts/add_session.py --title "..." --commit "..." --auto-commit` | Record and explicitly auto-commit workspace/task metadata |
-| `python ./.trellis/scripts/task.py archive <name>` | Archive a completed task |
+| `python ./.trellis/scripts/task.py archive <name>` | Archive a completed task and auto-commit `.trellis/tasks` |
+| `python ./.trellis/scripts/task.py archive <name> --no-commit` | Archive a completed task without a git commit |
 | `python ./.trellis/scripts/task.py list` | List active tasks |

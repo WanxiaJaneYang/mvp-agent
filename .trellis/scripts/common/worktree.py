@@ -211,13 +211,10 @@ def get_worktree_base_dir(repo_root: Path | None = None) -> Path:
     if not worktree_dir:
         worktree_dir = "../worktrees"
 
-    # Handle relative path
-    if worktree_dir.startswith("../") or worktree_dir.startswith("./"):
-        # Relative to repo_root
-        return repo_root / worktree_dir
-    else:
-        # Absolute path
-        return Path(worktree_dir)
+    path = Path(worktree_dir)
+    if path.is_absolute():
+        return path
+    return repo_root / path
 
 
 def get_worktree_copy_files(repo_root: Path | None = None) -> list[str]:
