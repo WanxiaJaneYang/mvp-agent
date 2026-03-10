@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from apps.agent.pipeline.types import CitationStoreEntry, DailyBriefBullet, DailyBriefSynthesis
+
 
 SECTION_SEQUENCE = ("prevailing", "counter", "minority", "watch")
 
@@ -12,8 +14,8 @@ def build_citation_store(
     evidence_items: Iterable[Mapping[str, Any]],
     documents_by_id: Mapping[str, Mapping[str, Any]],
     chunks_by_id: Mapping[str, Mapping[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    citations: dict[str, dict[str, Any]] = {}
+) -> dict[str, CitationStoreEntry]:
+    citations: dict[str, CitationStoreEntry] = {}
     for index, item in enumerate(_sorted_evidence_items(evidence_items), start=1):
         doc = documents_by_id[str(item["doc_id"])]
         chunk = chunks_by_id[str(item["chunk_id"])]
@@ -43,7 +45,7 @@ def build_synthesis(
     evidence_items: Iterable[Mapping[str, Any]],
     documents_by_id: Mapping[str, Mapping[str, Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
-) -> dict[str, list[dict[str, Any]]]:
+) -> DailyBriefSynthesis:
     synthesis = {section: [] for section in SECTION_SEQUENCE}
     citation_ids = list(citation_store.keys())
 
@@ -53,11 +55,14 @@ def build_synthesis(
 
         section = SECTION_SEQUENCE[index]
         doc = documents_by_id[str(item["doc_id"])]
+        bullet: DailyBriefBullet = {
+            "text": _build_bullet_text(section=section, document=doc, publisher=str(item["publisher"])),
+            "citation_ids": [citation_ids[index]],
+            "confidence_label": _confidence_label(int(item["credibility_tier"])),
+        }
         synthesis[section].append(
             {
-                "text": _build_bullet_text(section=section, document=doc, publisher=str(item["publisher"])),
-                "citation_ids": [citation_ids[index]],
-                "confidence_label": _confidence_label(int(item["credibility_tier"])),
+                **bullet,
             }
         )
 

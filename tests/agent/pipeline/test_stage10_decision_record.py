@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from apps.agent.pipeline.decision_record_validation import validate_decision_record
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
-from scripts.validate_decision_record_schema import validate_decision_record
 
 
 class Stage10DecisionRecordTests(unittest.TestCase):

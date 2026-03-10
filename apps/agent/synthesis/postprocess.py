@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+from apps.agent.pipeline.types import DailyBriefBullet, DailyBriefSynthesis, FinalSynthesisResult
 
 
 ABSTAIN_TEXT = "[Insufficient evidence to produce a validated output]"
 CORE_SECTIONS = ("prevailing", "counter", "minority", "watch")
 
 
-def build_abstain_synthesis(*, reason: str) -> dict[str, Any]:
-    bullet = {
+def build_abstain_synthesis(*, reason: str) -> DailyBriefSynthesis:
+    bullet: DailyBriefBullet = {
         "text": ABSTAIN_TEXT,
         "citation_ids": [],
         "confidence_label": "abstained",
@@ -21,7 +21,7 @@ def build_abstain_synthesis(*, reason: str) -> dict[str, Any]:
     return synthesis
 
 
-def finalize_validation_outcome(*, validation_result: dict[str, Any]) -> dict[str, Any]:
+def finalize_validation_outcome(*, validation_result: dict[str, object]) -> FinalSynthesisResult:
     status = validation_result["status"]
     if status in {"ok", "partial"}:
         return {
