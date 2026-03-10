@@ -25,6 +25,9 @@ Modelling phase complete when:
 - Citation validator passes
 - Budget guard implemented and enabled by default
 
+Canonical runtime status view:
+- `docs/status-matrix.md` is the single modelled/coded/verified matrix for current repo state.
+
 ## Strengthening Tracks (Prophet Benchmark Review - 2026-02-19)
 
 - [PASSING] **S1) Decision record schema** - Define persisted per-run rationale artifact (claims, citations, rejected alternatives, risk flags, budget usage)

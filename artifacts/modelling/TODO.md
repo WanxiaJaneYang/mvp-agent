@@ -29,3 +29,5 @@ Last updated: 2026-02-19
 
 - Keep all work aligned with PRD v1.1 constraints: local-first, citation-grounded, no trading instructions.
 - Do not relax paywall, budget hard-stop, or evidence requirements.
+- Treat alert delivery as post-daily-brief scope until the daily-brief path is stable.
+- Use `docs/status-matrix.md` as the canonical modelled/coded/verified status view.
