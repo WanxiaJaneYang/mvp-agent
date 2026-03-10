@@ -4,6 +4,34 @@ from apps.agent.validators.citation_validator import validate_synthesis
 
 
 class CitationValidatorTests(unittest.TestCase):
+    def _citation(
+        self,
+        citation_id: str,
+        *,
+        url: str,
+        published_at: str = "2026-02-19T00:00:00Z",
+        paywall_policy: str = "full",
+        source_id: str | None = None,
+        publisher: str | None = None,
+        quote_text: str | None = None,
+        snippet_text: str | None = None,
+    ) -> dict[str, object]:
+        citation: dict[str, object] = {
+            "citation_id": citation_id,
+            "url": url,
+            "published_at": published_at,
+            "paywall_policy": paywall_policy,
+        }
+        if source_id is not None:
+            citation["source_id"] = source_id
+        if publisher is not None:
+            citation["publisher"] = publisher
+        if quote_text is not None:
+            citation["quote_text"] = quote_text
+        if snippet_text is not None:
+            citation["snippet_text"] = snippet_text
+        return citation
+
     def test_valid_core_sections_pass_without_removals(self):
         synthesis = {
             "prevailing": [{"text": "Fed held rates.", "citation_ids": ["c1"]}],
@@ -64,7 +92,7 @@ class CitationValidatorTests(unittest.TestCase):
         self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
         self.assertIn("Insufficient evidence", report.synthesis["prevailing"][0]["text"])
 
-    def test_paywalled_quote_span_is_stripped(self):
+    def test_legacy_span_fields_are_normalized_to_runtime_fields(self):
         synthesis = {
             "prevailing": [{"text": "Claim.", "citation_ids": ["c1"]}],
             "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
@@ -88,7 +116,155 @@ class CitationValidatorTests(unittest.TestCase):
         report = validate_synthesis(synthesis, store)
 
         self.assertNotIn("quote_span", report.citation_store["c1"])
-        self.assertIn("snippet_span", report.citation_store["c1"])
+        self.assertNotIn("snippet_span", report.citation_store["c1"])
+        self.assertIsNone(report.citation_store["c1"]["quote_text"])
+        self.assertEqual(report.citation_store["c1"]["snippet_text"], "headline")
+
+    def test_metadata_only_citation_clears_quote_text_but_keeps_snippet_text(self):
+        synthesis = {
+            "prevailing": [{"text": "Claim.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": self._citation(
+                "c1",
+                url="https://example.test/metadata-only",
+                paywall_policy="metadata_only",
+                source_id="wsj_markets",
+                publisher="Wall Street Journal",
+                quote_text="fabricated quote",
+                snippet_text="Headline only.",
+            ),
+            "c2": self._citation("c2", url="https://source2.example/doc"),
+            "c3": self._citation("c3", url="https://source3.example/doc"),
+            "c4": self._citation("c4", url="https://source4.example/doc"),
+        }
+
+        report = validate_synthesis(synthesis, store)
+
+        self.assertIsNone(report.citation_store["c1"]["quote_text"])
+        self.assertEqual(report.citation_store["c1"]["snippet_text"], "Headline only.")
+
+    def test_numeric_claim_requires_credible_or_independent_citations_when_registry_available(self):
+        synthesis = {
+            "prevailing": [{"text": "Markets fell 2% yesterday.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": self._citation(
+                "c1",
+                url="https://tier3.example/markets",
+                source_id="tier3_markets",
+                publisher="Tier 3 Markets",
+            ),
+            "c2": self._citation("c2", url="https://source2.example/doc"),
+            "c3": self._citation("c3", url="https://source3.example/doc"),
+            "c4": self._citation("c4", url="https://source4.example/doc"),
+        }
+        source_registry = {
+            "tier3_markets": {
+                "base_url": "https://tier3.example",
+                "credibility_tier": 3,
+                "tags": ["market_narrative"],
+            },
+            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+        }
+        store["c2"]["source_id"] = "src2"
+        store["c3"]["source_id"] = "src3"
+        store["c4"]["source_id"] = "src4"
+
+        report = validate_synthesis(synthesis, store, source_registry=source_registry)
+
+        self.assertEqual(report.removed_bullets, 1)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
+
+    def test_numeric_claim_allows_two_independent_lower_tier_sources(self):
+        synthesis = {
+            "prevailing": [{"text": "Oil rose 3% on supply concerns.", "citation_ids": ["c1", "c2"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c3"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c4"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c5"]}],
+        }
+        store = {
+            "c1": self._citation(
+                "c1",
+                url="https://publisher-a.example/oil",
+                source_id="publisher_a",
+                publisher="Publisher A",
+            ),
+            "c2": self._citation(
+                "c2",
+                url="https://publisher-b.example/oil",
+                source_id="publisher_b",
+                publisher="Publisher B",
+            ),
+            "c3": self._citation("c3", url="https://source3.example/doc", source_id="src3"),
+            "c4": self._citation("c4", url="https://source4.example/doc", source_id="src4"),
+            "c5": self._citation("c5", url="https://source5.example/doc", source_id="src5"),
+        }
+        source_registry = {
+            "publisher_a": {"base_url": "https://publisher-a.example", "credibility_tier": 3, "tags": ["market_narrative"]},
+            "publisher_b": {"base_url": "https://publisher-b.example", "credibility_tier": 3, "tags": ["market_narrative"]},
+            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src5": {"base_url": "https://source5.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+        }
+
+        report = validate_synthesis(synthesis, store, source_registry=source_registry)
+
+        self.assertEqual(report.removed_bullets, 0)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], ["c1", "c2"])
+
+    def test_policy_claim_requires_tier_one_citation_when_official_source_exists_in_store(self):
+        synthesis = {
+            "prevailing": [{"text": "The Fed held rates steady.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": self._citation(
+                "c1",
+                url="https://reuters.example/fed",
+                source_id="reuters_business",
+                publisher="Reuters",
+            ),
+            "c2": self._citation("c2", url="https://source2.example/doc", source_id="src2"),
+            "c3": self._citation("c3", url="https://source3.example/doc", source_id="src3"),
+            "c4": self._citation("c4", url="https://source4.example/doc", source_id="src4"),
+            "official": self._citation(
+                "official",
+                url="https://federalreserve.gov/newsevents/pressreleases/monetary20260310a.htm",
+                source_id="fed_press_releases",
+                publisher="Federal Reserve",
+            ),
+        }
+        source_registry = {
+            "reuters_business": {
+                "base_url": "https://reuters.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "fed_press_releases": {
+                "base_url": "https://federalreserve.gov/newsevents/pressreleases",
+                "credibility_tier": 1,
+                "tags": ["policy_centralbank", "rates", "us"],
+            },
+            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+        }
+
+        report = validate_synthesis(synthesis, store, source_registry=source_registry)
+
+        self.assertEqual(report.removed_bullets, 1)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
 
     def test_section_empty_triggers_retry(self):
         synthesis = {

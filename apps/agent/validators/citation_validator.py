@@ -8,6 +8,20 @@ from urllib.parse import urlparse
 
 CORE_SECTIONS = ("prevailing", "counter", "minority", "watch")
 INSUFFICIENT_EVIDENCE_TEXT = "[Insufficient evidence to support this claim]"
+NUMERIC_TIME_PATTERN = re.compile(
+    r"\b(?:\d+(?:\.\d+)?%?|\d{4}-\d{2}-\d{2}|q[1-4]|"
+    r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b",
+    re.IGNORECASE,
+)
+POLICY_OR_MACRO_PATTERN = re.compile(
+    r"\b(?:fed|federal reserve|ecb|bank of england|bank of japan|"
+    r"people's bank|pboc|monetary authority|reserve bank|hkma|"
+    r"rates?|policy settings|policy rate|cpi|inflation|payroll|employment|"
+    r"unemployment|gdp|consumer spending|personal income|ppi|retail sales)\b",
+    re.IGNORECASE,
+)
+OFFICIAL_POLICY_TAGS = frozenset({"policy_centralbank", "macro_data"})
 
 
 @dataclass(frozen=True)
@@ -27,8 +41,30 @@ class ValidationReport:
 
 def _sanitize_citation(raw: Mapping[str, Any]) -> Dict[str, Any]:
     citation = dict(raw)
+    legacy_id = citation.pop("id", None)
+    if legacy_id is not None and "citation_id" not in citation:
+        citation["citation_id"] = str(legacy_id)
+
+    quote_span = citation.pop("quote_span", None)
+    if "quote_text" not in citation and isinstance(quote_span, Mapping):
+        quote_text = quote_span.get("text")
+        citation["quote_text"] = None if quote_text is None else str(quote_text)
+
+    snippet_span = citation.pop("snippet_span", None)
+    if "snippet_text" not in citation and isinstance(snippet_span, Mapping):
+        citation["snippet_text"] = str(snippet_span.get("text") or "")
+
     if citation.get("paywall_policy") == "metadata_only":
-        citation.pop("quote_span", None)
+        citation["quote_text"] = None
+    elif "quote_text" in citation and citation["quote_text"] is not None:
+        citation["quote_text"] = str(citation["quote_text"])
+    else:
+        citation.setdefault("quote_text", None)
+
+    if "snippet_text" in citation and citation["snippet_text"] is not None:
+        citation["snippet_text"] = str(citation["snippet_text"])
+    else:
+        citation["snippet_text"] = str(citation.get("title") or "")
     return citation
 
 
@@ -124,6 +160,135 @@ def _is_placeholder_bullet(bullet: Mapping[str, Any]) -> bool:
     return str(bullet.get("text", "")) == INSUFFICIENT_EVIDENCE_TEXT
 
 
+def _citation_quality_meta(
+    citation: Mapping[str, Any],
+    source_registry: Mapping[str, Mapping[str, Any]] | None,
+) -> Dict[str, Any]:
+    source_id = str(citation.get("source_id") or "")
+    publisher = str(citation.get("publisher") or "")
+    if source_registry is None or not source_id:
+        return {
+            "has_registry_meta": False,
+            "source_id": source_id,
+            "publisher": publisher,
+            "credibility_tier": None,
+            "tags": [],
+        }
+
+    source_meta = source_registry.get(source_id)
+    if not isinstance(source_meta, Mapping):
+        return {
+            "has_registry_meta": False,
+            "source_id": source_id,
+            "publisher": publisher,
+            "credibility_tier": None,
+            "tags": [],
+        }
+
+    raw_tier = source_meta.get("credibility_tier")
+    credibility_tier = None
+    if raw_tier is not None:
+        try:
+            credibility_tier = int(raw_tier)
+        except (TypeError, ValueError):
+            credibility_tier = None
+
+    raw_tags = source_meta.get("tags", [])
+    tags = [str(tag) for tag in raw_tags] if isinstance(raw_tags, list) else []
+    return {
+        "has_registry_meta": True,
+        "source_id": source_id,
+        "publisher": publisher,
+        "credibility_tier": credibility_tier,
+        "tags": tags,
+    }
+
+
+def _passes_numeric_time_quality(
+    *,
+    text: str,
+    cited_citations: List[Mapping[str, Any]],
+    source_registry: Mapping[str, Mapping[str, Any]] | None,
+) -> bool:
+    if source_registry is None or not NUMERIC_TIME_PATTERN.search(text):
+        return True
+
+    cited_meta = [_citation_quality_meta(citation, source_registry) for citation in cited_citations]
+    if not any(meta["has_registry_meta"] for meta in cited_meta):
+        return True
+
+    if any(
+        meta["credibility_tier"] is not None and int(meta["credibility_tier"]) <= 2
+        for meta in cited_meta
+    ):
+        return True
+
+    independence_keys = {
+        meta["source_id"] or meta["publisher"]
+        for meta in cited_meta
+        if meta["source_id"] or meta["publisher"]
+    }
+    return len(independence_keys) >= 2
+
+
+def _official_policy_source_available(
+    *,
+    citation_store: Mapping[str, Mapping[str, Any]],
+    source_registry: Mapping[str, Mapping[str, Any]] | None,
+) -> bool:
+    if source_registry is None:
+        return False
+
+    for citation in citation_store.values():
+        meta = _citation_quality_meta(citation, source_registry)
+        if meta["credibility_tier"] == 1 and OFFICIAL_POLICY_TAGS.intersection(meta["tags"]):
+            return True
+    return False
+
+
+def _passes_policy_claim_quality(
+    *,
+    text: str,
+    cited_citations: List[Mapping[str, Any]],
+    citation_store: Mapping[str, Mapping[str, Any]],
+    source_registry: Mapping[str, Mapping[str, Any]] | None,
+) -> bool:
+    if source_registry is None or not POLICY_OR_MACRO_PATTERN.search(text):
+        return True
+    if not _official_policy_source_available(citation_store=citation_store, source_registry=source_registry):
+        return True
+
+    cited_meta = [_citation_quality_meta(citation, source_registry) for citation in cited_citations]
+    if not any(meta["has_registry_meta"] for meta in cited_meta):
+        return True
+
+    return any(meta["credibility_tier"] == 1 for meta in cited_meta)
+
+
+def _passes_quality_rules(
+    *,
+    bullet: Mapping[str, Any],
+    valid_ids: List[str],
+    citation_store: Mapping[str, Mapping[str, Any]],
+    source_registry: Mapping[str, Mapping[str, Any]] | None,
+) -> bool:
+    if source_registry is None:
+        return True
+
+    cited_citations = [citation_store[citation_id] for citation_id in valid_ids if citation_id in citation_store]
+    text = str(bullet.get("text", ""))
+    return _passes_numeric_time_quality(
+        text=text,
+        cited_citations=cited_citations,
+        source_registry=source_registry,
+    ) and _passes_policy_claim_quality(
+        text=text,
+        cited_citations=cited_citations,
+        citation_store=citation_store,
+        source_registry=source_registry,
+    )
+
+
 def validate_synthesis(
     synthesis: Mapping[str, Iterable[Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
@@ -132,10 +297,11 @@ def validate_synthesis(
     replace_with_placeholder: bool = True,
     max_removed_without_retry: int = 3,
 ) -> ValidationReport:
-    sanitized_store: Dict[str, Dict[str, Any]] = {
-        str(cid): _sanitize_citation(citation)
-        for cid, citation in citation_store.items()
-    }
+    sanitized_store: Dict[str, Dict[str, Any]] = {}
+    for cid, citation in citation_store.items():
+        normalized_citation = _sanitize_citation(citation)
+        normalized_citation["citation_id"] = str(normalized_citation.get("citation_id") or cid)
+        sanitized_store[str(cid)] = normalized_citation
 
     normalized_synthesis: Dict[str, Any] = {}
     total_bullets = 0
@@ -164,7 +330,16 @@ def validate_synthesis(
                 ):
                     valid_ids.append(cid)
 
-            if not valid_ids or not _has_claim_span_coverage(bullet, valid_ids):
+            if (
+                not valid_ids
+                or not _has_claim_span_coverage(bullet, valid_ids)
+                or not _passes_quality_rules(
+                    bullet=bullet,
+                    valid_ids=valid_ids,
+                    citation_store=sanitized_store,
+                    source_registry=source_registry,
+                )
+            ):
                 removed_bullets += 1
                 if replace_with_placeholder:
                     section_out.append(
