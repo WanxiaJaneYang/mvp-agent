@@ -250,7 +250,10 @@ We were unable to generate a complete daily brief for [date] due to insufficient
 ### Retry Cost Guards
 
 - **Max retries:** 1 (total 2 synthesis attempts per daily brief)
+- **Attempt contract:** attempt 1 may return `retry`; attempt 2 is the terminal attempt and MUST set `retry_exhausted: true` if validation still returns `retry`
+- **Postprocess rule:** only convert a `retry` validation result into an abstaining output after the retry budget is exhausted
 - **Retry triggers logging:** Record retry reason, removed bullets count, evidence pack diversity stats
+- **Runtime reporting:** persist `validation_attempts`, `max_validation_attempts`, and `validation_retry_exhausted` beside the normal budget snapshot so retry work is visible without fabricating extra spend
 - **Abort after 2nd failure:** Do not loop indefinitely; deliver abstaining report
 
 **Rationale:** This prevents scenarios where poor evidence packs cause repeated expensive synthesis calls. Better to abstain explicitly than burn budget retrying.

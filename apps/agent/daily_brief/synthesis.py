@@ -50,6 +50,13 @@ class _SectionCandidate:
     scores: dict[DailyBriefOutputSection, int]
 
 
+@dataclass(frozen=True)
+class SynthesisRetryPlan:
+    pinned_chunk_ids_by_section: Mapping[DailyBriefOutputSection, str]
+    target_sections: tuple[DailyBriefOutputSection, ...]
+    blocked_chunk_ids: frozenset[str]
+
+
 def build_citation_store(
     *,
     evidence_items: Iterable[Mapping[str, Any]],
@@ -86,6 +93,7 @@ def build_synthesis(
     evidence_items: Iterable[Mapping[str, Any]],
     documents_by_id: Mapping[str, Mapping[str, Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
+    retry_plan: SynthesisRetryPlan | None = None,
 ) -> DailyBriefSynthesis:
     synthesis = {section: [] for section in DAILY_BRIEF_CORE_OUTPUT_SECTIONS}
     candidates = _build_section_candidates(
@@ -93,7 +101,7 @@ def build_synthesis(
         documents_by_id=documents_by_id,
         citation_store=citation_store,
     )
-    assignments = _assign_sections(candidates)
+    assignments = _assign_sections(candidates, retry_plan=retry_plan)
 
     for section in DAILY_BRIEF_CORE_OUTPUT_SECTIONS:
         candidate = assignments.get(section)
@@ -154,11 +162,39 @@ def _build_section_candidates(
 
 def _assign_sections(
     candidates: Iterable[_SectionCandidate],
+    *,
+    retry_plan: SynthesisRetryPlan | None = None,
 ) -> dict[DailyBriefOutputSection, _SectionCandidate]:
     ordered_candidates = list(candidates)
+    candidates_by_chunk_id = {candidate.chunk_id: candidate for candidate in ordered_candidates}
     best_assignment: dict[DailyBriefOutputSection, _SectionCandidate] = {}
     best_key: tuple[int, tuple[tuple[int, int, str], ...]] | None = None
+    blocked_chunk_ids = frozenset()
+    seeded_assignment: dict[DailyBriefOutputSection, _SectionCandidate] = {}
+    used_chunk_ids = frozenset()
     search_order: tuple[DailyBriefOutputSection, ...] = ("watch", "counter", "minority", "prevailing")
+
+    if retry_plan is not None:
+        blocked_chunk_ids = frozenset(retry_plan.blocked_chunk_ids)
+        used_chunk_ids_mutable: set[str] = set()
+        for section, chunk_id in retry_plan.pinned_chunk_ids_by_section.items():
+            candidate = candidates_by_chunk_id.get(chunk_id)
+            if candidate is None or candidate.chunk_id in blocked_chunk_ids:
+                continue
+            seeded_assignment[section] = candidate
+            used_chunk_ids_mutable.add(candidate.chunk_id)
+        used_chunk_ids = frozenset(used_chunk_ids_mutable)
+        prioritized_targets = tuple(
+            section
+            for section in retry_plan.target_sections
+            if section not in seeded_assignment
+        )
+        remaining_sections = tuple(
+            section
+            for section in search_order
+            if section not in seeded_assignment and section not in prioritized_targets
+        )
+        search_order = prioritized_targets + remaining_sections
 
     def search(
         section_index: int,
@@ -176,7 +212,7 @@ def _assign_sections(
         section = search_order[section_index]
         assigned_any = False
         for candidate in ordered_candidates:
-            if candidate.chunk_id in used_chunk_ids:
+            if candidate.chunk_id in used_chunk_ids or candidate.chunk_id in blocked_chunk_ids:
                 continue
             assigned_any = True
             assignment[section] = candidate
@@ -190,7 +226,7 @@ def _assign_sections(
         if not assigned_any:
             search(section_index + 1, used_chunk_ids, assignment)
 
-    search(0, frozenset(), {})
+    search(0, used_chunk_ids, dict(seeded_assignment))
     return best_assignment
 
 

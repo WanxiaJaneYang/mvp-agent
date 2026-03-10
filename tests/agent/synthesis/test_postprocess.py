@@ -75,7 +75,7 @@ class SynthesisPostprocessTests(unittest.TestCase):
         self.assertEqual(result["synthesis"], validation_result["synthesis"])
         self.assertIsNone(result["abstain_reason"])
 
-    def test_finalize_validation_outcome_maps_retry_to_abstained_output(self):
+    def test_finalize_validation_outcome_requires_retry_exhaustion_before_abstaining(self):
         validation_result = {
             "status": "retry",
             "synthesis": {
@@ -85,6 +85,27 @@ class SynthesisPostprocessTests(unittest.TestCase):
                 "removed_bullets": 4,
                 "empty_core_sections": ["prevailing", "counter"],
             },
+            "validation_attempts": 1,
+            "max_validation_attempts": 2,
+            "retry_exhausted": False,
+        }
+
+        with self.assertRaises(ValueError):
+            finalize_validation_outcome(validation_result=validation_result)
+
+    def test_finalize_validation_outcome_maps_exhausted_retry_to_abstained_output(self):
+        validation_result = {
+            "status": "retry",
+            "synthesis": {
+                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+            },
+            "report": {
+                "removed_bullets": 4,
+                "empty_core_sections": ["prevailing", "counter"],
+            },
+            "validation_attempts": 2,
+            "max_validation_attempts": 2,
+            "retry_exhausted": True,
         }
 
         result = finalize_validation_outcome(validation_result=validation_result)

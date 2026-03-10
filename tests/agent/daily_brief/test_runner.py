@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import get_args, get_type_hints
+from unittest.mock import patch
 
 from apps.agent.daily_brief.runner import (
     build_daily_brief_query,
@@ -14,6 +15,7 @@ from apps.agent.daily_brief.runner import (
     load_active_fixture_payloads,
     run_fixture_daily_brief,
 )
+from apps.agent.daily_brief.synthesis import build_citation_store
 from apps.agent.pipeline.types import (
     BulletCitationRow,
     CitationStoreEntry,
@@ -39,6 +41,330 @@ from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 
 
 class DailyBriefRunnerTests(unittest.TestCase):
+    def test_build_daily_brief_synthesis_retry_reassigns_failed_section_without_retry_metadata(self):
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "bls_preview",
+                    "publisher": "BLS Preview Desk",
+                    "canonical_url": "https://example.test/watch",
+                    "title": "Watch Friday CPI for shelter inflation",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "analysis",
+                    "published_at": "2026-03-10T16:00:00Z",
+                    "fetched_at": "2026-03-10T16:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Markets are watching Friday CPI for shelter inflation surprises.",
+                    "body_text": "Watch Friday CPI for shelter inflation surprises.",
+                    "content_hash": "hash_watch",
+                    "status": "active",
+                    "created_at": "2026-03-10T16:05:00Z",
+                    "updated_at": "2026-03-10T16:05:00Z",
+                    "doc_id": "doc_watch",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_retry_real",
+                },
+                {
+                    "source_id": "market_commentary",
+                    "publisher": "Market Commentary",
+                    "canonical_url": "https://example.test/minority",
+                    "title": "Minority view still expects a hard landing",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "analysis",
+                    "published_at": "2026-03-10T15:30:00Z",
+                    "fetched_at": "2026-03-10T15:35:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "A minority of investors still expects a hard landing.",
+                    "body_text": "A minority of investors still expects a hard landing.",
+                    "content_hash": "hash_minority",
+                    "status": "active",
+                    "created_at": "2026-03-10T15:35:00Z",
+                    "updated_at": "2026-03-10T15:35:00Z",
+                    "doc_id": "doc_minority",
+                    "credibility_tier": 3,
+                    "ingestion_run_id": "run_retry_real",
+                },
+                {
+                    "source_id": "fed_press_releases",
+                    "publisher": "Federal Reserve",
+                    "canonical_url": "https://example.test/prevailing",
+                    "title": "Fed keeps policy steady",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "statement",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "fetched_at": "2026-03-10T14:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "body_text": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "content_hash": "hash_prevailing",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:05:00Z",
+                    "updated_at": "2026-03-10T14:05:00Z",
+                    "doc_id": "doc_prevailing",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_retry_real",
+                },
+                {
+                    "source_id": "reuters_business",
+                    "publisher": "Reuters",
+                    "canonical_url": "https://example.test/counter-invalid",
+                    "title": "Bond traders push back on soft-landing consensus",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": None,
+                    "fetched_at": "2026-03-10T14:35:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Bond traders push back on the soft-landing consensus as growth cools.",
+                    "body_text": "Bond traders push back on the soft-landing consensus as growth cools.",
+                    "content_hash": "hash_counter_invalid",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:35:00Z",
+                    "updated_at": "2026-03-10T14:35:00Z",
+                    "doc_id": "doc_counter_invalid",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_retry_real",
+                },
+                {
+                    "source_id": "wsj_markets",
+                    "publisher": "Wall Street Journal",
+                    "canonical_url": "https://example.test/counter-retry",
+                    "title": "Investors question the soft-landing narrative",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T14:20:00Z",
+                    "fetched_at": "2026-03-10T14:25:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Investors question the soft-landing narrative as growth data weakens.",
+                    "body_text": "Investors question the soft-landing narrative as growth data weakens.",
+                    "content_hash": "hash_counter_retry",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:25:00Z",
+                    "updated_at": "2026-03-10T14:25:00Z",
+                    "doc_id": "doc_counter_retry",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_retry_real",
+                },
+            ],
+            chunks=[
+                {"chunk_id": "doc_watch_chunk_000", "doc_id": "doc_watch", "chunk_index": 0, "text": "Watch Friday CPI for shelter inflation surprises.", "token_count": 6, "char_start": 0, "char_end": 43, "created_at": "2026-03-10T16:05:00Z"},
+                {"chunk_id": "doc_minority_chunk_000", "doc_id": "doc_minority", "chunk_index": 0, "text": "A minority of investors still expects a hard landing.", "token_count": 9, "char_start": 0, "char_end": 55, "created_at": "2026-03-10T15:35:00Z"},
+                {"chunk_id": "doc_prevailing_chunk_000", "doc_id": "doc_prevailing", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},
+                {"chunk_id": "doc_counter_invalid_chunk_000", "doc_id": "doc_counter_invalid", "chunk_index": 0, "text": "Bond traders push back on the soft-landing consensus as growth cools.", "token_count": 10, "char_start": 0, "char_end": 70, "created_at": "2026-03-10T14:35:00Z"},
+                {"chunk_id": "doc_counter_retry_chunk_000", "doc_id": "doc_counter_retry", "chunk_index": 0, "text": "Investors question the soft-landing narrative as growth data weakens.", "token_count": 9, "char_start": 0, "char_end": 68, "created_at": "2026-03-10T14:25:00Z"},
+            ],
+            fts_rows=[
+                {"text": "Watch Friday CPI for shelter inflation surprises.", "doc_id": "doc_watch", "chunk_id": "doc_watch_chunk_000", "publisher": "BLS Preview Desk", "source_id": "bls_preview", "published_at": "2026-03-10T16:00:00Z", "credibility_tier": 1},
+                {"text": "A minority of investors still expects a hard landing.", "doc_id": "doc_minority", "chunk_id": "doc_minority_chunk_000", "publisher": "Market Commentary", "source_id": "market_commentary", "published_at": "2026-03-10T15:30:00Z", "credibility_tier": 3},
+                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_prevailing", "chunk_id": "doc_prevailing_chunk_000", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
+                {"text": "Bond traders push back on the soft-landing consensus as growth cools.", "doc_id": "doc_counter_invalid", "chunk_id": "doc_counter_invalid_chunk_000", "publisher": "Reuters", "source_id": "reuters_business", "published_at": None, "credibility_tier": 2},
+                {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_counter_retry", "chunk_id": "doc_counter_retry_chunk_000", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
+            ],
+        )
+        registry = {
+            "bls_preview": {"id": "bls_preview", "name": "BLS Preview Desk", "url": "https://example.test/watch", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["macro_data"]},
+            "market_commentary": {"id": "market_commentary", "name": "Market Commentary", "url": "https://example.test/minority", "type": "rss", "credibility_tier": 3, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/prevailing", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},
+            "reuters_business": {"id": "reuters_business", "name": "Reuters", "url": "https://example.test/counter-invalid", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/counter-retry", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_evidence_pack_report") as evidence_pack_report_mock:
+            evidence_pack_report_mock.return_value = {
+                "items": [
+                    {"chunk_id": "doc_watch_chunk_000", "source_id": "bls_preview", "publisher": "BLS Preview Desk", "credibility_tier": 1, "retrieval_score": 0.95, "semantic_score": 0.95, "recency_score": 0.90, "credibility_score": 1.0, "rank_in_pack": 1},
+                    {"chunk_id": "doc_minority_chunk_000", "source_id": "market_commentary", "publisher": "Market Commentary", "credibility_tier": 3, "retrieval_score": 0.90, "semantic_score": 0.90, "recency_score": 0.80, "credibility_score": 0.6, "rank_in_pack": 2},
+                    {"chunk_id": "doc_prevailing_chunk_000", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.88, "semantic_score": 0.88, "recency_score": 0.70, "credibility_score": 1.0, "rank_in_pack": 3},
+                    {"chunk_id": "doc_counter_invalid_chunk_000", "source_id": "reuters_business", "publisher": "Reuters", "credibility_tier": 2, "retrieval_score": 0.86, "semantic_score": 0.86, "recency_score": 0.68, "credibility_score": 0.8, "rank_in_pack": 4},
+                    {"chunk_id": "doc_counter_retry_chunk_000", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.84, "semantic_score": 0.84, "recency_score": 0.66, "credibility_score": 0.8, "rank_in_pack": 5},
+                ],
+                "diversity_stats": {"unique_publishers": 5},
+                "diversity_check": "pass",
+                "notes": [],
+            }
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=stage_data,
+                registry=registry,
+                run_id="run_retry_real",
+            )
+
+        self.assertEqual(synthesis.stage8_result["status"], "ok")
+        self.assertEqual(synthesis.stage8_result["validation_attempts"], 2)
+        self.assertFalse(synthesis.stage8_result["retry_exhausted"])
+        self.assertEqual(synthesis.final_result["synthesis"]["counter"][0]["citation_ids"], ["cite_005"])
+        self.assertNotIn("meta", synthesis.final_result["synthesis"])
+
+    def test_build_daily_brief_synthesis_retries_once_before_returning_validated_output(self):
+        stage_inputs = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
+        context = RunContext(
+            run_id="run_daily_fixture",
+            run_type=RunType.DAILY_BRIEF,
+            started_at="2026-03-10T16:00:00Z",
+            status=RunStatus.RUNNING,
+        )
+        corpus = build_daily_brief_corpus(
+            stage_data=stage_inputs,
+            run_id="run_daily_fixture",
+            context=context,
+        )
+        first_attempt = {
+            "prevailing": [{"text": "First attempt prevailing.", "citation_ids": ["cite_001"]}],
+            "counter": [],
+            "minority": [],
+            "watch": [],
+        }
+        retried_attempt = {
+            "prevailing": [{"text": "Retried prevailing.", "citation_ids": ["cite_001"]}],
+            "counter": [{"text": "Retried counter.", "citation_ids": ["cite_002"]}],
+            "minority": [{"text": "Retried minority.", "citation_ids": ["cite_003"]}],
+            "watch": [{"text": "Retried watch.", "citation_ids": ["cite_004"]}],
+        }
+        citation_store = {
+            "cite_001": {"citation_id": "cite_001", "source_id": "src1", "publisher": "Pub 1", "doc_id": "doc_001", "chunk_id": "chunk_001", "url": "https://example.test/1", "title": "Doc 1", "published_at": "2026-03-10T10:00:00Z", "fetched_at": "2026-03-10T10:05:00Z", "paywall_policy": "full", "quote_text": "Quote 1", "snippet_text": "Snippet 1"},
+            "cite_002": {"citation_id": "cite_002", "source_id": "src2", "publisher": "Pub 2", "doc_id": "doc_002", "chunk_id": "chunk_002", "url": "https://example.test/2", "title": "Doc 2", "published_at": "2026-03-10T11:00:00Z", "fetched_at": "2026-03-10T11:05:00Z", "paywall_policy": "full", "quote_text": "Quote 2", "snippet_text": "Snippet 2"},
+            "cite_003": {"citation_id": "cite_003", "source_id": "src3", "publisher": "Pub 3", "doc_id": "doc_003", "chunk_id": "chunk_003", "url": "https://example.test/3", "title": "Doc 3", "published_at": "2026-03-10T12:00:00Z", "fetched_at": "2026-03-10T12:05:00Z", "paywall_policy": "full", "quote_text": "Quote 3", "snippet_text": "Snippet 3"},
+            "cite_004": {"citation_id": "cite_004", "source_id": "src4", "publisher": "Pub 4", "doc_id": "doc_004", "chunk_id": "chunk_004", "url": "https://example.test/4", "title": "Doc 4", "published_at": "2026-03-10T13:00:00Z", "fetched_at": "2026-03-10T13:05:00Z", "paywall_policy": "full", "quote_text": "Quote 4", "snippet_text": "Snippet 4"},
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_synthesis") as build_synthesis_mock, patch(
+            "apps.agent.daily_brief.runner.run_stage8_citation_validation"
+        ) as validation_mock:
+            build_synthesis_mock.side_effect = [first_attempt, retried_attempt]
+            validation_mock.side_effect = [
+                {
+                    "status": "retry",
+                    "synthesis": first_attempt,
+                    "citation_store": citation_store,
+                    "report": {
+                        "removed_bullets": 4,
+                        "empty_core_sections": ["counter", "minority", "watch"],
+                        "total_bullets": 1,
+                        "cited_bullets": 1,
+                        "validation_passed": False,
+                        "should_retry": True,
+                        "synthesis": first_attempt,
+                        "citation_store": citation_store,
+                    },
+                },
+                {
+                    "status": "ok",
+                    "synthesis": retried_attempt,
+                    "citation_store": citation_store,
+                    "report": {
+                        "removed_bullets": 0,
+                        "empty_core_sections": [],
+                        "total_bullets": 4,
+                        "cited_bullets": 4,
+                        "validation_passed": True,
+                        "should_retry": False,
+                        "synthesis": retried_attempt,
+                        "citation_store": citation_store,
+                    },
+                },
+            ]
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=corpus,
+                registry=stage_inputs.registry,
+                run_id="run_daily_fixture",
+            )
+
+        self.assertEqual(validation_mock.call_count, 2)
+        self.assertIsNone(build_synthesis_mock.call_args_list[0].kwargs["retry_plan"])
+        self.assertIsNotNone(build_synthesis_mock.call_args_list[1].kwargs["retry_plan"])
+        self.assertEqual(synthesis.stage8_result["validation_attempts"], 2)
+        self.assertEqual(synthesis.stage8_result["max_validation_attempts"], 2)
+        self.assertFalse(synthesis.stage8_result["retry_exhausted"])
+        self.assertEqual(synthesis.final_result["status"], "ok")
+
+    def test_build_daily_brief_synthesis_abstains_after_retry_exhaustion(self):
+        stage_inputs = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
+        context = RunContext(
+            run_id="run_daily_fixture",
+            run_type=RunType.DAILY_BRIEF,
+            started_at="2026-03-10T16:00:00Z",
+            status=RunStatus.RUNNING,
+        )
+        corpus = build_daily_brief_corpus(
+            stage_data=stage_inputs,
+            run_id="run_daily_fixture",
+            context=context,
+        )
+        first_attempt = {
+            "prevailing": [{"text": "First attempt prevailing.", "citation_ids": ["cite_001"]}],
+            "counter": [],
+            "minority": [],
+            "watch": [],
+        }
+        second_attempt = {
+            "prevailing": [],
+            "counter": [],
+            "minority": [],
+            "watch": [],
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_synthesis") as build_synthesis_mock, patch(
+            "apps.agent.daily_brief.runner.run_stage8_citation_validation"
+        ) as validation_mock:
+            build_synthesis_mock.side_effect = [first_attempt, second_attempt]
+            validation_mock.side_effect = [
+                {
+                    "status": "retry",
+                    "synthesis": first_attempt,
+                    "citation_store": {},
+                    "report": {
+                        "removed_bullets": 4,
+                        "empty_core_sections": ["counter", "minority", "watch"],
+                        "total_bullets": 1,
+                        "cited_bullets": 1,
+                        "validation_passed": False,
+                        "should_retry": True,
+                        "synthesis": first_attempt,
+                        "citation_store": {},
+                    },
+                },
+                {
+                    "status": "retry",
+                    "synthesis": second_attempt,
+                    "citation_store": {},
+                    "report": {
+                        "removed_bullets": 4,
+                        "empty_core_sections": ["prevailing", "counter", "minority", "watch"],
+                        "total_bullets": 0,
+                        "cited_bullets": 0,
+                        "validation_passed": False,
+                        "should_retry": True,
+                        "synthesis": second_attempt,
+                        "citation_store": {},
+                    },
+                },
+            ]
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=corpus,
+                registry=stage_inputs.registry,
+                run_id="run_daily_fixture",
+            )
+
+        self.assertEqual(validation_mock.call_count, 2)
+        self.assertEqual(synthesis.stage8_result["status"], "retry")
+        self.assertEqual(synthesis.stage8_result["validation_attempts"], 2)
+        self.assertEqual(synthesis.stage8_result["max_validation_attempts"], 2)
+        self.assertTrue(synthesis.stage8_result["retry_exhausted"])
+        self.assertEqual(synthesis.final_result["status"], "abstained")
+        self.assertEqual(synthesis.final_result["abstain_reason"], "validation_retry_exhausted")
+
     def test_stage_payload_annotations_use_named_contract_types(self):
         input_hints = get_type_hints(DailyBriefInputStageData)
         corpus_hints = get_type_hints(DailyBriefCorpusStageData)
@@ -251,6 +577,100 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(run_summary["budget_snapshot"]["hourly_spend_usd"], 0.03)
         self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
         self.assertIn("Budget: Pass", html)
+
+    def test_run_fixture_daily_brief_reports_retry_attempts_without_double_counting_budget(self):
+        first_attempt = {
+            "prevailing": [{"text": "First attempt prevailing.", "citation_ids": ["cite_001"]}],
+            "counter": [],
+            "minority": [],
+            "watch": [],
+        }
+        retried_attempt = {
+            "prevailing": [{"text": "Retried prevailing.", "citation_ids": ["cite_001"]}],
+            "counter": [{"text": "Retried counter.", "citation_ids": ["cite_002"]}],
+            "minority": [{"text": "Retried minority.", "citation_ids": ["cite_003"]}],
+            "watch": [{"text": "Retried watch.", "citation_ids": ["cite_004"]}],
+        }
+        citation_store = {
+            "cite_001": {"citation_id": "cite_001", "source_id": "src1", "publisher": "Pub 1", "doc_id": "doc_001", "chunk_id": "chunk_001", "url": "https://example.test/1", "title": "Doc 1", "published_at": "2026-03-10T10:00:00Z", "fetched_at": "2026-03-10T10:05:00Z", "paywall_policy": "full", "quote_text": "Quote 1", "snippet_text": "Snippet 1"},
+            "cite_002": {"citation_id": "cite_002", "source_id": "src2", "publisher": "Pub 2", "doc_id": "doc_002", "chunk_id": "chunk_002", "url": "https://example.test/2", "title": "Doc 2", "published_at": "2026-03-10T11:00:00Z", "fetched_at": "2026-03-10T11:05:00Z", "paywall_policy": "full", "quote_text": "Quote 2", "snippet_text": "Snippet 2"},
+            "cite_003": {"citation_id": "cite_003", "source_id": "src3", "publisher": "Pub 3", "doc_id": "doc_003", "chunk_id": "chunk_003", "url": "https://example.test/3", "title": "Doc 3", "published_at": "2026-03-10T12:00:00Z", "fetched_at": "2026-03-10T12:05:00Z", "paywall_policy": "full", "quote_text": "Quote 3", "snippet_text": "Snippet 3"},
+            "cite_004": {"citation_id": "cite_004", "source_id": "src4", "publisher": "Pub 4", "doc_id": "doc_004", "chunk_id": "chunk_004", "url": "https://example.test/4", "title": "Doc 4", "published_at": "2026-03-10T13:00:00Z", "fetched_at": "2026-03-10T13:05:00Z", "paywall_policy": "full", "quote_text": "Quote 4", "snippet_text": "Snippet 4"},
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_synthesis") as build_synthesis_mock, patch(
+            "apps.agent.daily_brief.runner.run_stage8_citation_validation"
+        ) as validation_mock, tempfile.TemporaryDirectory() as tmpdir:
+            build_synthesis_mock.side_effect = [first_attempt, retried_attempt]
+            validation_mock.side_effect = [
+                {
+                    "status": "retry",
+                    "synthesis": first_attempt,
+                    "citation_store": citation_store,
+                    "report": {
+                        "removed_bullets": 4,
+                        "empty_core_sections": ["counter", "minority", "watch"],
+                        "total_bullets": 1,
+                        "cited_bullets": 1,
+                        "validation_passed": False,
+                        "should_retry": True,
+                        "synthesis": first_attempt,
+                        "citation_store": citation_store,
+                    },
+                },
+                {
+                    "status": "ok",
+                    "synthesis": retried_attempt,
+                    "citation_store": citation_store,
+                    "report": {
+                        "removed_bullets": 0,
+                        "empty_core_sections": [],
+                        "total_bullets": 4,
+                        "cited_bullets": 4,
+                        "validation_passed": True,
+                        "should_retry": False,
+                        "synthesis": retried_attempt,
+                        "citation_store": citation_store,
+                    },
+                },
+            ]
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_retry_truth",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                budget_preflight={
+                    "hourly_spend_usd": 0.02,
+                    "daily_spend_usd": 0.50,
+                    "monthly_spend_usd": 20.0,
+                    "next_estimated_cost_usd": 0.01,
+                    "caps": BudgetCaps(),
+                    "windows": {
+                        "hourly": BudgetWindowSnapshot(
+                            window_start="2026-03-10T16:00:00Z",
+                            window_end="2026-03-10T16:59:59Z",
+                            cost_usd=0.02,
+                        ),
+                        "daily": BudgetWindowSnapshot(
+                            window_start="2026-03-10T00:00:00Z",
+                            window_end="2026-03-10T23:59:59Z",
+                            cost_usd=0.50,
+                        ),
+                        "monthly": BudgetWindowSnapshot(
+                            window_start="2026-03-01T00:00:00Z",
+                            window_end="2026-03-31T23:59:59Z",
+                            cost_usd=20.0,
+                        ),
+                    },
+                },
+            )
+            run_summary = json.loads((Path(result["artifact_dir"]) / "run_summary.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(run_summary["validation_attempts"], 2)
+        self.assertEqual(run_summary["max_validation_attempts"], 2)
+        self.assertFalse(run_summary["validation_retry_exhausted"])
+        self.assertEqual(run_summary["budget_snapshot"]["hourly_spend_usd"], 0.03)
+        self.assertEqual(run_summary["budget_snapshot"]["daily_spend_usd"], 0.51)
+        self.assertEqual(run_summary["budget_snapshot"]["monthly_spend_usd"], 20.01)
 
     def test_run_fixture_daily_brief_reports_diversity_failure_in_outputs(self):
         with tempfile.TemporaryDirectory() as tmpdir:

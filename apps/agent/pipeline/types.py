@@ -189,6 +189,9 @@ class CitationValidationResult(TypedDict):
     synthesis: DailyBriefSynthesis
     citation_store: dict[str, CitationStoreEntry]
     report: CitationValidationReport
+    validation_attempts: int
+    max_validation_attempts: int
+    retry_exhausted: bool
 
 
 class FinalSynthesisResult(TypedDict):

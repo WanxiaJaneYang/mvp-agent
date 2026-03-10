@@ -31,6 +31,9 @@ def run_pipeline(
     max_stage_attempts: int = 1,
     budget_preflight: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if max_stage_attempts < 1:
+        raise ValueError("max_stage_attempts must be at least 1")
+
     started_at = _utc_now_iso()
     normalized_run_type = _normalize_run_type(run_type)
     context = RunContext(

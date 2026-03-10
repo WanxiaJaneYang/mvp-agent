@@ -49,6 +49,16 @@ class OrchestratorTests(unittest.TestCase):
 
         self.assertEqual(result["run_type"], "daily_brief")
 
+    def test_rejects_non_positive_stage_attempt_limit(self):
+        with self.assertRaises(ValueError):
+            run_pipeline(
+                run_id="run_bad_attempt_limit",
+                run_type=RunType.DAILY_BRIEF,
+                stages=[],
+                recorder=lambda snapshot: None,
+                max_stage_attempts=0,
+            )
+
     def test_retries_retryable_stage_until_success(self):
         attempts = {"count": 0}
 
