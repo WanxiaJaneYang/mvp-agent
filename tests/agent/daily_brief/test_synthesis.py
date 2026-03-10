@@ -1,9 +1,37 @@
 import unittest
 
-from apps.agent.daily_brief.synthesis import SynthesisRetryPlan, build_citation_store, build_synthesis
+from apps.agent.daily_brief.synthesis import (
+    SynthesisRetryPlan,
+    build_changed_section,
+    build_citation_store,
+    build_synthesis,
+)
 
 
 class DailyBriefSynthesisTests(unittest.TestCase):
+    def test_build_changed_section_uses_current_cited_bullets_when_sections_shift(self):
+        changed = build_changed_section(
+            current_synthesis={
+                "prevailing": [{"text": "Fed kept policy steady (Federal Reserve).", "citation_ids": ["cite_001"], "confidence_label": "high"}],
+                "counter": [{"text": "Growth is cooling faster (Reuters).", "citation_ids": ["cite_002"], "confidence_label": "medium"}],
+                "minority": [{"text": "Some investors expect a rebound (WSJ).", "citation_ids": ["cite_003"], "confidence_label": "medium"}],
+                "watch": [{"text": "Watch payroll revisions next week.", "citation_ids": ["cite_004"], "confidence_label": "high"}],
+            },
+            previous_synthesis={
+                "prevailing": [{"text": "Inflation stayed sticky yesterday.", "citation_ids": ["cite_old_001"]}],
+                "counter": [{"text": "Growth is cooling faster (Reuters).", "citation_ids": ["cite_old_002"]}],
+                "watch": [{"text": "[Insufficient evidence to produce a validated output]", "citation_ids": []}],
+            },
+        )
+
+        self.assertEqual(len(changed), 3)
+        self.assertEqual(changed[0]["citation_ids"], ["cite_001"])
+        self.assertIn("Prevailing changed versus yesterday", changed[0]["text"])
+        self.assertEqual(changed[1]["citation_ids"], ["cite_003"])
+        self.assertIn("Minority is newly supported today", changed[1]["text"])
+        self.assertEqual(changed[2]["citation_ids"], ["cite_004"])
+        self.assertIn("Watch gained support today", changed[2]["text"])
+
     def test_build_synthesis_retry_plan_reassigns_failed_section_with_alternate_evidence(self):
         evidence_items = [
             {
