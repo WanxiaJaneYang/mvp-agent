@@ -33,6 +33,13 @@ DAILY_BRIEF_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = (
     "watch",
     "changed",
 )
+DAILY_BRIEF_CORE_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = (
+    "prevailing",
+    "counter",
+    "minority",
+    "watch",
+)
+DAILY_BRIEF_OPTIONAL_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = ("changed",)
 DAILY_BRIEF_CLAIM_SECTIONS: frozenset[DailyBriefOutputSection] = frozenset(DAILY_BRIEF_OUTPUT_SECTIONS)
 DAILY_BRIEF_SECTION_ALIASES: dict[str, DailyBriefOutputSection] = {
     "counterarguments": "counter",

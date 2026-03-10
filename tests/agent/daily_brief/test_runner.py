@@ -193,13 +193,17 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(result["lifecycle"][-1]["status"], "ok")
             self.assertIn("Daily Brief", html_path.read_text(encoding="utf-8"))
             citation_rows = json.loads((artifact_dir / "citations.json").read_text(encoding="utf-8"))
+            synthesis_payload = json.loads((artifact_dir / "synthesis.json").read_text(encoding="utf-8"))
             synthesis_bullets = json.loads((artifact_dir / "synthesis_bullets.json").read_text(encoding="utf-8"))
             bullet_citations = json.loads((artifact_dir / "bullet_citations.json").read_text(encoding="utf-8"))
             run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
             self.assertIsInstance(citation_rows, list)
             self.assertEqual(citation_rows[0]["citation_id"], "cite_001")
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
-            self.assertEqual(bullet_citations[0]["citation_id"], "cite_001")
+            self.assertEqual(
+                bullet_citations[0]["citation_id"],
+                synthesis_payload["prevailing"][0]["citation_ids"][0],
+            )
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
 
