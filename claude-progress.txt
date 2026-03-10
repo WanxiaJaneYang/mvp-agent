@@ -499,3 +499,35 @@
 - Outcome: PASS (issue `#33` now has an executable source-of-truth for the first runtime source surface)
 - Next single step:
   - Open PR for issue `#33`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 28] Built the first executable daily-brief vertical slice
+- Created:
+  - `artifacts/runtime/daily_brief_fixture_payloads.json`
+  - `apps/agent/daily_brief/__init__.py`
+  - `apps/agent/daily_brief/synthesis.py`
+  - `apps/agent/delivery/__init__.py`
+  - `apps/agent/delivery/html_report.py`
+  - `scripts/run_daily_brief_fixture.py`
+  - `tests/agent/daily_brief/test_runner.py`
+  - `tests/agent/daily_brief/test_synthesis.py`
+  - `tests/agent/delivery/test_html_report.py`
+- Updated:
+  - `apps/agent/daily_brief/runner.py`
+  - `claude-progress.txt`
+- Implemented:
+  - deterministic fixture-driven daily-brief runner for the active v1 US-first source subset
+  - rule-based query selection, evidence-pack assembly, synthesis construction, citation validation, abstain fallback, local HTML rendering, and decision-record persistence
+  - SQLite-compatible JSON artifact emission for sources, documents, chunks, FTS rows, evidence-pack items, citations, synthesis bullets, bullet citations, and run summary
+  - standalone script entrypoint for the local vertical slice
+  - runtime validation host normalization to reconcile feed-host registry entries with article-host citations in this narrow slice
+- Verification run + outcome:
+  - `python scripts/run_daily_brief_fixture.py --base-dir "$env:TEMP\\mvp-agent-issue36-verify" --run-id run_issue36_verify --generated-at-utc 2026-03-10T16:00:00Z` -> PASS (`status: ok`)
+  - generated artifacts confirmed on disk:
+    - `%TEMP%\\mvp-agent-issue36-verify\\artifacts\\daily\\2026-03-10\\brief.html`
+    - `%TEMP%\\mvp-agent-issue36-verify\\artifacts\\decision_records\\2026-03-10\\run_issue36_verify.json`
+    - `%TEMP%\\mvp-agent-issue36-verify\\artifacts\\runtime\\daily_brief_runs\\2026-03-10\\run_issue36_verify\\synthesis_bullets.json`
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (`83` tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (issue `#36` now has the first runnable local daily-brief path)
+- Next single step:
+  - run final reviewer pass for the whole branch, prepare the clean PR branch, open the PR, and merge after CI
