@@ -4,12 +4,22 @@ Local-first financial news and macro literature-review assistant.
 
 This repository contains the modelling artifacts and early runtime components for an assistant that:
 - ingests financial/macro sources (RSS, HTML, PDF),
-- produces citation-grounded daily briefs and major-event alerts,
+- produces citation-grounded daily briefs,
+- keeps alert scoring and alert delivery as planned follow-on work,
 - enforces strict budget and safety guardrails.
 
 ## Current Phase
 
-This project is currently in the modelling + early implementation phase.
+This project is currently in early implementation with the modelling pack still serving as the planning source of truth.
+
+Implemented in-tree today:
+- daily-brief runtime, local HTML delivery, and citation/postprocess guardrails
+- eval harness with 12 golden cases
+
+Planned next:
+- alert scoring and policy gates
+- alert delivery
+- portfolio relevance mapping
 
 Completed modelling artifacts:
 - `artifacts/modelling/source_registry.yaml`
@@ -45,13 +55,18 @@ See:
 ```text
 apps/
   agent/
-    runtime/              # Early runtime modules (e.g., budget guard)
+    daily_brief/          # Daily-brief runtime stages
+    delivery/             # Local HTML delivery
+    runtime/              # Runtime modules (e.g., budget guard)
+evals/
+  golden/                # Golden cases for current runtime contracts
 artifacts/
   PRD.md                  # Product requirements
   PROJECT_FACT.md         # Hard constraints
   modelling/              # Modelling pack and planning docs
 tests/
-  agent/runtime/          # Unit tests
+  agent/                  # Runtime and tooling unit tests
+  evals/                  # Eval harness tests
 docs/plans/               # Planning notes
 ```
 

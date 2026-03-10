@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "generated_on": "2026-03-10",
-  "phase": "modelling",
+  "phase": "implementation",
   "tickets": [
     {
       "id": "M001",
@@ -105,7 +105,7 @@
     {
       "id": "M007",
       "title": "Implement daily brief delivery",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P1",
       "depends_on": ["M004"],
       "files": [
@@ -121,7 +121,7 @@
     {
       "id": "M008",
       "title": "Add eval harness and 10 golden cases",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P1",
       "depends_on": ["M004", "M005", "M007"],
       "files": [
