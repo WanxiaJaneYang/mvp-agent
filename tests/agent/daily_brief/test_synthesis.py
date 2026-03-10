@@ -143,14 +143,30 @@ class DailyBriefSynthesisTests(unittest.TestCase):
             },
         }
         chunks_by_id = {
-            "doc_prevailing_a_chunk_000": {"text": "Fed officials kept policy steady while inflation progress remained uneven."},
-            "doc_prevailing_b_chunk_000": {"text": "Payroll growth remained resilient even as hiring cooled from January's pace."},
-            "doc_counter_a_chunk_000": {"text": "Bond desks pushed back on the soft-landing consensus as growth indicators cooled."},
-            "doc_counter_b_chunk_000": {"text": "Investors questioned the expected growth rebound after weaker survey data."},
-            "doc_minority_a_chunk_000": {"text": "A minority of strategists still sees inflation reacceleration risk this spring."},
-            "doc_minority_b_chunk_000": {"text": "Contrarian desks expect a sharper slowdown than consensus forecasts imply."},
-            "doc_watch_a_chunk_000": {"text": "Watch the next CPI shelter prints for confirmation that disinflation is broadening."},
-            "doc_watch_b_chunk_000": {"text": "Monitor payroll revisions next week for confirmation that labor demand is cooling."},
+            "doc_prevailing_a_chunk_000": {
+                "text": "Fed officials kept policy steady while inflation progress remained uneven."
+            },
+            "doc_prevailing_b_chunk_000": {
+                "text": "Payroll growth remained resilient even as hiring cooled from January's pace."
+            },
+            "doc_counter_a_chunk_000": {
+                "text": "Bond desks pushed back on the soft-landing consensus as growth indicators cooled."
+            },
+            "doc_counter_b_chunk_000": {
+                "text": "Investors questioned the expected growth rebound after weaker survey data."
+            },
+            "doc_minority_a_chunk_000": {
+                "text": "A minority of strategists still sees inflation reacceleration risk this spring."
+            },
+            "doc_minority_b_chunk_000": {
+                "text": "Contrarian desks expect a sharper slowdown than consensus forecasts imply."
+            },
+            "doc_watch_a_chunk_000": {
+                "text": "Watch the next CPI shelter prints for confirmation that disinflation is broadening."
+            },
+            "doc_watch_b_chunk_000": {
+                "text": "Monitor payroll revisions next week for confirmation that labor demand is cooling."
+            },
         }
 
         citations = build_citation_store(
@@ -247,10 +263,18 @@ class DailyBriefSynthesisTests(unittest.TestCase):
             },
         }
         chunks_by_id = {
-            "doc_prevailing_chunk_000": {"text": "Fed officials kept policy steady while inflation progress remained uneven."},
-            "doc_counter_chunk_000": {"text": "Investors questioned the expected growth rebound after weaker survey data."},
-            "doc_minority_chunk_000": {"text": "A minority of strategists still sees inflation reacceleration risk this spring."},
-            "doc_watch_chunk_000": {"text": "Watch the next CPI shelter prints for confirmation that disinflation is broadening."},
+            "doc_prevailing_chunk_000": {
+                "text": "Fed officials kept policy steady while inflation progress remained uneven."
+            },
+            "doc_counter_chunk_000": {
+                "text": "Investors questioned the expected growth rebound after weaker survey data."
+            },
+            "doc_minority_chunk_000": {
+                "text": "A minority of strategists still sees inflation reacceleration risk this spring."
+            },
+            "doc_watch_chunk_000": {
+                "text": "Watch the next CPI shelter prints for confirmation that disinflation is broadening."
+            },
         }
 
         citations = build_citation_store(
@@ -284,15 +308,51 @@ class DailyBriefSynthesisTests(unittest.TestCase):
     def test_build_changed_section_uses_current_cited_bullets_when_sections_shift(self):
         changed = build_changed_section(
             current_synthesis={
-                "prevailing": [{"text": "Fed kept policy steady (Federal Reserve).", "citation_ids": ["cite_001"], "confidence_label": "high"}],
-                "counter": [{"text": "Growth is cooling faster (Reuters).", "citation_ids": ["cite_002"], "confidence_label": "medium"}],
-                "minority": [{"text": "Some investors expect a rebound (WSJ).", "citation_ids": ["cite_003"], "confidence_label": "medium"}],
-                "watch": [{"text": "Watch payroll revisions next week.", "citation_ids": ["cite_004"], "confidence_label": "high"}],
+                "prevailing": [
+                    {
+                        "text": "Fed kept policy steady (Federal Reserve).",
+                        "citation_ids": ["cite_001"],
+                        "confidence_label": "high",
+                    }
+                ],
+                "counter": [
+                    {
+                        "text": "Growth is cooling faster (Reuters).",
+                        "citation_ids": ["cite_002"],
+                        "confidence_label": "medium",
+                    }
+                ],
+                "minority": [
+                    {
+                        "text": "Some investors expect a rebound (WSJ).",
+                        "citation_ids": ["cite_003"],
+                        "confidence_label": "medium",
+                    }
+                ],
+                "watch": [
+                    {
+                        "text": "Watch payroll revisions next week.",
+                        "citation_ids": ["cite_004"],
+                        "confidence_label": "high",
+                    }
+                ],
             },
             previous_synthesis={
-                "prevailing": [{"text": "Inflation stayed sticky yesterday.", "citation_ids": ["cite_old_001"]}],
-                "counter": [{"text": "Growth is cooling faster (Reuters).", "citation_ids": ["cite_old_002"]}],
-                "watch": [{"text": "[Insufficient evidence to produce a validated output]", "citation_ids": []}],
+                "prevailing": [
+                    {"text": "Inflation stayed sticky yesterday.", "citation_ids": ["cite_old_001"]}
+                ],
+                "counter": [
+                    {
+                        "text": "Growth is cooling faster (Reuters).",
+                        "citation_ids": ["cite_old_002"],
+                    }
+                ],
+                "watch": [
+                    {
+                        "text": "[Insufficient evidence to produce a validated output]",
+                        "citation_ids": [],
+                    }
+                ],
             },
         )
 
@@ -391,10 +451,18 @@ class DailyBriefSynthesisTests(unittest.TestCase):
         }
         chunks_by_id = {
             "doc_watch_chunk_000": {"text": "Watch Friday CPI for shelter inflation surprises."},
-            "doc_minority_chunk_000": {"text": "A minority of investors still expects inflation to reaccelerate."},
-            "doc_prevailing_chunk_000": {"text": "Fed officials kept policy steady while inflation progress remained uneven."},
-            "doc_counter_invalid_chunk_000": {"text": "Bond traders push back on the soft-landing consensus as growth cools."},
-            "doc_counter_retry_chunk_000": {"text": "Investors question the soft-landing narrative as growth data weakens."},
+            "doc_minority_chunk_000": {
+                "text": "A minority of investors still expects inflation to reaccelerate."
+            },
+            "doc_prevailing_chunk_000": {
+                "text": "Fed officials kept policy steady while inflation progress remained uneven."
+            },
+            "doc_counter_invalid_chunk_000": {
+                "text": "Bond traders push back on the soft-landing consensus as growth cools."
+            },
+            "doc_counter_retry_chunk_000": {
+                "text": "Investors question the soft-landing narrative as growth data weakens."
+            },
         }
 
         citations = build_citation_store(
@@ -500,9 +568,15 @@ class DailyBriefSynthesisTests(unittest.TestCase):
         }
         chunks_by_id = {
             "doc_watch_chunk_000": {"text": "Watch Friday CPI for shelter inflation surprises."},
-            "doc_minority_chunk_000": {"text": "A minority of investors still expects inflation to reaccelerate."},
-            "doc_prevailing_chunk_000": {"text": "Fed officials kept policy steady while inflation progress remained uneven."},
-            "doc_counter_chunk_000": {"text": "Bond traders push back on the soft-landing consensus as growth cools."},
+            "doc_minority_chunk_000": {
+                "text": "A minority of investors still expects inflation to reaccelerate."
+            },
+            "doc_prevailing_chunk_000": {
+                "text": "Fed officials kept policy steady while inflation progress remained uneven."
+            },
+            "doc_counter_chunk_000": {
+                "text": "Bond traders push back on the soft-landing consensus as growth cools."
+            },
         }
 
         citations = build_citation_store(
@@ -592,9 +666,15 @@ class DailyBriefSynthesisTests(unittest.TestCase):
             },
         }
         chunks_by_id = {
-            "doc_001_chunk_000": {"text": "Fed keeps policy steady while inflation progress is uneven."},
-            "doc_002_chunk_000": {"text": "A minority of strategists still expects a hard landing."},
-            "doc_003_chunk_000": {"text": "Investors challenge the soft-landing narrative as growth data weakens."},
+            "doc_001_chunk_000": {
+                "text": "Fed keeps policy steady while inflation progress is uneven."
+            },
+            "doc_002_chunk_000": {
+                "text": "A minority of strategists still expects a hard landing."
+            },
+            "doc_003_chunk_000": {
+                "text": "Investors challenge the soft-landing narrative as growth data weakens."
+            },
             "doc_004_chunk_000": {"text": "Watch payroll revisions next week for confirmation."},
         }
 

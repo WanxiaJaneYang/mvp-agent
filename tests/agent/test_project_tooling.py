@@ -1,10 +1,11 @@
-from pathlib import Path
 import tomllib
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORTED_TEST_COMMAND = 'python -m unittest discover -s tests -t . -p "test_*.py" -v'
+SUPPORTED_RUFF_COMMAND = "python -m ruff check apps tests scripts"
+SUPPORTED_MYPY_COMMAND = "python -m mypy apps"
 
 
 class ProjectToolingTests(unittest.TestCase):
@@ -28,17 +29,22 @@ class ProjectToolingTests(unittest.TestCase):
 
         self.assertIn(SUPPORTED_TEST_COMMAND, readme_text)
 
-    def test_readme_marks_lint_and_type_checks_as_informational(self):
+    def test_readme_documents_gated_lint_and_type_checks(self):
         readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("informational today", readme_text)
-        self.assertIn("not CI-gated yet", readme_text)
-        self.assertIn("currently fail on pre-existing repo-wide issues", readme_text)
+        self.assertIn(SUPPORTED_RUFF_COMMAND, readme_text)
+        self.assertIn(SUPPORTED_MYPY_COMMAND, readme_text)
+        self.assertIn("required and CI-gated", readme_text)
+        self.assertNotIn("informational today", readme_text)
+        self.assertNotIn("not CI-gated yet", readme_text)
+        self.assertNotIn("currently fail on pre-existing repo-wide issues", readme_text)
 
-    def test_ci_uses_supported_test_command(self):
+    def test_ci_uses_supported_commands(self):
         ci_text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
         self.assertIn(SUPPORTED_TEST_COMMAND, ci_text)
+        self.assertIn(SUPPORTED_RUFF_COMMAND, ci_text)
+        self.assertIn(SUPPORTED_MYPY_COMMAND, ci_text)
 
 
 if __name__ == "__main__":

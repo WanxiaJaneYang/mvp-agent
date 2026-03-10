@@ -122,7 +122,9 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
                 for spend_key, cap_key in spend_cap_pairs
             )
             if cap_reached and allowed:
-                errors.append("budget_snapshot.allowed must be false when spend reaches/exceeds cap")
+                errors.append(
+                    "budget_snapshot.allowed must be false when spend reaches/exceeds cap"
+                )
 
     guardrail = _require(record, "guardrail_checks", dict, errors) or {}
     if guardrail:
@@ -157,7 +159,9 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
             errors.append("decision_rationale.confidence_label must be high|medium|low")
 
         uncertainties = rationale.get("uncertainties")
-        if not isinstance(uncertainties, list) or not all(isinstance(v, str) for v in uncertainties):
+        if not isinstance(uncertainties, list) or not all(
+            isinstance(v, str) for v in uncertainties
+        ):
             errors.append("decision_rationale.uncertainties must be an array of strings")
             uncertainties = []
         if status == "abstained" and len(uncertainties) == 0:
@@ -172,7 +176,9 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
                 continue
             candidate_summary = item.get("candidate_summary")
             if not isinstance(candidate_summary, str) or not candidate_summary:
-                errors.append("rejected_alternatives[].candidate_summary must be a non-empty string")
+                errors.append(
+                    "rejected_alternatives[].candidate_summary must be a non-empty string"
+                )
             reason_code = item.get("reason_code")
             if not isinstance(reason_code, str) or not reason_code:
                 errors.append("rejected_alternatives[].reason_code must be a non-empty string")

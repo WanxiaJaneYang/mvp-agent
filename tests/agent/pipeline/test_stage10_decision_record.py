@@ -51,7 +51,9 @@ class Stage10DecisionRecordTests(unittest.TestCase):
             record_path = Path(result["record_path"])
             self.assertTrue(record_path.exists())
             self.assertIn("decision_records", str(record_path))
-            expected = Path(tmpdir) / "artifacts" / "decision_records" / "2026-02-19" / "run_123.json"
+            expected = (
+                Path(tmpdir) / "artifacts" / "decision_records" / "2026-02-19" / "run_123.json"
+            )
             self.assertEqual(record_path, expected)
 
             persisted = json.loads(record_path.read_text(encoding="utf-8"))

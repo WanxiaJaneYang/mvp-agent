@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 
-
 _SEPARATOR = "\x1f"
 
 

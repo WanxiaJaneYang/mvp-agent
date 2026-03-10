@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import asdict, dataclass
 import re
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any, Collection, Dict, Iterable, List, Mapping
 from urllib.parse import urlparse
 
@@ -36,7 +36,16 @@ class ValidationReport:
     citation_store: Dict[str, Dict[str, Any]]
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        return {
+            "total_bullets": self.total_bullets,
+            "cited_bullets": self.cited_bullets,
+            "removed_bullets": self.removed_bullets,
+            "validation_passed": self.validation_passed,
+            "should_retry": self.should_retry,
+            "empty_core_sections": list(self.empty_core_sections),
+            "synthesis": deepcopy(self.synthesis),
+            "citation_store": deepcopy(self.citation_store),
+        }
 
 
 def _sanitize_citation(raw: Mapping[str, Any]) -> Dict[str, Any]:
@@ -288,7 +297,9 @@ def _passes_quality_rules(
     if source_registry is None:
         return True
 
-    cited_citations = [citation_store[citation_id] for citation_id in valid_ids if citation_id in citation_store]
+    cited_citations = [
+        citation_store[citation_id] for citation_id in valid_ids if citation_id in citation_store
+    ]
     text = str(bullet.get("text", ""))
     return _passes_numeric_time_quality(
         text=text,
@@ -336,11 +347,11 @@ def validate_synthesis(
             valid_ids: List[str] = []
             for citation_id in bullet["citation_ids"]:
                 cid = str(citation_id)
-                citation = sanitized_store.get(cid)
+                candidate_citation = sanitized_store.get(cid)
                 if (
-                    citation
-                    and _is_valid_citation(citation)
-                    and _citation_matches_source_registry(citation, source_registry)
+                    candidate_citation is not None
+                    and _is_valid_citation(candidate_citation)
+                    and _citation_matches_source_registry(candidate_citation, source_registry)
                 ):
                     valid_ids.append(cid)
 

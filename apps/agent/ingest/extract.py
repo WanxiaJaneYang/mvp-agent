@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import base64
-from io import BytesIO
 from collections.abc import Mapping
+from io import BytesIO
 from typing import Any
 
 from pypdf import PdfReader
@@ -19,7 +19,9 @@ def extract_payload(*, source: Mapping[str, Any], payload: Mapping[str, Any]) ->
     raise ValueError(f"Unsupported source type: {source_type}")
 
 
-def _extract_rss_payload(*, source: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
+def _extract_rss_payload(
+    *, source: Mapping[str, Any], payload: Mapping[str, Any]
+) -> dict[str, Any]:
     return {
         "publisher": source["name"],
         "canonical_url": payload["url"],
@@ -34,7 +36,9 @@ def _extract_rss_payload(*, source: Mapping[str, Any], payload: Mapping[str, Any
     }
 
 
-def _extract_html_payload(*, source: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
+def _extract_html_payload(
+    *, source: Mapping[str, Any], payload: Mapping[str, Any]
+) -> dict[str, Any]:
     return {
         "publisher": source["name"],
         "canonical_url": payload["canonical_url"],
@@ -49,7 +53,9 @@ def _extract_html_payload(*, source: Mapping[str, Any], payload: Mapping[str, An
     }
 
 
-def _extract_pdf_payload(*, source: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
+def _extract_pdf_payload(
+    *, source: Mapping[str, Any], payload: Mapping[str, Any]
+) -> dict[str, Any]:
     canonical_url = payload.get("canonical_url", payload.get("url"))
     if not canonical_url:
         raise ValueError("PDF payload must include canonical_url or url")

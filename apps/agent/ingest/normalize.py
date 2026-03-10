@@ -5,7 +5,9 @@ from collections.abc import Mapping
 from typing import Any
 
 
-def build_document_record(*, source: Mapping[str, Any], extracted: Mapping[str, Any]) -> dict[str, Any]:
+def build_document_record(
+    *, source: Mapping[str, Any], extracted: Mapping[str, Any]
+) -> dict[str, Any]:
     paywall_policy = source["paywall_policy"]
     metadata_only = int(paywall_policy == "metadata_only")
     body_text = None if metadata_only else extracted.get("body_text")

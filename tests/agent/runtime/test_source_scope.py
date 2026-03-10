@@ -1,6 +1,6 @@
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 import yaml
 
@@ -26,7 +26,9 @@ class SourceScopeTests(unittest.TestCase):
         subset = load_active_source_subset()
 
         tier_1_count = sum(1 for source in subset if source["credibility_tier"] == 1)
-        metadata_only_count = sum(1 for source in subset if source["paywall_policy"] == "metadata_only")
+        metadata_only_count = sum(
+            1 for source in subset if source["paywall_policy"] == "metadata_only"
+        )
 
         self.assertGreaterEqual(tier_1_count, 3)
         self.assertEqual(metadata_only_count, 1)
@@ -38,7 +40,9 @@ class SourceScopeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             active_ids_path = Path(temp_dir) / "active_sources.yaml"
             active_ids_path.write_text(
-                yaml.safe_dump({"active_source_ids": ["fed_press_releases", "missing_source"]}, sort_keys=False),
+                yaml.safe_dump(
+                    {"active_source_ids": ["fed_press_releases", "missing_source"]}, sort_keys=False
+                ),
                 encoding="utf-8",
             )
 
@@ -46,14 +50,16 @@ class SourceScopeTests(unittest.TestCase):
                 load_active_source_subset(registry=registry, active_ids_path=active_ids_path)
 
     def test_validate_artifacts_script_includes_runtime_subset_artifact(self):
-        validate_script = (Path(__file__).resolve().parents[3] / "scripts" / "validate_artifacts.py").read_text(
-            encoding="utf-8"
-        )
+        validate_script = (
+            Path(__file__).resolve().parents[3] / "scripts" / "validate_artifacts.py"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("artifacts/runtime/v1_active_sources.yaml", validate_script)
 
     def test_readme_documents_v1_active_subset_first(self):
-        readme_text = (Path(__file__).resolve().parents[3] / "README.md").read_text(encoding="utf-8")
+        readme_text = (Path(__file__).resolve().parents[3] / "README.md").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("active source subset", readme_text)
         self.assertIn("fed_press_releases", readme_text)

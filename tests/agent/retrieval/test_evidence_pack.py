@@ -1,7 +1,6 @@
 import unittest
 
-from apps.agent.retrieval.evidence_pack import build_evidence_pack
-from apps.agent.retrieval.evidence_pack import build_evidence_pack_report
+from apps.agent.retrieval.evidence_pack import build_evidence_pack, build_evidence_pack_report
 
 
 class EvidencePackTests(unittest.TestCase):

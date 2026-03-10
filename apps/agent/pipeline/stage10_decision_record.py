@@ -73,7 +73,9 @@ def build_and_persist_decision_record(
                 "section": _normalize_section(str(section)),
                 "text": str(bullet.get("text", "")),
                 "citation_ids": citation_ids,
-                "coverage_status": "supported" if len(citation_ids) >= 1 else "insufficient_evidence",
+                "coverage_status": "supported"
+                if len(citation_ids) >= 1
+                else "insufficient_evidence",
             }
             if claim["section"] not in ALLOWED_CLAIM_SECTIONS:
                 continue
@@ -108,7 +110,9 @@ def build_and_persist_decision_record(
             guardrail_notes = list(guardrail_notes)
         else:
             guardrail_notes = []
-        guardrail_notes.append("Missing output artifact/hash; decision record downgraded to failed.")
+        guardrail_notes.append(
+            "Missing output artifact/hash; decision record downgraded to failed."
+        )
         guardrail_checks = {**dict(guardrail_checks), "notes": guardrail_notes}
 
     uncertainties: list[str] = []

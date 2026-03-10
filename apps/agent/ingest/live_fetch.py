@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.request import Request, urlopen
-import xml.etree.ElementTree as ET
 
 DEFAULT_REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; MVP-Agent/0.1; +https://example.test/local)",
@@ -40,7 +40,9 @@ def parse_rss_feed(*, feed_text: str, fetched_at_utc: str) -> list[dict[str, Any
 
     entries = root.findall(".//{*}entry")
     if entries:
-        return [_atom_entry_to_payload(entry=entry, fetched_at_utc=fetched_at_utc) for entry in entries]
+        return [
+            _atom_entry_to_payload(entry=entry, fetched_at_utc=fetched_at_utc) for entry in entries
+        ]
 
     return []
 
@@ -51,7 +53,9 @@ def _rss_item_to_payload(*, item: ET.Element, fetched_at_utc: str) -> dict[str, 
         "title": _first_text(item, "title"),
         "author": _first_text(item, "author", "{*}creator"),
         "language": None,
-        "published_at": _normalize_timestamp(_first_text(item, "pubDate", "{*}published", "{*}updated")),
+        "published_at": _normalize_timestamp(
+            _first_text(item, "pubDate", "{*}published", "{*}updated")
+        ),
         "fetched_at": fetched_at_utc,
         "summary": _first_text(item, "description", "{*}summary"),
         "body_text": _first_text(item, "{*}encoded", "{*}content"),

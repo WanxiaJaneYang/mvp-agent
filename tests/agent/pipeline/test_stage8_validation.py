@@ -12,10 +12,30 @@ class Stage8ValidationTests(unittest.TestCase):
             "watch": [{"text": "Watch item", "citation_ids": ["c4"]}],
         }
         store = {
-            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c1": {
+                "id": "c1",
+                "url": "u1",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "u2",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "u3",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c4": {
+                "id": "c4",
+                "url": "u4",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
         }
 
         result = run_stage8_citation_validation(synthesis, store)
@@ -34,10 +54,30 @@ class Stage8ValidationTests(unittest.TestCase):
             "watch": [{"text": "ok", "citation_ids": ["c3"]}],
         }
         store = {
-            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c1": {
+                "id": "c1",
+                "url": "u1",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "u2",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "u3",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c4": {
+                "id": "c4",
+                "url": "u4",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
         }
 
         result = run_stage8_citation_validation(synthesis, store)
@@ -58,7 +98,9 @@ class Stage8ValidationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "retry")
 
-    def test_stage8_requires_tier_one_policy_citation_when_official_source_is_in_evidence_pack(self):
+    def test_stage8_requires_tier_one_policy_citation_when_official_source_is_in_evidence_pack(
+        self,
+    ):
         synthesis = {
             "prevailing": [{"text": "The Fed held rates steady.", "citation_ids": ["c1"]}],
             "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
@@ -106,9 +148,21 @@ class Stage8ValidationTests(unittest.TestCase):
                 "credibility_tier": 1,
                 "tags": ["policy_centralbank", "rates", "us"],
             },
-            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src2": {
+                "base_url": "https://source2.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src3": {
+                "base_url": "https://source3.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src4": {
+                "base_url": "https://source4.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
         }
 
         result = run_stage8_citation_validation(
