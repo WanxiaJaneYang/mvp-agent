@@ -5,7 +5,7 @@ Local-first financial news and macro literature-review assistant.
 This repository contains the modelling artifacts and early runtime components for an assistant that:
 - ingests financial/macro sources (RSS, HTML, PDF),
 - produces citation-grounded daily briefs,
-- keeps alert scoring and alert delivery as planned follow-on work,
+- implements alert scoring and policy gates while keeping alert delivery as a planned follow-on step,
 - enforces strict budget and safety guardrails.
 
 ## Current Phase
@@ -14,10 +14,10 @@ This project is currently in early implementation with the modelling pack still 
 
 Implemented in-tree today:
 - daily-brief runtime, local HTML delivery, and citation/postprocess guardrails
+- alert scoring and policy-gate helpers
 - eval harness with 12 golden cases
 
 Planned next:
-- alert scoring and policy gates
 - alert delivery
 - portfolio relevance mapping
 
@@ -55,6 +55,7 @@ See:
 ```text
 apps/
   agent/
+    alerts/               # Alert scoring and policy gates
     daily_brief/          # Daily-brief runtime stages
     delivery/             # Local HTML delivery
     runtime/              # Runtime modules (e.g., budget guard)
@@ -133,4 +134,5 @@ python -m compileall -q apps tests scripts
 
 - This project is not a trading signal engine and should not produce buy/sell instructions.
 - Outputs are intended to provide evidence-grounded scenarios and risk flags.
+- Major-event alerts remain planned until alert delivery runtime is implemented.
 - The live daily-brief slice starts with the current RSS-backed active subset and skips sources that are temporarily blocked or unavailable.
