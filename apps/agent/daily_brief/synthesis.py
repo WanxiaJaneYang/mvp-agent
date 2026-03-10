@@ -22,6 +22,12 @@ WATCH_KEYWORDS = (
     "risk",
     "watch",
 )
+WATCH_STRICT_KEYWORDS = (
+    "ahead",
+    "monitor",
+    "next",
+    "watch",
+)
 COUNTER_KEYWORDS = (
     "against",
     "challenge",
@@ -41,6 +47,20 @@ MINORITY_KEYWORDS = (
 )
 INSUFFICIENT_EVIDENCE_TEXT = "[Insufficient evidence to produce a validated output]"
 CHANGED_SECTION_MAX_BULLETS = 3
+SECTION_BULLET_LIMITS: dict[DailyBriefOutputSection, int] = {
+    "prevailing": 3,
+    "counter": 2,
+    "minority": 2,
+    "watch": 3,
+    "changed": CHANGED_SECTION_MAX_BULLETS,
+}
+SECTION_STRICT_SCORE_FLOORS: dict[DailyBriefOutputSection, int] = {
+    "prevailing": 0,
+    "counter": 100,
+    "minority": 100,
+    "watch": 100,
+    "changed": 0,
+}
 
 
 @dataclass(frozen=True)
@@ -48,6 +68,7 @@ class _SectionCandidate:
     chunk_id: str
     item: Mapping[str, Any]
     document: Mapping[str, Any]
+    citation: Mapping[str, Any]
     citation_id: str
     scores: dict[DailyBriefOutputSection, int]
 
@@ -106,19 +127,22 @@ def build_synthesis(
     assignments = _assign_sections(candidates, retry_plan=retry_plan)
 
     for section in DAILY_BRIEF_CORE_OUTPUT_SECTIONS:
-        candidate = assignments.get(section)
-        if candidate is None:
+        section_candidates = assignments.get(section, [])
+        if not section_candidates:
             continue
-        bullet: DailyBriefBullet = {
-            "text": _build_bullet_text(
-                section=section,
-                document=candidate.document,
-                publisher=str(candidate.item["publisher"]),
-            ),
-            "citation_ids": [candidate.citation_id],
-            "confidence_label": _confidence_label(int(candidate.item["credibility_tier"])),
-        }
-        synthesis[section].append(dict(bullet))
+        for candidate in section_candidates:
+            bullet: DailyBriefBullet = {
+                "text": _build_bullet_text(
+                    section=section,
+                    document=candidate.document,
+                    citation=candidate.citation,
+                    publisher=str(candidate.item["publisher"]),
+                    strict_match=_is_strict_section_match(candidate=candidate, section=section),
+                ),
+                "citation_ids": [candidate.citation_id],
+                "confidence_label": _confidence_label(int(candidate.item["credibility_tier"])),
+            }
+            synthesis[section].append(dict(bullet))
     return synthesis
 
 
@@ -178,23 +202,25 @@ def _build_section_candidates(
     documents_by_id: Mapping[str, Mapping[str, Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
 ) -> list[_SectionCandidate]:
-    citation_ids_by_chunk_id = {
-        str(entry["chunk_id"]): str(citation_id)
+    citations_by_chunk_id = {
+        str(entry["chunk_id"]): (str(citation_id), entry)
         for citation_id, entry in citation_store.items()
         if isinstance(entry, Mapping) and entry.get("chunk_id") is not None
     }
     candidates: list[_SectionCandidate] = []
     for item in _sorted_evidence_items(evidence_items):
         chunk_id = str(item["chunk_id"])
-        citation_id = citation_ids_by_chunk_id.get(chunk_id)
-        if citation_id is None:
+        citation_payload = citations_by_chunk_id.get(chunk_id)
+        if citation_payload is None:
             continue
+        citation_id, citation = citation_payload
         document = documents_by_id[str(item["doc_id"])]
         candidates.append(
             _SectionCandidate(
                 chunk_id=chunk_id,
                 item=item,
                 document=document,
+                citation=citation,
                 citation_id=citation_id,
                 scores=_section_scores(item=item, document=document),
             )
@@ -206,37 +232,91 @@ def _assign_sections(
     candidates: Iterable[_SectionCandidate],
     *,
     retry_plan: SynthesisRetryPlan | None = None,
-) -> dict[DailyBriefOutputSection, _SectionCandidate]:
+) -> dict[DailyBriefOutputSection, list[_SectionCandidate]]:
     ordered_candidates = list(candidates)
     candidates_by_chunk_id = {candidate.chunk_id: candidate for candidate in ordered_candidates}
-    best_assignment: dict[DailyBriefOutputSection, _SectionCandidate] = {}
-    best_key: tuple[int, tuple[tuple[int, int, str], ...]] | None = None
     blocked_chunk_ids = frozenset()
-    seeded_assignment: dict[DailyBriefOutputSection, _SectionCandidate] = {}
-    used_chunk_ids = frozenset()
+    assignments: dict[DailyBriefOutputSection, list[_SectionCandidate]] = {}
+    used_chunk_ids: set[str] = set()
     search_order: tuple[DailyBriefOutputSection, ...] = ("watch", "counter", "minority", "prevailing")
 
     if retry_plan is not None:
         blocked_chunk_ids = frozenset(retry_plan.blocked_chunk_ids)
-        used_chunk_ids_mutable: set[str] = set()
         for section, chunk_id in retry_plan.pinned_chunk_ids_by_section.items():
             candidate = candidates_by_chunk_id.get(chunk_id)
             if candidate is None or candidate.chunk_id in blocked_chunk_ids:
                 continue
-            seeded_assignment[section] = candidate
-            used_chunk_ids_mutable.add(candidate.chunk_id)
-        used_chunk_ids = frozenset(used_chunk_ids_mutable)
+            assignments.setdefault(section, []).append(candidate)
+            used_chunk_ids.add(candidate.chunk_id)
         prioritized_targets = tuple(
             section
             for section in retry_plan.target_sections
-            if section not in seeded_assignment
+            if section not in assignments
         )
         remaining_sections = tuple(
             section
             for section in search_order
-            if section not in seeded_assignment and section not in prioritized_targets
+            if section not in assignments and section not in prioritized_targets
         )
         search_order = prioritized_targets + remaining_sections
+
+    initial_assignment = _best_single_assignment(
+        ordered_candidates=ordered_candidates,
+        search_order=search_order,
+        seeded_assignment={section: items[0] for section, items in assignments.items()},
+        blocked_chunk_ids=blocked_chunk_ids,
+    )
+    assignments = {section: [candidate] for section, candidate in initial_assignment.items()}
+    used_chunk_ids = {candidate.chunk_id for candidate in initial_assignment.values()}
+
+    if retry_plan is not None:
+        return assignments
+
+    for section in search_order:
+        section_candidates = assignments.setdefault(section, [])
+        if section_candidates and not _has_validation_safe_lead(section_candidates[0]):
+            continue
+        section_limit = SECTION_BULLET_LIMITS[section]
+        if retry_plan is not None:
+            if section in retry_plan.pinned_chunk_ids_by_section:
+                section_limit = len(section_candidates)
+            elif section in retry_plan.target_sections:
+                section_limit = 1
+        ranked_candidates = sorted(
+            ordered_candidates,
+            key=lambda candidate: _section_sort_key(section=section, candidate=candidate),
+            reverse=True,
+        )
+        for candidate in ranked_candidates:
+            if len(section_candidates) >= section_limit:
+                break
+            if candidate.chunk_id in used_chunk_ids or candidate.chunk_id in blocked_chunk_ids:
+                continue
+            if section != "prevailing" and not _is_strict_section_match(candidate=candidate, section=section):
+                continue
+            section_candidates.append(candidate)
+            used_chunk_ids.add(candidate.chunk_id)
+        if section != "prevailing" and not section_candidates:
+            for candidate in ranked_candidates:
+                if candidate.chunk_id in used_chunk_ids or candidate.chunk_id in blocked_chunk_ids:
+                    continue
+                section_candidates.append(candidate)
+                used_chunk_ids.add(candidate.chunk_id)
+                break
+
+    return {section: items for section, items in assignments.items() if items}
+
+
+def _best_single_assignment(
+    *,
+    ordered_candidates: list[_SectionCandidate],
+    search_order: tuple[DailyBriefOutputSection, ...],
+    seeded_assignment: Mapping[DailyBriefOutputSection, _SectionCandidate],
+    blocked_chunk_ids: frozenset[str],
+) -> dict[DailyBriefOutputSection, _SectionCandidate]:
+    best_assignment: dict[DailyBriefOutputSection, _SectionCandidate] = {}
+    best_key: tuple[int, tuple[tuple[int, int, str], ...]] | None = None
+    seeded_chunk_ids = frozenset(candidate.chunk_id for candidate in seeded_assignment.values())
 
     def search(
         section_index: int,
@@ -252,6 +332,10 @@ def _assign_sections(
             return
 
         section = search_order[section_index]
+        if section in seeded_assignment:
+            search(section_index + 1, used_chunk_ids, assignment)
+            return
+
         assigned_any = False
         for candidate in ordered_candidates:
             if candidate.chunk_id in used_chunk_ids or candidate.chunk_id in blocked_chunk_ids:
@@ -268,7 +352,7 @@ def _assign_sections(
         if not assigned_any:
             search(section_index + 1, used_chunk_ids, assignment)
 
-    search(0, used_chunk_ids, dict(seeded_assignment))
+    search(0, seeded_chunk_ids, dict(seeded_assignment))
     return best_assignment
 
 
@@ -338,15 +422,103 @@ def _recency_bonus(document: Mapping[str, Any]) -> int:
     minutes = int(hhmmss[2:4])
     return hours * 2 + minutes // 15
 
+def _is_strict_section_match(
+    *,
+    candidate: _SectionCandidate,
+    section: DailyBriefOutputSection,
+) -> bool:
+    if section == "prevailing":
+        return True
+    keyword_sets: dict[DailyBriefOutputSection, tuple[str, ...]] = {
+        "counter": COUNTER_KEYWORDS,
+        "minority": MINORITY_KEYWORDS,
+        "watch": WATCH_STRICT_KEYWORDS,
+        "prevailing": (),
+        "changed": (),
+    }
+    text = _normalized_document_text(candidate.document)
+    keywords = keyword_sets[section]
+    if keywords:
+        return any(keyword in text for keyword in keywords)
+    return candidate.scores[section] >= SECTION_STRICT_SCORE_FLOORS[section]
 
-def _build_bullet_text(*, section: str, document: Mapping[str, Any], publisher: str) -> str:
-    title = str(document.get("title") or document.get("rss_snippet") or publisher).strip()
-    normalized_title = title.rstrip(".")
+
+def _section_sort_key(
+    *,
+    section: DailyBriefOutputSection,
+    candidate: _SectionCandidate,
+) -> tuple[int, int, int, str]:
+    credibility_priority = 0
     if section == "watch":
-        if normalized_title.lower().startswith("watch "):
-            return f"{normalized_title}."
-        return f"Watch {normalized_title.lower()}."
-    return f"{normalized_title} ({publisher})."
+        credibility_priority = max(0, 5 - int(candidate.item.get("credibility_tier", 4))) * 10
+    return (
+        credibility_priority,
+        candidate.scores[section],
+        -int(candidate.item.get("rank_in_pack", 9999)),
+        candidate.chunk_id,
+    )
+
+
+def _has_validation_safe_lead(candidate: _SectionCandidate) -> bool:
+    return bool(candidate.citation.get("url")) and bool(candidate.citation.get("published_at"))
+
+
+def _build_bullet_text(
+    *,
+    section: str,
+    document: Mapping[str, Any],
+    citation: Mapping[str, Any],
+    publisher: str,
+    strict_match: bool,
+) -> str:
+    del publisher
+    if section in {"counter", "watch"}:
+        preferred_text = document.get("title")
+    elif strict_match:
+        preferred_text = (
+            citation.get("quote_text")
+            or citation.get("snippet_text")
+            or document.get("rss_snippet")
+        )
+    else:
+        preferred_text = document.get("title")
+    sentence = _normalized_sentence(
+        str(
+            preferred_text
+            or citation.get("snippet_text")
+            or citation.get("quote_text")
+            or document.get("title")
+            or ""
+        )
+    )
+    if section == "counter":
+        return f"Counterpoint: {sentence}"
+    if section == "minority":
+        return f"Minority view: {sentence}"
+    if section == "watch":
+        lowered = sentence[:-1].strip()
+        lowered = lowered[6:] if lowered.lower().startswith("watch ") else lowered
+        lowered = lowered[8:] if lowered.lower().startswith("monitor ") else lowered
+        lowered = _normalize_watch_phrase(lowered)
+        return f"Watch: {lowered}."
+    return sentence
+
+
+def _normalized_sentence(value: str) -> str:
+    sentence = " ".join(part for part in value.strip().split())
+    if not sentence:
+        return "Evidence was available but could not be summarized."
+    return f"{sentence.rstrip('.')}."
+
+
+def _normalize_watch_phrase(value: str) -> str:
+    phrase = value.strip()
+    if not phrase:
+        return phrase
+    first_token = phrase.split(" ", 1)[0]
+    if first_token.isupper() and len(first_token) <= 5:
+        return phrase
+    return phrase[:1].lower() + phrase[1:]
 
 
 def _first_bullet(raw_bullets: Any) -> Mapping[str, Any] | None:
