@@ -19,6 +19,15 @@ Completed modelling artifacts:
 - `artifacts/modelling/alert_scoring.md`
 - `artifacts/modelling/backlog.json`
 
+Current runtime validation narrows the full catalogue to an active source subset first:
+- `artifacts/runtime/v1_active_sources.yaml`
+- initial US-first active source subset:
+  - `fed_press_releases`
+  - `us_bls_news`
+  - `us_bea_news`
+  - `reuters_business`
+  - `wsj_markets`
+
 ## Core Non-Negotiables
 
 1. No uncited factual claims in generated analysis.
