@@ -8,6 +8,8 @@
 python evals/run_eval_suite.py
 ```
 
+The same golden eval suite now runs in GitHub Actions CI on pull requests to `master`.
+
 ## Golden Case Files
 
 - Path: `evals/golden/case*.json`
