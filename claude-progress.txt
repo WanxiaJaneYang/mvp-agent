@@ -475,3 +475,27 @@
 - Outcome: PASS (issue `#35` now has executable eval coverage beyond citation validation)
 - Next single step:
   - Open PR for issue `#35`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 27] Added v1 active source subset for runtime validation
+- Created:
+  - `artifacts/runtime/v1_active_sources.yaml`
+  - `apps/agent/runtime/source_scope.py`
+  - `tests/agent/runtime/test_source_scope.py`
+- Updated:
+  - `scripts/validate_artifacts.py`
+  - `README.md`
+  - `claude-progress.txt`
+- Implemented:
+  - explicit US-first runtime allowlist artifact for the v1 active source subset
+  - deterministic helper to resolve the subset against the full source registry
+  - validation that unknown active IDs fail clearly
+  - README guidance that runtime validation targets the active subset first
+  - artifact validation coverage for the new runtime subset artifact
+- Verification run + outcome:
+  - `python -m unittest tests.agent.runtime.test_source_scope -v` -> PASS (5 tests)
+  - `python scripts/validate_artifacts.py` -> PASS
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (83 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (issue `#33` now has an executable source-of-truth for the first runtime source surface)
+- Next single step:
+  - Open PR for issue `#33`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
