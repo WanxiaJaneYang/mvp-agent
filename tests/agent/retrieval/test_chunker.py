@@ -1,5 +1,6 @@
 import unittest
 
+from apps.agent.pipeline.identifiers import build_chunk_id
 from apps.agent.retrieval.chunker import build_chunk_rows, chunk_document
 
 
@@ -78,7 +79,7 @@ class ChunkDocumentTests(unittest.TestCase):
             chunk_rows,
             [
                 {
-                    "chunk_id": "doc_003_chunk_000",
+                    "chunk_id": build_chunk_id(doc_id="doc_003", chunk_index=0),
                     "doc_id": "doc_003",
                     "chunk_index": 0,
                     "text": "Alpha beta gamma delta",
@@ -88,7 +89,7 @@ class ChunkDocumentTests(unittest.TestCase):
                     "created_at": "2026-03-10T09:05:00Z",
                 },
                 {
-                    "chunk_id": "doc_003_chunk_001",
+                    "chunk_id": build_chunk_id(doc_id="doc_003", chunk_index=1),
                     "doc_id": "doc_003",
                     "chunk_index": 1,
                     "text": "epsilon zeta eta theta",
@@ -98,7 +99,7 @@ class ChunkDocumentTests(unittest.TestCase):
                     "created_at": "2026-03-10T09:05:00Z",
                 },
                 {
-                    "chunk_id": "doc_003_chunk_002",
+                    "chunk_id": build_chunk_id(doc_id="doc_003", chunk_index=2),
                     "doc_id": "doc_003",
                     "chunk_index": 2,
                     "text": "iota.",

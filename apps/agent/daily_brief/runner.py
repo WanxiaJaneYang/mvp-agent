@@ -17,6 +17,7 @@ from apps.agent.ingest.normalize import build_document_record
 from apps.agent.orchestrator import run_pipeline
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
+from apps.agent.pipeline.identifiers import build_document_id, build_synthesis_id
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_OUTPUT_SECTIONS,
     BulletCitationRow,
@@ -42,6 +43,7 @@ from apps.agent.runtime.budget_guard import BudgetCaps
 from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 from apps.agent.runtime.source_scope import load_active_source_subset
 from apps.agent.runtime.source_scope import load_source_registry
+from apps.agent.storage.sqlite_runtime import persist_daily_brief_runtime
 from apps.agent.synthesis.postprocess import finalize_validation_outcome
 from apps.agent.daily_brief.synthesis import (
     SynthesisRetryPlan,
@@ -163,6 +165,14 @@ def run_fixture_daily_brief(
     execution["lifecycle"] = lifecycle
     execution["pipeline_status"] = pipeline_result["status"]
     execution["error_summary"] = pipeline_result.get("error_summary")
+    execution["runtime_db_path"] = str(
+        _persist_run_state(
+            base_dir=base_dir,
+            generated_at_utc=timestamp,
+            execution=execution,
+            pipeline_result=pipeline_result,
+        )
+    )
     return execution
 
 
@@ -220,6 +230,14 @@ def run_daily_brief(
     execution["lifecycle"] = lifecycle
     execution["pipeline_status"] = pipeline_result["status"]
     execution["error_summary"] = pipeline_result.get("error_summary")
+    execution["runtime_db_path"] = str(
+        _persist_run_state(
+            base_dir=base_dir,
+            generated_at_utc=timestamp,
+            execution=execution,
+            pipeline_result=pipeline_result,
+        )
+    )
     return execution
 
 
@@ -377,14 +395,14 @@ def build_daily_brief_corpus(
     chunks: list[RuntimeChunkRow] = []
     fts_rows: list[FtsRow] = []
 
-    for index, planned in enumerate(stage_data.planned_items, start=1):
+    for planned in stage_data.planned_items:
         source_id = str(planned["source_id"])
         source = stage_data.registry[source_id]
         extracted = extract_payload(source=source, payload=planned["payload"])
         document = _build_runtime_document_record(
             source=source,
             extracted=extracted,
-            doc_id=f"doc_{index:03d}",
+            doc_id=build_document_id(canonical_url=str(extracted["canonical_url"])),
             run_id=run_id,
         )
 
@@ -491,7 +509,7 @@ def build_daily_brief_synthesis(
             **final_result,
             "synthesis": final_synthesis,
         }
-    synthesis_id = f"syn_{run_id}"
+    synthesis_id = build_synthesis_id(run_id=run_id)
     return DailyBriefSynthesisStageData(
         query_text=query_text,
         evidence_pack_items=evidence_pack_items,
@@ -874,6 +892,85 @@ def _persist_budget_stop_outputs(
         "query_text": None,
         "abstain_reason": pipeline_result.get("error_summary"),
     }
+
+
+def _persist_run_state(
+    *,
+    base_dir: Path,
+    generated_at_utc: str,
+    execution: Mapping[str, Any],
+    pipeline_result: Mapping[str, Any],
+) -> Path:
+    report_date = generated_at_utc[:10]
+    run_row = dict(pipeline_result)
+    artifact_dir_value = execution.get("artifact_dir")
+
+    if artifact_dir_value:
+        artifact_dir = Path(str(artifact_dir_value))
+        if not (artifact_dir / "sources.json").exists():
+            return persist_daily_brief_runtime(
+                base_dir=base_dir,
+                generated_at_utc=generated_at_utc,
+                report_date=report_date,
+                query_text="",
+                source_rows=[],
+                documents=[],
+                chunks=[],
+                evidence_pack_items=[],
+                evidence_pack_report={"diversity_stats": {}},
+                citation_rows=[],
+                synthesis_rows=[],
+                bullet_citation_rows=[],
+                run_row=run_row,
+                budget_ledger_rows=pipeline_result.get("budget_ledger_rows", []),
+            )
+        source_rows = json.loads((artifact_dir / "sources.json").read_text(encoding="utf-8"))
+        documents = json.loads((artifact_dir / "documents.json").read_text(encoding="utf-8"))
+        chunks = json.loads((artifact_dir / "chunks.json").read_text(encoding="utf-8"))
+        evidence_pack_items = json.loads(
+            (artifact_dir / "evidence_pack_items.json").read_text(encoding="utf-8")
+        )
+        citations = json.loads((artifact_dir / "citations.json").read_text(encoding="utf-8"))
+        synthesis_bullets = json.loads(
+            (artifact_dir / "synthesis_bullets.json").read_text(encoding="utf-8")
+        )
+        bullet_citations = json.loads(
+            (artifact_dir / "bullet_citations.json").read_text(encoding="utf-8")
+        )
+        run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
+        return persist_daily_brief_runtime(
+            base_dir=base_dir,
+            generated_at_utc=generated_at_utc,
+            report_date=report_date,
+            query_text=str(execution.get("query_text") or ""),
+            source_rows=source_rows,
+            documents=documents,
+            chunks=chunks,
+            evidence_pack_items=evidence_pack_items,
+            evidence_pack_report={"diversity_stats": run_summary.get("diversity_stats", {})},
+            citation_rows=citations,
+            synthesis_rows=synthesis_bullets,
+            bullet_citation_rows=bullet_citations,
+            run_row=run_row,
+            budget_ledger_rows=run_summary.get("budget_ledger_rows", []),
+        )
+
+    return persist_daily_brief_runtime(
+        base_dir=base_dir,
+        generated_at_utc=generated_at_utc,
+        report_date=report_date,
+        query_text="",
+        source_rows=[],
+        documents=[],
+        chunks=[],
+        evidence_pack_items=[],
+        evidence_pack_report={"diversity_stats": {}},
+        citation_rows=[],
+        synthesis_rows=[],
+        bullet_citation_rows=[],
+        run_row=run_row,
+        budget_ledger_rows=pipeline_result.get("budget_ledger_rows", []),
+    )
 
 
 def _utc_now_iso() -> str:
