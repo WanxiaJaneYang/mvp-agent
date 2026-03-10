@@ -110,10 +110,13 @@
       "depends_on": ["M004"],
       "files": [
         "apps/agent/delivery/html_report.py",
+        "apps/agent/delivery/email_sender.py",
+        "apps/agent/delivery/scheduler.py",
         "scripts/run_daily_brief_fixture.py"
       ],
       "acceptance_criteria": [
-        "Daily brief local HTML output generated in stable structure",
+        "Daily brief can be scheduled in the user timezone",
+        "Daily brief delivers local HTML plus optional email",
         "Daily brief runtime produces validated or explicit abstained output",
         "Daily brief delivery failures are logged and retry-eligible next run"
       ]
@@ -158,7 +161,7 @@
       "priority": "P2",
       "depends_on": ["M006", "M007"],
       "files": [
-        "apps/agent/delivery/email_sender.py"
+        "apps/agent/delivery/alert_delivery.py"
       ],
       "acceptance_criteria": [
         "Alert output follows 3-6 bullet format with citations",

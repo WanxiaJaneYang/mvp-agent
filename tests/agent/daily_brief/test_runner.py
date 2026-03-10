@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import get_args, get_type_hints
 from unittest.mock import patch
 
+from apps.agent.delivery.email_sender import EmailDeliveryConfig
+from apps.agent.delivery.scheduler import DailyBriefSchedule
 from apps.agent.daily_brief.runner import (
     build_daily_brief_query,
     prepare_daily_brief_inputs,
@@ -44,6 +46,29 @@ from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 
 
 class DailyBriefRunnerTests(unittest.TestCase):
+    class _FakeSMTP:
+        last_instance = None
+
+        def __init__(self, host: str, port: int, timeout: float) -> None:
+            self.host = host
+            self.port = port
+            self.timeout = timeout
+            self.started_tls = False
+            self.sent_messages = []
+            DailyBriefRunnerTests._FakeSMTP.last_instance = self
+
+        def __enter__(self) -> "DailyBriefRunnerTests._FakeSMTP":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def starttls(self) -> None:
+            self.started_tls = True
+
+        def send_message(self, message) -> None:
+            self.sent_messages.append(message)
+
     def test_build_daily_brief_synthesis_retry_reassigns_failed_section_without_retry_metadata(self):
         stage_data = DailyBriefCorpusStageData(
             source_rows=[],
@@ -999,6 +1024,34 @@ class DailyBriefRunnerTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("run_script_entrypoint", completed.stdout)
+
+    def test_run_fixture_daily_brief_can_send_email_and_report_schedule_metadata(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_delivery",
+                generated_at_utc="2026-03-10T23:30:00Z",
+                delivery_schedule=DailyBriefSchedule(
+                    timezone_name="Asia/Singapore",
+                    delivery_hour=7,
+                    delivery_minute=5,
+                ),
+                email_config=EmailDeliveryConfig(
+                    smtp_host="smtp.example.test",
+                    smtp_port=2525,
+                    sender_email="briefs@example.test",
+                    recipient_emails=("pm@example.test",),
+                ),
+                smtp_class=self._FakeSMTP,
+            )
+
+        self.assertEqual(result["scheduled_for_local_date"], "2026-03-11")
+        self.assertEqual(result["next_scheduled_run_at_utc"], "2026-03-11T23:05:00Z")
+        self.assertEqual(result["email_delivery"]["recipient_count"], 1)
+        self.assertEqual(
+            DailyBriefRunnerTests._FakeSMTP.last_instance.sent_messages[0]["Subject"],
+            "Daily Brief: 2026-03-11",
+        )
 
 
 if __name__ == "__main__":

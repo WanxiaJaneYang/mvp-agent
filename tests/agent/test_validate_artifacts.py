@@ -75,7 +75,7 @@ class ArtifactValidationTests(unittest.TestCase):
         backlog = {
             "tickets": [
                 {"id": "M006", "status": "planned", "files": ["apps/agent/alerts/scoring.py"]},
-                {"id": "M010", "status": "planned", "files": ["apps/agent/delivery/email_sender.py"]},
+                {"id": "M010", "status": "planned", "files": ["apps/agent/delivery/alert_delivery.py"]},
             ]
         }
 
@@ -92,7 +92,7 @@ class ArtifactValidationTests(unittest.TestCase):
     def test_status_matrix_ticket_rows_must_match_backlog_ticket_status(self):
         backlog = {
             "tickets": [
-                {"id": "M010", "status": "planned", "files": ["apps/agent/delivery/email_sender.py"]},
+                {"id": "M010", "status": "planned", "files": ["apps/agent/delivery/alert_delivery.py"]},
             ]
         }
         status_matrix_text = textwrap.dedent(

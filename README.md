@@ -5,6 +5,7 @@ Local-first financial news and macro literature-review assistant.
 This repository contains the modelling artifacts and early runtime components for an assistant that:
 - ingests financial/macro sources (RSS, HTML, PDF),
 - produces citation-grounded daily briefs,
+- delivers daily briefs to local HTML plus optional email on a user-timezone schedule,
 - implements alert scoring and policy gates while keeping alert delivery as a planned follow-on step,
 - enforces strict budget and safety guardrails.
 
@@ -13,7 +14,7 @@ This repository contains the modelling artifacts and early runtime components fo
 This project is currently in early implementation with the modelling pack still serving as the planning source of truth.
 
 Implemented in-tree today:
-- daily-brief runtime, local HTML delivery, and citation/postprocess guardrails
+- daily-brief runtime, scheduled HTML/email delivery, and citation/postprocess guardrails
 - alert scoring and policy-gate helpers
 - eval harness with 12 golden cases
 
@@ -57,7 +58,7 @@ apps/
   agent/
     alerts/               # Alert scoring and policy gates
     daily_brief/          # Daily-brief runtime stages
-    delivery/             # Local HTML delivery
+    delivery/             # HTML, email, and schedule helpers
     runtime/              # Runtime modules (e.g., budget guard)
 evals/
   golden/                # Golden cases for current runtime contracts
@@ -115,6 +116,12 @@ Run the deterministic fixture-backed daily brief slice:
 python scripts/run_daily_brief_fixture.py
 ```
 
+Run the fixture slice with the modeled Asia/Singapore schedule and email delivery:
+
+```bash
+python scripts/run_daily_brief_fixture.py --smtp-host smtp.example.test --sender-email briefs@example.test --recipient-email pm@example.test
+```
+
 Run repository validation:
 
 ```bash
@@ -136,3 +143,4 @@ python -m compileall -q apps tests scripts
 - Outputs are intended to provide evidence-grounded scenarios and risk flags.
 - Major-event alerts remain planned until alert delivery runtime is implemented.
 - The live daily-brief slice starts with the current RSS-backed active subset and skips sources that are temporarily blocked or unavailable.
+- Daily-brief scheduling defaults to `07:05 Asia/Singapore`, with timezone overrides available from the runner scripts.
