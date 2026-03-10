@@ -327,6 +327,7 @@ def build_daily_brief_synthesis(
         synthesis,
         citation_store,
         source_registry=validation_registry,
+        available_source_ids={str(item["source_id"]) for item in evidence_pack_items},
     )
     final_result = finalize_validation_outcome(validation_result=stage8_result)
     synthesis_id = f"syn_{run_id}"

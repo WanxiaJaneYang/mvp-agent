@@ -221,7 +221,41 @@ class CitationValidatorTests(unittest.TestCase):
         self.assertEqual(report.removed_bullets, 0)
         self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], ["c1", "c2"])
 
-    def test_policy_claim_requires_tier_one_citation_when_official_source_exists_in_store(self):
+    def test_numeric_claim_rejects_single_tier_two_citation(self):
+        synthesis = {
+            "prevailing": [{"text": "GDP grew 2.9% in Q4.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": self._citation(
+                "c1",
+                url="https://reuters.example/gdp",
+                source_id="reuters_business",
+                publisher="Reuters",
+            ),
+            "c2": self._citation("c2", url="https://source2.example/doc", source_id="src2"),
+            "c3": self._citation("c3", url="https://source3.example/doc", source_id="src3"),
+            "c4": self._citation("c4", url="https://source4.example/doc", source_id="src4"),
+        }
+        source_registry = {
+            "reuters_business": {
+                "base_url": "https://reuters.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+        }
+
+        report = validate_synthesis(synthesis, store, source_registry=source_registry)
+
+        self.assertEqual(report.removed_bullets, 1)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
+
+    def test_policy_claim_requires_tier_one_citation_when_official_source_is_available_in_evidence_pack(self):
         synthesis = {
             "prevailing": [{"text": "The Fed held rates steady.", "citation_ids": ["c1"]}],
             "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
@@ -238,12 +272,6 @@ class CitationValidatorTests(unittest.TestCase):
             "c2": self._citation("c2", url="https://source2.example/doc", source_id="src2"),
             "c3": self._citation("c3", url="https://source3.example/doc", source_id="src3"),
             "c4": self._citation("c4", url="https://source4.example/doc", source_id="src4"),
-            "official": self._citation(
-                "official",
-                url="https://federalreserve.gov/newsevents/pressreleases/monetary20260310a.htm",
-                source_id="fed_press_releases",
-                publisher="Federal Reserve",
-            ),
         }
         source_registry = {
             "reuters_business": {
@@ -261,7 +289,12 @@ class CitationValidatorTests(unittest.TestCase):
             "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
         }
 
-        report = validate_synthesis(synthesis, store, source_registry=source_registry)
+        report = validate_synthesis(
+            synthesis,
+            store,
+            source_registry=source_registry,
+            available_source_ids={"fed_press_releases", "reuters_business", "src2", "src3", "src4"},
+        )
 
         self.assertEqual(report.removed_bullets, 1)
         self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])

@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 import re
-from typing import Any, Dict, Iterable, List, Mapping
+from typing import Any, Collection, Dict, Iterable, List, Mapping
 from urllib.parse import urlparse
 
 CORE_SECTIONS = ("prevailing", "counter", "minority", "watch")
@@ -217,10 +217,7 @@ def _passes_numeric_time_quality(
     if not any(meta["has_registry_meta"] for meta in cited_meta):
         return True
 
-    if any(
-        meta["credibility_tier"] is not None and int(meta["credibility_tier"]) <= 2
-        for meta in cited_meta
-    ):
+    if any(meta["credibility_tier"] == 1 for meta in cited_meta):
         return True
 
     independence_keys = {
@@ -233,15 +230,27 @@ def _passes_numeric_time_quality(
 
 def _official_policy_source_available(
     *,
-    citation_store: Mapping[str, Mapping[str, Any]],
+    available_source_ids: Collection[str] | None,
     source_registry: Mapping[str, Mapping[str, Any]] | None,
 ) -> bool:
     if source_registry is None:
         return False
 
-    for citation in citation_store.values():
-        meta = _citation_quality_meta(citation, source_registry)
-        if meta["credibility_tier"] == 1 and OFFICIAL_POLICY_TAGS.intersection(meta["tags"]):
+    if available_source_ids is None:
+        return False
+
+    for source_id in available_source_ids:
+        source_meta = source_registry.get(str(source_id))
+        if not isinstance(source_meta, Mapping):
+            continue
+        raw_tier = source_meta.get("credibility_tier")
+        try:
+            credibility_tier = int(raw_tier) if raw_tier is not None else None
+        except (TypeError, ValueError):
+            credibility_tier = None
+        raw_tags = source_meta.get("tags", [])
+        tags = [str(tag) for tag in raw_tags] if isinstance(raw_tags, list) else []
+        if credibility_tier == 1 and OFFICIAL_POLICY_TAGS.intersection(tags):
             return True
     return False
 
@@ -250,12 +259,15 @@ def _passes_policy_claim_quality(
     *,
     text: str,
     cited_citations: List[Mapping[str, Any]],
-    citation_store: Mapping[str, Mapping[str, Any]],
+    available_source_ids: Collection[str] | None,
     source_registry: Mapping[str, Mapping[str, Any]] | None,
 ) -> bool:
     if source_registry is None or not POLICY_OR_MACRO_PATTERN.search(text):
         return True
-    if not _official_policy_source_available(citation_store=citation_store, source_registry=source_registry):
+    if not _official_policy_source_available(
+        available_source_ids=available_source_ids,
+        source_registry=source_registry,
+    ):
         return True
 
     cited_meta = [_citation_quality_meta(citation, source_registry) for citation in cited_citations]
@@ -270,6 +282,7 @@ def _passes_quality_rules(
     bullet: Mapping[str, Any],
     valid_ids: List[str],
     citation_store: Mapping[str, Mapping[str, Any]],
+    available_source_ids: Collection[str] | None,
     source_registry: Mapping[str, Mapping[str, Any]] | None,
 ) -> bool:
     if source_registry is None:
@@ -284,7 +297,7 @@ def _passes_quality_rules(
     ) and _passes_policy_claim_quality(
         text=text,
         cited_citations=cited_citations,
-        citation_store=citation_store,
+        available_source_ids=available_source_ids,
         source_registry=source_registry,
     )
 
@@ -294,6 +307,7 @@ def validate_synthesis(
     citation_store: Mapping[str, Mapping[str, Any]],
     *,
     source_registry: Mapping[str, Mapping[str, Any]] | None = None,
+    available_source_ids: Collection[str] | None = None,
     replace_with_placeholder: bool = True,
     max_removed_without_retry: int = 3,
 ) -> ValidationReport:
@@ -337,6 +351,7 @@ def validate_synthesis(
                     bullet=bullet,
                     valid_ids=valid_ids,
                     citation_store=sanitized_store,
+                    available_source_ids=available_source_ids,
                     source_registry=source_registry,
                 )
             ):
