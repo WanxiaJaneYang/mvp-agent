@@ -49,6 +49,9 @@ class EvalRunnerTests(unittest.TestCase):
                     "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
                 },
                 "report": {"removed_bullets": 4},
+                "validation_attempts": 2,
+                "max_validation_attempts": 2,
+                "retry_exhausted": True,
             },
             "expected": {
                 "status": "abstained",

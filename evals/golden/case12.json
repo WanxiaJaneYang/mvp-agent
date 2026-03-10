@@ -13,7 +13,10 @@
         },
         "report": {
             "removed_bullets": 4
-        }
+        },
+        "validation_attempts": 2,
+        "max_validation_attempts": 2,
+        "retry_exhausted": true
     },
     "expected": {
         "status": "abstained",
