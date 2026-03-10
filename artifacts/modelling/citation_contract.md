@@ -12,7 +12,7 @@ Every citation references a stored document/chunk with the following structure:
 
 ```json
 {
-  "id": "cite_<uuid>",
+  "citation_id": "cite_<uuid>",
   "source_id": "fed_press_releases",
   "publisher": "Federal Reserve",
   "doc_id": "doc_<uuid>",
@@ -21,19 +21,13 @@ Every citation references a stored document/chunk with the following structure:
   "title": "Federal Reserve announces...",
   "published_at": "2026-02-10T14:00:00Z",
   "fetched_at": "2026-02-11T02:15:00Z",
-  "quote_span": {
-    "start": 150,
-    "end": 320,
-    "text": "...actual quoted text snippet..."
-  },
-  "snippet_span": {
-    "text": "...headline or RSS snippet..."
-  }
+  "quote_text": "...actual quoted text snippet...",
+  "snippet_text": "...headline or RSS snippet..."
 }
 ```
 
 **Required fields:**
-- `id`: Unique citation identifier
+- `citation_id`: Unique citation identifier
 - `source_id`: Reference to source_registry.yaml entry
 - `publisher`: Publisher name (derived from sources table via source_id, stored for diversity checks)
 - `doc_id`: Document identifier in local store
@@ -44,13 +38,13 @@ Every citation references a stored document/chunk with the following structure:
 - `fetched_at`: When we fetched/stored it (ISO 8601)
 
 **Optional fields:**
-- `quote_span`: Precise location + text excerpt from full document body (only for `paywall_policy: full` sources)
-- `snippet_span`: Headline/snippet from RSS/metadata (allowed for all sources, including `paywall_policy: metadata_only`)
+- `quote_text`: Full-text excerpt stored in the runtime payload (only for `paywall_policy: full` sources)
+- `snippet_text`: Headline/snippet text from RSS/metadata (allowed for all sources, including `paywall_policy: metadata_only`)
 
 **Paywall-sourced citations:**
 - If `source_registry.yaml` marks source as `paywall_policy: metadata_only`:
-  - Citation MUST NOT include `quote_span` (no full-text extraction)
-  - Citation MAY include `snippet_span` (headline/RSS snippet explicitly labeled)
+  - Citation MUST set `quote_text` to `null` (no full-text extraction)
+  - Citation MAY include `snippet_text` (headline/RSS snippet explicitly labeled)
   - System must NOT fabricate or extract paywalled full text
 
 ---
@@ -68,8 +62,8 @@ Claude's API returns structured citation metadata that includes:
 
 1. **Store model-returned citation metadata as canonical evidence pointers:**
    - Claude API citations map to our citation objects via `doc_id`/`chunk_id`
-   - The API's citation range becomes our `quote_span` (if full-text) or `snippet_span` (if metadata-only)
-   - Store the structured metadata (start/end offsets, extracted text) in our citations table
+   - The API's citation range is normalized into `quote_text` (if full-text) or `snippet_text` (if metadata-only) for the v1 runtime payload
+   - Offset/range metadata may be kept upstream, but validator/storage parity is defined by the flattened runtime fields above
 
 2. **Presentation layer vs storage layer:**
    - The rendered `[1][2]` numbering in output is a presentation layer convenience
@@ -159,7 +153,7 @@ Before delivering any synthesis output, the system MUST run a citation validator
 | Bullet has 0 citations | **Remove bullet** OR replace with `[Insufficient evidence to support this claim]` |
 | Citation ID not found in store | **Remove citation** from bullet; if bullet has no remaining citations, apply above rule |
 | Citation missing required fields (url, published_at) | **Remove citation**; if bullet has no remaining citations, apply above rule |
-| Paywalled source cited with full-text quote | **Strip quote_span**, keep metadata-only citation |
+| Paywalled source cited with full-text quote | **Set `quote_text` to null**, keep metadata-only citation |
 
 **No exceptions:** If a claim cannot be cited, it must not appear in the output.
 
@@ -191,6 +185,7 @@ If a bullet contains **numbers, percentages, or specific dates** (except purely 
 - "Markets fell 2% yesterday. [single Tier-3 source]" — Numeric claim needs corroboration
 
 **Validator action:** If numeric/time claim fails quality check, remove bullet or mark "[Insufficient credible evidence for this claim]".
+**v1 scope:** Enforce this rule when cited sources can be resolved to `credibility_tier` metadata from `source_registry`.
 
 ### Policy Claims Rule
 
@@ -208,7 +203,7 @@ If a bullet is about **central bank policy** or **official macro releases** (ide
 
 **Validator action:** If policy claim lacks Tier 1 citation and Tier 1 source exists in evidence pack, remove bullet or mark "[Cite official source directly for policy claims]".
 
-**Implementation note:** Quality checks run after basic citation validation. They access the evidence pack metadata to determine available sources.
+**Implementation note:** Quality checks run after basic citation validation. In v1 the validator uses `source_registry` tags/tiers plus the emitted `citation_store` payload as its evidence-pack view.
 
 ---
 
@@ -357,13 +352,14 @@ When citing a paywalled source:
 Citation object includes:
 ```json
 {
-  "id": "cite_123",
+  "citation_id": "cite_123",
   "source_id": "ft_markets",
   "url": "https://www.ft.com/content/...",
   "title": "Stocks tumble as CPI exceeds forecasts",
   "published_at": "2026-02-10T10:30:00Z",
   "fetched_at": "2026-02-11T02:00:00Z",
-  "quote_span": null  // No full-text available
+  "quote_text": null,
+  "snippet_text": "Stocks tumble as CPI exceeds forecasts"
 }
 ```
 
@@ -480,9 +476,9 @@ At the end of each synthesis output, include a **References** section:
 ### Citations Table
 
 Store all fields from §1 citation object:
-- Required: `id`, `source_id`, `publisher`, `doc_id`, `chunk_id`, `url`, `title`, `published_at`, `fetched_at`
-- Optional: `quote_span` (start, end, text) for full-text sources
-- Optional: `snippet_span` (text) for metadata-only sources
+- Required: `citation_id`, `source_id`, `publisher`, `doc_id`, `chunk_id`, `url`, `title`, `published_at`, `fetched_at`
+- Optional: `quote_text` for full-text sources
+- Optional: `snippet_text` for metadata-only sources
 - Foreign keys to sources, documents, chunks tables
 - Indexes on: `source_id`, `doc_id`, `published_at`
 

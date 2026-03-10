@@ -58,6 +58,70 @@ class Stage8ValidationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "retry")
 
+    def test_stage8_requires_tier_one_policy_citation_when_official_source_is_in_evidence_pack(self):
+        synthesis = {
+            "prevailing": [{"text": "The Fed held rates steady.", "citation_ids": ["c1"]}],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": {
+                "citation_id": "c1",
+                "url": "https://reuters.example/fed",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "reuters_business",
+                "paywall_policy": "full",
+            },
+            "c2": {
+                "citation_id": "c2",
+                "url": "https://source2.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "src2",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "citation_id": "c3",
+                "url": "https://source3.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "src3",
+                "paywall_policy": "full",
+            },
+            "c4": {
+                "citation_id": "c4",
+                "url": "https://source4.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+                "source_id": "src4",
+                "paywall_policy": "full",
+            },
+        }
+        source_registry = {
+            "reuters_business": {
+                "base_url": "https://reuters.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "fed_press_releases": {
+                "base_url": "https://federalreserve.gov/newsevents/pressreleases",
+                "credibility_tier": 1,
+                "tags": ["policy_centralbank", "rates", "us"],
+            },
+            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+        }
+
+        result = run_stage8_citation_validation(
+            synthesis,
+            store,
+            source_registry=source_registry,
+            available_source_ids={"fed_press_releases", "reuters_business", "src2", "src3", "src4"},
+        )
+
+        self.assertEqual(result["status"], "retry")
+        self.assertEqual(result["report"]["removed_bullets"], 1)
+        self.assertEqual(result["synthesis"]["prevailing"][0]["citation_ids"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
