@@ -59,16 +59,40 @@ docs/plans/               # Planning notes
 
 Use Python 3.11+ (3.14 also works for current test scope).
 
+Install the supported local toolchain:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+Lint and type-check commands are available through the toolchain, but they are informational today:
+- not CI-gated yet
+- currently fail on pre-existing repo-wide issues that are outside this tooling slice
+
+Run lint:
+
+```bash
+python -m ruff check apps tests scripts
+```
+
+Run type checks:
+
+```bash
+python -m mypy apps
+```
+
 Run tests:
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m unittest discover -s tests -t . -p "test_*.py" -v
 ```
 
-Run syntax compilation check:
+Run repository validation:
 
 ```bash
-python -m compileall -q apps tests
+python scripts/validate_artifacts.py
+python scripts/validate_decision_record_schema.py
+python -m compileall -q apps tests scripts
 ```
 
 ## Working Conventions
