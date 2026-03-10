@@ -18,10 +18,19 @@ from apps.agent.pipeline.stage10_decision_record import build_and_persist_decisi
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_OUTPUT_SECTIONS,
+    BulletCitationRow,
+    DailyBriefSectionBulletRow,
+    DailyBriefSynthesis,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
     DailyBriefSynthesisStageData,
+    EvidencePackItem,
+    FtsRow,
+    RuntimeChunkRow,
+    RuntimeDocumentRecord,
     RunStatus,
+    SourceRegistryEntry,
+    SourceRow,
     StageResult,
 )
 from apps.agent.retrieval.chunker import build_chunk_rows
@@ -245,9 +254,9 @@ def build_daily_brief_corpus(
     run_id: str,
     context: Any,
 ) -> DailyBriefCorpusStageData:
-    documents: list[dict[str, Any]] = []
-    chunks: list[dict[str, Any]] = []
-    fts_rows: list[dict[str, Any]] = []
+    documents: list[RuntimeDocumentRecord] = []
+    chunks: list[RuntimeChunkRow] = []
+    fts_rows: list[FtsRow] = []
 
     for index, planned in enumerate(stage_data.planned_items, start=1):
         source_id = str(planned["source_id"])
@@ -287,7 +296,7 @@ def build_daily_brief_corpus(
 def build_daily_brief_synthesis(
     *,
     stage_data: DailyBriefCorpusStageData,
-    registry: Mapping[str, Mapping[str, Any]],
+    registry: Mapping[str, SourceRegistryEntry],
     run_id: str,
 ) -> DailyBriefSynthesisStageData:
     query_text = build_daily_brief_query(documents=stage_data.documents)
@@ -339,7 +348,7 @@ def build_daily_brief_synthesis(
     )
 
 
-def _build_source_row(*, source: Mapping[str, Any], generated_at_utc: str) -> dict[str, Any]:
+def _build_source_row(*, source: SourceRegistryEntry, generated_at_utc: str) -> SourceRow:
     return {
         "source_id": source["id"],
         "name": source["name"],
@@ -361,7 +370,7 @@ def _build_runtime_document_record(
     extracted: Mapping[str, Any],
     doc_id: str,
     run_id: str,
-) -> dict[str, Any]:
+) -> RuntimeDocumentRecord:
     document = build_document_record(source=source, extracted=extracted)
     document["doc_id"] = doc_id
     document["credibility_tier"] = source["credibility_tier"]
@@ -371,9 +380,9 @@ def _build_runtime_document_record(
 
 def _build_validation_registry(
     *,
-    registry: Mapping[str, Mapping[str, Any]],
-    documents: Iterable[Mapping[str, Any]],
-) -> dict[str, dict[str, Any]]:
+    registry: Mapping[str, SourceRegistryEntry],
+    documents: Iterable[RuntimeDocumentRecord],
+) -> dict[str, SourceRegistryEntry]:
     normalized_registry = {source_id: dict(source) for source_id, source in registry.items()}
     for document in documents:
         source_id = str(document["source_id"])
@@ -389,10 +398,10 @@ def _build_validation_registry(
 def _attach_doc_ids(
     *,
     evidence_pack_items: Iterable[Mapping[str, Any]],
-    fts_rows: Iterable[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
+    fts_rows: Iterable[FtsRow],
+) -> list[EvidencePackItem]:
     doc_ids_by_chunk_id = {str(row["chunk_id"]): row["doc_id"] for row in fts_rows}
-    enriched_items: list[dict[str, Any]] = []
+    enriched_items: list[EvidencePackItem] = []
     for item in evidence_pack_items:
         enriched = dict(item)
         enriched["doc_id"] = doc_ids_by_chunk_id[str(item["chunk_id"])]
@@ -402,10 +411,10 @@ def _attach_doc_ids(
 
 def _build_synthesis_bullet_rows(
     *,
-    synthesis: Mapping[str, Any],
+    synthesis: DailyBriefSynthesis,
     synthesis_id: str,
-) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+) -> list[DailyBriefSectionBulletRow]:
+    rows: list[DailyBriefSectionBulletRow] = []
     for section in DAILY_BRIEF_OUTPUT_SECTIONS:
         bullets = synthesis.get(section, [])
         if not isinstance(bullets, list):
@@ -429,10 +438,10 @@ def _build_synthesis_bullet_rows(
 
 def _build_bullet_citation_rows(
     *,
-    synthesis: Mapping[str, Any],
+    synthesis: DailyBriefSynthesis,
     synthesis_id: str,
-) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+) -> list[BulletCitationRow]:
+    rows: list[BulletCitationRow] = []
     for section in DAILY_BRIEF_OUTPUT_SECTIONS:
         bullets = synthesis.get(section, [])
         if not isinstance(bullets, list):

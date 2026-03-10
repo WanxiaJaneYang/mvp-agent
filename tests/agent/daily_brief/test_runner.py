@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import get_args, get_type_hints
 
 from apps.agent.daily_brief.runner import (
     build_daily_brief_query,
@@ -14,16 +15,51 @@ from apps.agent.daily_brief.runner import (
     run_fixture_daily_brief,
 )
 from apps.agent.pipeline.types import (
+    BulletCitationRow,
+    CitationStoreEntry,
+    CitationValidationResult,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
+    DailyBriefSectionBulletRow,
     DailyBriefSynthesisStageData,
+    EvidencePackItem,
+    FinalSynthesisResult,
+    FtsRow,
+    PlannedFetchItem,
     RunContext,
     RunStatus,
     RunType,
+    RuntimeChunkRow,
+    RuntimeDocumentRecord,
+    SourceRegistryEntry,
+    SourceRow,
 )
 
 
 class DailyBriefRunnerTests(unittest.TestCase):
+    def test_stage_payload_annotations_use_named_contract_types(self):
+        input_hints = get_type_hints(DailyBriefInputStageData)
+        corpus_hints = get_type_hints(DailyBriefCorpusStageData)
+        synthesis_hints = get_type_hints(DailyBriefSynthesisStageData)
+
+        self.assertEqual(get_args(input_hints["registry"])[1], SourceRegistryEntry)
+        self.assertEqual(get_args(input_hints["active_sources"])[0], SourceRegistryEntry)
+        self.assertEqual(get_args(input_hints["planned_items"])[0], PlannedFetchItem)
+        self.assertEqual(get_args(input_hints["source_rows"])[0], SourceRow)
+
+        self.assertEqual(get_args(corpus_hints["source_rows"])[0], SourceRow)
+        self.assertEqual(get_args(corpus_hints["documents"])[0], RuntimeDocumentRecord)
+        self.assertEqual(get_args(corpus_hints["chunks"])[0], RuntimeChunkRow)
+        self.assertEqual(get_args(corpus_hints["fts_rows"])[0], FtsRow)
+
+        self.assertEqual(get_args(synthesis_hints["evidence_pack_items"])[0], EvidencePackItem)
+        self.assertEqual(get_args(synthesis_hints["citation_store"])[1], CitationStoreEntry)
+        self.assertIs(synthesis_hints["stage8_result"], CitationValidationResult)
+        self.assertIs(synthesis_hints["final_result"], FinalSynthesisResult)
+        self.assertEqual(get_args(synthesis_hints["citation_rows"])[0], CitationStoreEntry)
+        self.assertEqual(get_args(synthesis_hints["synthesis_bullet_rows"])[0], DailyBriefSectionBulletRow)
+        self.assertEqual(get_args(synthesis_hints["bullet_citation_rows"])[0], BulletCitationRow)
+
     def test_prepare_daily_brief_inputs_returns_typed_stage_payload(self):
         stage_data = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
 
@@ -80,6 +116,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertGreater(len(synthesis.evidence_pack_items), 0)
         self.assertIn(synthesis.final_result["status"], {"ok", "abstained"})
         self.assertGreater(len(synthesis.synthesis_bullet_rows), 0)
+        self.assertIsInstance(synthesis.final_result["synthesis"]["prevailing"][0], dict)
+        self.assertIn("citation_ids", synthesis.final_result["synthesis"]["prevailing"][0])
 
     def test_load_active_fixture_payloads_filters_to_runtime_subset(self):
         fixture_payloads = {

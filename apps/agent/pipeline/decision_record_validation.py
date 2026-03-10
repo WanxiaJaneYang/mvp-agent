@@ -6,10 +6,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from apps.agent.pipeline.types import DAILY_BRIEF_CLAIM_SECTIONS
+
 SCHEMA_VERSION = "decision_record.v1"
 RUN_TYPES = {"daily_brief", "alert"}
 STATUSES = {"ok", "partial", "abstained", "failed"}
-CLAIM_SECTIONS = {"prevailing", "counter", "minority", "watch", "changed"}
+CLAIM_SECTIONS = DAILY_BRIEF_CLAIM_SECTIONS
 COVERAGE_STATUSES = {"supported", "insufficient_evidence", "removed"}
 GUARDRAIL_LEVELS = {"pass", "warn", "fail"}
 CONFIDENCE_LABELS = {"high", "medium", "low"}

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
+from apps.agent.pipeline.types import CitationValidationResult
 from apps.agent.validators.citation_validator import validate_synthesis
 
 
@@ -12,7 +13,7 @@ def run_stage8_citation_validation(
     source_registry: Mapping[str, Mapping[str, Any]] | None = None,
     replace_with_placeholder: bool = True,
     max_removed_without_retry: int = 3,
-) -> Dict[str, Any]:
+) -> CitationValidationResult:
     report = validate_synthesis(
         synthesis,
         citation_store,

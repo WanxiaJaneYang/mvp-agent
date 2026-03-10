@@ -3,10 +3,17 @@ import sys
 import unittest
 from pathlib import Path
 
+from apps.agent.pipeline.decision_record_validation import CLAIM_SECTIONS
+from apps.agent.pipeline.stage10_decision_record import ALLOWED_CLAIM_SECTIONS
+from apps.agent.pipeline.types import DAILY_BRIEF_CLAIM_SECTIONS
 from scripts.validate_decision_record_schema import validate_decision_record, validate_example_file
 
 
 class DecisionRecordSchemaValidationTests(unittest.TestCase):
+    def test_claim_section_vocabulary_uses_shared_runtime_constant(self):
+        self.assertIs(CLAIM_SECTIONS, DAILY_BRIEF_CLAIM_SECTIONS)
+        self.assertIs(ALLOWED_CLAIM_SECTIONS, DAILY_BRIEF_CLAIM_SECTIONS)
+
     def test_script_entrypoint_passes(self):
         repo_root = Path(__file__).resolve().parents[2]
         script_path = repo_root / "scripts" / "validate_decision_record_schema.py"
