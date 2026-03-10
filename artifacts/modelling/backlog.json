@@ -89,7 +89,7 @@
     {
       "id": "M006",
       "title": "Implement alert scoring and policy gates",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P1",
       "depends_on": ["M003", "M004", "M005"],
       "files": [
