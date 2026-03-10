@@ -12,6 +12,7 @@ from apps.agent.delivery.html_report import render_daily_brief_html
 from apps.agent.ingest.dedup import classify_duplicate
 from apps.agent.ingest.extract import extract_payload
 from apps.agent.ingest.fetch import plan_fetch_items
+from apps.agent.ingest.live_fetch import fetch_live_payloads_for_source
 from apps.agent.ingest.normalize import build_document_record
 from apps.agent.orchestrator import run_pipeline
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
@@ -160,6 +161,63 @@ def run_fixture_daily_brief(
     return execution
 
 
+def run_daily_brief(
+    *,
+    base_dir: Path,
+    run_id: str = "run_daily_live",
+    generated_at_utc: str | None = None,
+    budget_preflight: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    lifecycle: list[dict[str, Any]] = []
+    execution: dict[str, Any] = {}
+    timestamp = generated_at_utc or _utc_now_iso()
+
+    def stage(context: Any) -> StageResult:
+        try:
+            result = _execute_daily_brief_slice(
+                base_dir=base_dir,
+                fixture_path=None,
+                run_id=run_id,
+                generated_at_utc=timestamp,
+                context=context,
+                use_live_sources=True,
+            )
+        except Exception as exc:
+            execution["status"] = "failed"
+            execution["error_summary"] = str(exc)
+            return StageResult(status=RunStatus.FAILED, error_summary=str(exc))
+
+        execution.update(result)
+        if result["status"] == "ok":
+            return StageResult(status=RunStatus.OK)
+        return StageResult(
+            status=RunStatus.PARTIAL,
+            error_summary=result.get("abstain_reason") or result["status"],
+        )
+
+    pipeline_result = run_pipeline(
+        run_id=run_id,
+        run_type="daily_brief",
+        stages=[stage],
+        recorder=lifecycle.append,
+        budget_preflight=budget_preflight or _default_budget_preflight(generated_at_utc=timestamp),
+    )
+    if pipeline_result["status"] == "stopped_budget" and not execution:
+        execution.update(
+            _persist_budget_stop_outputs(
+                base_dir=base_dir,
+                run_id=run_id,
+                generated_at_utc=timestamp,
+                pipeline_result=pipeline_result,
+            )
+        )
+    execution.setdefault("status", pipeline_result["status"])
+    execution["lifecycle"] = lifecycle
+    execution["pipeline_status"] = pipeline_result["status"]
+    execution["error_summary"] = pipeline_result.get("error_summary")
+    return execution
+
+
 def _execute_daily_brief_slice(
     *,
     base_dir: Path,
@@ -167,10 +225,12 @@ def _execute_daily_brief_slice(
     run_id: str,
     generated_at_utc: str,
     context: Any,
+    use_live_sources: bool = False,
 ) -> dict[str, Any]:
     input_data = prepare_daily_brief_inputs(
         fixture_path=fixture_path,
         generated_at_utc=generated_at_utc,
+        use_live_sources=use_live_sources,
     )
     corpus_data = build_daily_brief_corpus(
         stage_data=input_data,
@@ -258,12 +318,19 @@ def prepare_daily_brief_inputs(
     *,
     fixture_path: Path | None = None,
     generated_at_utc: str,
+    use_live_sources: bool = False,
 ) -> DailyBriefInputStageData:
     registry = load_source_registry()
     active_sources = load_active_source_subset(registry=registry)
-    fixture_payloads = load_active_fixture_payloads(fixture_path=fixture_path)
-    planned_items = plan_fetch_items(sources=active_sources, candidate_payloads=fixture_payloads)
+    candidate_payloads = (
+        load_active_live_payloads(active_sources=active_sources, fetched_at_utc=generated_at_utc)
+        if use_live_sources
+        else load_active_fixture_payloads(fixture_path=fixture_path)
+    )
+    planned_items = plan_fetch_items(sources=active_sources, candidate_payloads=candidate_payloads)
     if not planned_items:
+        if use_live_sources:
+            raise ValueError("No live payloads available for active sources")
         raise ValueError("No fixture payloads available for active sources")
 
     source_rows = [_build_source_row(source=source, generated_at_utc=generated_at_utc) for source in active_sources]
@@ -273,6 +340,25 @@ def prepare_daily_brief_inputs(
         planned_items=planned_items,
         source_rows=source_rows,
     )
+
+
+def load_active_live_payloads(
+    *,
+    active_sources: Iterable[SourceRegistryEntry],
+    fetched_at_utc: str,
+) -> dict[str, list[dict[str, Any]]]:
+    payloads: dict[str, list[dict[str, Any]]] = {}
+    for source in active_sources:
+        source_id = str(source["id"])
+        try:
+            payloads[source_id] = fetch_live_payloads_for_source(
+                source=source,
+                fetched_at_utc=fetched_at_utc,
+            )
+        except Exception:
+            # Keep the live slice usable when one active source is blocked or drifts.
+            payloads[source_id] = []
+    return payloads
 
 
 def build_daily_brief_corpus(

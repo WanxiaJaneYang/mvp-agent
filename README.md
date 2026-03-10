@@ -102,6 +102,18 @@ Run tests:
 python -m unittest discover -s tests -t . -p "test_*.py" -v
 ```
 
+Run the active-subset daily brief against live feeds:
+
+```bash
+python scripts/run_daily_brief.py
+```
+
+Run the deterministic fixture-backed daily brief slice:
+
+```bash
+python scripts/run_daily_brief_fixture.py
+```
+
 Run repository validation:
 
 ```bash
@@ -121,3 +133,4 @@ python -m compileall -q apps tests scripts
 
 - This project is not a trading signal engine and should not produce buy/sell instructions.
 - Outputs are intended to provide evidence-grounded scenarios and risk flags.
+- The live daily-brief slice starts with the current RSS-backed active subset and skips sources that are temporarily blocked or unavailable.
