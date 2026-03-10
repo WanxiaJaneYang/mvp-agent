@@ -109,7 +109,7 @@ sources:
 
   - id: us_bea_news
     name: U.S. Bureau of Economic Analysis - News Releases
-    url: https://www.bea.gov/rss/news_release.xml
+    url: https://apps.bea.gov/rss/rss.xml
     type: rss
     tags: [macro_data, growth, us]
     credibility_tier: 1

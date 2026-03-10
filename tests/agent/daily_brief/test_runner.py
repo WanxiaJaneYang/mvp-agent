@@ -13,6 +13,8 @@ from apps.agent.daily_brief.runner import (
     build_daily_brief_corpus,
     build_daily_brief_synthesis,
     load_active_fixture_payloads,
+    load_active_live_payloads,
+    run_daily_brief,
     run_fixture_daily_brief,
 )
 from apps.agent.daily_brief.synthesis import build_citation_store
@@ -396,6 +398,21 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(len(stage_data.source_rows), len(stage_data.active_sources))
         self.assertGreater(len(stage_data.planned_items), 0)
 
+    def test_prepare_daily_brief_inputs_can_use_live_payloads_for_active_subset(self):
+        fixture_payloads = load_active_fixture_payloads()
+
+        with patch("apps.agent.daily_brief.runner.fetch_live_payloads_for_source") as live_fetch_mock:
+            live_fetch_mock.side_effect = lambda *, source, fetched_at_utc: fixture_payloads[str(source["id"])]
+            stage_data = prepare_daily_brief_inputs(
+                generated_at_utc="2026-03-10T16:00:00Z",
+                use_live_sources=True,
+            )
+
+        self.assertIsInstance(stage_data, DailyBriefInputStageData)
+        self.assertEqual(len(stage_data.active_sources), 5)
+        self.assertGreater(len(stage_data.planned_items), 0)
+        self.assertEqual(stage_data.planned_items[0]["source_id"], "fed_press_releases")
+
     def test_build_daily_brief_corpus_returns_typed_stage_payload_and_updates_counters(self):
         stage_inputs = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
         context = RunContext(
@@ -475,6 +492,45 @@ class DailyBriefRunnerTests(unittest.TestCase):
         )
         self.assertNotIn("ecb_press_releases", loaded)
 
+    def test_load_active_live_payloads_degrades_source_level_failures(self):
+        active_sources = [
+            {
+                "id": "fed_press_releases",
+                "name": "Federal Reserve - Press Releases",
+                "url": "https://example.test/fed",
+                "type": "rss",
+                "credibility_tier": 1,
+                "paywall_policy": "full",
+                "fetch_interval": "daily",
+                "tags": ["policy_centralbank"],
+            },
+            {
+                "id": "us_bls_news",
+                "name": "U.S. Bureau of Labor Statistics - News Releases",
+                "url": "https://example.test/bls",
+                "type": "rss",
+                "credibility_tier": 1,
+                "paywall_policy": "full",
+                "fetch_interval": "daily",
+                "tags": ["macro_data"],
+            },
+        ]
+
+        def side_effect(*, source, fetched_at_utc):
+            if source["id"] == "us_bls_news":
+                raise ValueError("blocked")
+            return [{"url": "https://example.test/fed", "title": "Fed keeps policy steady"}]
+
+        with patch("apps.agent.daily_brief.runner.fetch_live_payloads_for_source") as live_fetch_mock:
+            live_fetch_mock.side_effect = side_effect
+            loaded = load_active_live_payloads(
+                active_sources=active_sources,
+                fetched_at_utc="2026-03-10T16:00:00Z",
+            )
+
+        self.assertEqual(loaded["fed_press_releases"][0]["title"], "Fed keeps policy steady")
+        self.assertEqual(loaded["us_bls_news"], [])
+
     def test_build_daily_brief_query_uses_repeated_document_terms(self):
         documents = [
             {
@@ -532,6 +588,26 @@ class DailyBriefRunnerTests(unittest.TestCase):
             )
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
+
+    def test_run_daily_brief_writes_expected_artifacts_from_live_payloads(self):
+        fixture_payloads = load_active_fixture_payloads()
+
+        with patch("apps.agent.daily_brief.runner.fetch_live_payloads_for_source") as live_fetch_mock, tempfile.TemporaryDirectory() as tmpdir:
+            live_fetch_mock.side_effect = lambda *, source, fetched_at_utc: fixture_payloads.get(str(source["id"]), [])
+            result = run_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_live_ok",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+            html_path = Path(result["html_path"])
+            artifact_dir = Path(result["artifact_dir"])
+            run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "ok")
+            self.assertTrue(html_path.exists())
+            self.assertTrue((artifact_dir / "documents.json").exists())
+            self.assertEqual(run_summary["docs_fetched"], 5)
+            self.assertEqual(result["pipeline_status"], "ok")
 
     def test_run_fixture_daily_brief_persists_budget_preflight_truthfully(self):
         with tempfile.TemporaryDirectory() as tmpdir:
