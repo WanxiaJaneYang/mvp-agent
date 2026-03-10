@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_on": "2026-02-19",
+  "generated_on": "2026-03-10",
   "phase": "modelling",
   "tickets": [
     {
@@ -104,18 +104,18 @@
     },
     {
       "id": "M007",
-      "title": "Implement daily brief and alert delivery",
+      "title": "Implement daily brief delivery",
       "status": "planned",
       "priority": "P1",
-      "depends_on": ["M004", "M006"],
+      "depends_on": ["M004"],
       "files": [
         "apps/agent/delivery/html_report.py",
-        "apps/agent/delivery/email_sender.py"
+        "scripts/run_daily_brief_fixture.py"
       ],
       "acceptance_criteria": [
         "Daily brief local HTML output generated in stable structure",
-        "Alert output follows 3-6 bullet format with citations",
-        "Delivery failures are logged and retry-eligible next run"
+        "Daily brief runtime produces validated or explicit abstained output",
+        "Daily brief delivery failures are logged and retry-eligible next run"
       ]
     },
     {
@@ -149,6 +149,21 @@
         "Users can input and update ticker + weight locally",
         "Outputs relevance tags and risk flags without buy/sell guidance",
         "Relevance is included in daily brief and alert context"
+      ]
+    },
+    {
+      "id": "M010",
+      "title": "Implement alert delivery after the daily-brief path is stable",
+      "status": "planned",
+      "priority": "P2",
+      "depends_on": ["M006", "M007"],
+      "files": [
+        "apps/agent/delivery/email_sender.py"
+      ],
+      "acceptance_criteria": [
+        "Alert output follows 3-6 bullet format with citations",
+        "Alert delivery happens only after the daily-brief path is working",
+        "Alert delivery failures are logged and retry-eligible next run"
       ]
     }
   ]
