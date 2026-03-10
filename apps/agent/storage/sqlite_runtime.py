@@ -14,6 +14,17 @@ def runtime_db_path(*, base_dir: Path) -> Path:
     return runtime_dir / "agent_runtime.sqlite3"
 
 
+def ensure_runtime_db(*, base_dir: Path) -> Path:
+    db_path = runtime_db_path(base_dir=base_dir)
+    connection = sqlite3.connect(db_path)
+    try:
+        _initialize_schema(connection)
+        connection.commit()
+    finally:
+        connection.close()
+    return db_path
+
+
 def persist_daily_brief_runtime(
     *,
     base_dir: Path,
@@ -30,12 +41,12 @@ def persist_daily_brief_runtime(
     bullet_citation_rows: Iterable[Mapping[str, Any]],
     run_row: Mapping[str, Any],
     budget_ledger_rows: Iterable[Mapping[str, Any]],
+    relevance_flag_rows: Iterable[Mapping[str, Any]] = (),
 ) -> Path:
-    db_path = runtime_db_path(base_dir=base_dir)
+    db_path = ensure_runtime_db(base_dir=base_dir)
     connection = sqlite3.connect(db_path)
     try:
         connection.row_factory = sqlite3.Row
-        _initialize_schema(connection)
 
         source_rows_list = [dict(row) for row in source_rows]
         document_rows_list = [dict(row) for row in documents]
@@ -45,8 +56,10 @@ def persist_daily_brief_runtime(
         synthesis_rows_list = [dict(row) for row in synthesis_rows]
         bullet_citation_rows_list = [dict(row) for row in bullet_citation_rows]
         budget_ledger_rows_list = [dict(row) for row in budget_ledger_rows]
+        relevance_flag_rows_list = [dict(row) for row in relevance_flag_rows]
 
         pack_id = build_pack_id(run_id=str(run_row["run_id"]), query_text=query_text)
+        synthesis_id = str(synthesis_rows_list[0]["synthesis_id"]) if synthesis_rows_list else None
         _persist_run(connection, row=dict(run_row))
         _persist_sources(connection, rows=source_rows_list)
         _persist_documents(connection, rows=document_rows_list)
@@ -79,6 +92,11 @@ def persist_daily_brief_runtime(
             citation_id_map=persisted_citation_ids,
         )
         _persist_budget_ledger(connection, rows=budget_ledger_rows_list)
+        _persist_relevance_flags(
+            connection,
+            synthesis_id=synthesis_id,
+            rows=relevance_flag_rows_list,
+        )
         connection.commit()
     finally:
         connection.close()
@@ -261,6 +279,29 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           cost_usd REAL NOT NULL,
           cap_usd REAL NOT NULL,
           exceeded INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS portfolio_positions (
+          position_id TEXT PRIMARY KEY,
+          ticker TEXT NOT NULL,
+          weight_pct REAL NOT NULL,
+          asset_type TEXT DEFAULT 'equity',
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(ticker)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS relevance_flags (
+          relevance_id TEXT PRIMARY KEY,
+          synthesis_id TEXT NOT NULL REFERENCES syntheses(synthesis_id) ON DELETE CASCADE,
+          ticker TEXT NOT NULL,
+          relevance_score REAL NOT NULL,
+          risk_flag TEXT NOT NULL,
+          rationale TEXT,
+          created_at TEXT NOT NULL
         )
         """,
     )
@@ -607,6 +648,34 @@ def _persist_budget_ledger(connection: sqlite3.Connection, *, rows: list[dict[st
           cost_usd=excluded.cost_usd,
           cap_usd=excluded.cap_usd,
           exceeded=excluded.exceeded
+        """,
+        rows,
+    )
+
+
+def _persist_relevance_flags(
+    connection: sqlite3.Connection,
+    *,
+    synthesis_id: str | None,
+    rows: list[dict[str, Any]],
+) -> None:
+    if synthesis_id is not None:
+        connection.execute("DELETE FROM relevance_flags WHERE synthesis_id = ?", (synthesis_id,))
+    if not rows:
+        return
+    connection.executemany(
+        """
+        INSERT INTO relevance_flags (
+          relevance_id, synthesis_id, ticker, relevance_score, risk_flag, rationale, created_at
+        ) VALUES (
+          :relevance_id, :synthesis_id, :ticker, :relevance_score, :risk_flag, :rationale, :created_at
+        )
+        ON CONFLICT(relevance_id) DO UPDATE SET
+          ticker=excluded.ticker,
+          relevance_score=excluded.relevance_score,
+          risk_flag=excluded.risk_flag,
+          rationale=excluded.rationale,
+          created_at=excluded.created_at
         """,
         rows,
     )

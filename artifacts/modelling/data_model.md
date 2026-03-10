@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS portfolio_positions (
   ticker TEXT NOT NULL,
   weight_pct REAL NOT NULL CHECK (weight_pct >= 0 AND weight_pct <= 100),
   asset_type TEXT DEFAULT 'equity',
-  notes TEXT,
+  notes TEXT, -- optional manual mapping hints (themes, sectors, macro sensitivities)
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE(ticker)
@@ -251,11 +251,14 @@ CREATE TABLE IF NOT EXISTS relevance_flags (
   synthesis_id TEXT NOT NULL REFERENCES syntheses(synthesis_id) ON DELETE CASCADE,
   ticker TEXT NOT NULL,
   relevance_score REAL NOT NULL,
-  risk_flag TEXT NOT NULL,
+  risk_flag TEXT NOT NULL, -- deterministic categories such as direct_holding or mapped_theme
   rationale TEXT,
   created_at TEXT NOT NULL
 );
 ```
+
+- `portfolio_positions.notes` stores optional user-supplied mapping hints for local-first relevance matching.
+- `relevance_flags` capture deterministic relevance/risk context for a synthesis and must not encode buy/sell guidance.
 
 ### 4.10 Runs, Budget, and Failures
 

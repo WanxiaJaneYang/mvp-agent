@@ -19,7 +19,7 @@ Definitions:
 | Alert scoring and policy gates | yes | yes | yes | `artifacts/modelling/alert_scoring.md`, `apps/agent/alerts/scoring.py`, `apps/agent/alerts/policy_gate.py`, `tests/agent/alerts/test_scoring.py`, `artifacts/modelling/backlog.json` (`M006`) |
 | Alert delivery runtime | yes | no | no | `artifacts/PRD.md`, `artifacts/modelling/backlog.json` (`M010`) |
 | Eval harness and golden cases | yes | yes | yes | `artifacts/modelling/backlog.json` (`M008`), `evals/run_eval_suite.py`, `evals/golden/`, `tests/evals/test_run_eval_suite.py` |
-| Portfolio relevance mapping | yes | no | no | `artifacts/PRD.md`, `artifacts/modelling/backlog.json` (`M009`) |
+| Portfolio relevance mapping | yes | yes | yes | `artifacts/PRD.md`, `artifacts/modelling/backlog.json` (`M009`), `apps/agent/portfolio/input_store.py`, `apps/agent/portfolio/relevance.py`, `apps/agent/storage/sqlite_runtime.py`, `apps/agent/daily_brief/runner.py`, `tests/agent/portfolio/test_input_store.py`, `tests/agent/portfolio/test_relevance.py`, `tests/agent/daily_brief/test_runner.py` |
 
 Priority note:
-- The daily-brief path, eval harness, and alert scoring gates are implemented in-tree. Alert delivery and portfolio relevance remain modelled-only and intentionally downstream in `artifacts/modelling/backlog.json`.
+- The daily-brief path, eval harness, alert scoring gates, and portfolio relevance mapping are implemented in-tree. Alert delivery remains modelled-only and intentionally downstream in `artifacts/modelling/backlog.json`.
