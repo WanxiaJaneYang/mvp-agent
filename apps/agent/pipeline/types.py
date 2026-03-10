@@ -40,7 +40,9 @@ DAILY_BRIEF_CORE_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = (
     "watch",
 )
 DAILY_BRIEF_OPTIONAL_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = ("changed",)
-DAILY_BRIEF_CLAIM_SECTIONS: frozenset[DailyBriefOutputSection] = frozenset(DAILY_BRIEF_OUTPUT_SECTIONS)
+DAILY_BRIEF_CLAIM_SECTIONS: frozenset[DailyBriefOutputSection] = frozenset(
+    DAILY_BRIEF_OUTPUT_SECTIONS
+)
 DAILY_BRIEF_SECTION_ALIASES: dict[str, DailyBriefOutputSection] = {
     "counterarguments": "counter",
     "what_to_watch": "watch",
@@ -52,6 +54,7 @@ class SourceRegistryEntry(TypedDict):
     id: Required[str]
     name: Required[str]
     url: Required[str]
+    base_url: NotRequired[str]
     type: Required[str]
     credibility_tier: Required[int]
     paywall_policy: Required[str]
@@ -120,7 +123,7 @@ class FtsRow(TypedDict):
     publisher: str
     source_id: str
     published_at: str | None
-    credibility_tier: int
+    credibility_tier: NotRequired[int]
 
 
 class EvidencePackItem(TypedDict):

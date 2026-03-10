@@ -50,7 +50,9 @@ def validate_backlog_ticket_paths(backlog: dict[str, Any], repo_root: Path) -> l
         if status == "implemented" and not all(existing_paths):
             missing_files = [path for path in files if not (repo_root / path).exists()]
             errors.append(
-                f"Backlog ticket {ticket_id} is marked implemented but missing listed files: {', '.join(missing_files)}."
+                "Backlog ticket "
+                f"{ticket_id} is marked implemented but missing listed files: "
+                f"{', '.join(missing_files)}."
             )
         if status == "planned" and files and all(existing_paths):
             errors.append(
@@ -62,7 +64,9 @@ def validate_backlog_ticket_paths(backlog: dict[str, Any], repo_root: Path) -> l
 
 def validate_status_matrix(status_matrix_text: str, backlog: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    ticket_statuses = {ticket["id"]: ticket["status"] for ticket in backlog.get("tickets", []) if "id" in ticket}
+    ticket_statuses = {
+        ticket["id"]: ticket["status"] for ticket in backlog.get("tickets", []) if "id" in ticket
+    }
 
     for raw_line in status_matrix_text.splitlines():
         line = raw_line.strip()
@@ -81,11 +85,13 @@ def validate_status_matrix(status_matrix_text: str, backlog: dict[str, Any]) -> 
             status = ticket_statuses.get(ticket_id)
             if status == "planned" and (coded != "no" or verified != "no"):
                 errors.append(
-                    f"docs/status-matrix.md row for ticket {ticket_id} must report coded=no and verified=no while backlog status is planned."
+                    "docs/status-matrix.md row for ticket "
+                    f"{ticket_id} must report coded=no and verified=no while backlog status is planned."
                 )
             if status == "implemented" and (coded != "yes" or verified != "yes"):
                 errors.append(
-                    f"docs/status-matrix.md row for ticket {ticket_id} must report coded=yes and verified=yes while backlog status is implemented."
+                    "docs/status-matrix.md row for ticket "
+                    f"{ticket_id} must report coded=yes and verified=yes while backlog status is implemented."
                 )
 
     return errors
@@ -93,12 +99,18 @@ def validate_status_matrix(status_matrix_text: str, backlog: dict[str, Any]) -> 
 
 def validate_readme_status(readme_text: str, backlog: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    ticket_statuses = {ticket["id"]: ticket["status"] for ticket in backlog.get("tickets", []) if "id" in ticket}
+    ticket_statuses = {
+        ticket["id"]: ticket["status"] for ticket in backlog.get("tickets", []) if "id" in ticket
+    }
     lower_text = readme_text.lower()
 
-    alerts_planned = any(ticket_statuses.get(ticket_id) != "implemented" for ticket_id in ("M006", "M010"))
+    alerts_planned = any(
+        ticket_statuses.get(ticket_id) != "implemented" for ticket_id in ("M006", "M010")
+    )
     if alerts_planned and "major-event alerts" in lower_text and "remain planned" not in lower_text:
-        errors.append("README.md must mark alerts as planned until backlog tickets M006 and M010 are implemented.")
+        errors.append(
+            "README.md must mark alerts as planned until backlog tickets M006 and M010 are implemented."
+        )
 
     return errors
 

@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from apps.agent.pipeline.identifiers import build_chunk_id
+from apps.agent.pipeline.types import RuntimeChunkRow
 
 
-def chunk_document(*, document: Mapping[str, Any], max_chars: int = 800) -> list[dict[str, int | str]]:
+def chunk_document(
+    *, document: Mapping[str, Any], max_chars: int = 800
+) -> list[dict[str, int | str]]:
     if document.get("metadata_only") or not document.get("body_text"):
         return []
 
@@ -27,22 +30,28 @@ def chunk_document(*, document: Mapping[str, Any], max_chars: int = 800) -> list
         proposed_start = current_words[0].start()
         proposed_end = word.end()
         if proposed_end - proposed_start >= max_chars:
-            chunks.append(_build_chunk(body_text=body_text, chunk_index=len(chunks), words=current_words))
+            chunks.append(
+                _build_chunk(body_text=body_text, chunk_index=len(chunks), words=current_words)
+            )
             current_words = [word]
             continue
 
         current_words.append(word)
 
     if current_words:
-        chunks.append(_build_chunk(body_text=body_text, chunk_index=len(chunks), words=current_words))
+        chunks.append(
+            _build_chunk(body_text=body_text, chunk_index=len(chunks), words=current_words)
+        )
 
     return chunks
 
 
-def build_chunk_rows(*, document: Mapping[str, Any], max_chars: int = 800) -> list[dict[str, Any]]:
-    chunk_rows: list[dict[str, Any]] = []
+def build_chunk_rows(
+    *, document: Mapping[str, Any], max_chars: int = 800
+) -> list[RuntimeChunkRow]:
+    chunk_rows: list[RuntimeChunkRow] = []
     for chunk in chunk_document(document=document, max_chars=max_chars):
-        chunk_index = int(chunk["chunk_index"])
+        chunk_index = cast(int, chunk["chunk_index"])
         chunk_rows.append(
             {
                 "chunk_id": build_chunk_id(
@@ -51,10 +60,10 @@ def build_chunk_rows(*, document: Mapping[str, Any], max_chars: int = 800) -> li
                 ),
                 "doc_id": document["doc_id"],
                 "chunk_index": chunk_index,
-                "text": chunk["text"],
+                "text": cast(str, chunk["text"]),
                 "token_count": len(str(chunk["text"]).split()),
-                "char_start": chunk["char_start"],
-                "char_end": chunk["char_end"],
+                "char_start": cast(int, chunk["char_start"]),
+                "char_end": cast(int, chunk["char_end"]),
                 "created_at": document["fetched_at"],
             }
         )

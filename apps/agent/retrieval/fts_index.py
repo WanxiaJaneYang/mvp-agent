@@ -3,9 +3,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from apps.agent.pipeline.types import FtsRow
 
-def build_fts_rows(*, document: Mapping[str, Any], chunk_rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+
+def build_fts_rows(
+    *, document: Mapping[str, Any], chunk_rows: Iterable[Mapping[str, Any]]
+) -> list[FtsRow]:
+    rows: list[FtsRow] = []
     for chunk_row in chunk_rows:
         _validate_chunk_row(chunk_row)
         rows.append(
@@ -49,6 +53,10 @@ def search_fts_rows(
 
 def _validate_chunk_row(chunk_row: Mapping[str, Any]) -> None:
     required_fields = ("chunk_id", "doc_id", "text")
-    missing_fields = [field for field in required_fields if field not in chunk_row or chunk_row[field] in (None, "")]
+    missing_fields = [
+        field
+        for field in required_fields
+        if field not in chunk_row or chunk_row[field] in (None, "")
+    ]
     if missing_fields:
         raise ValueError(f"Invalid chunk row for FTS indexing: missing {', '.join(missing_fields)}")

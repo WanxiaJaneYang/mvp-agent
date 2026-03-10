@@ -9,16 +9,15 @@ from typing import get_args, get_type_hints
 from unittest.mock import patch
 
 from apps.agent.daily_brief.runner import (
-    build_daily_brief_query,
-    prepare_daily_brief_inputs,
     build_daily_brief_corpus,
+    build_daily_brief_query,
     build_daily_brief_synthesis,
     load_active_fixture_payloads,
     load_active_live_payloads,
+    prepare_daily_brief_inputs,
     run_daily_brief,
     run_fixture_daily_brief,
 )
-from apps.agent.daily_brief.synthesis import build_citation_store
 from apps.agent.pipeline.types import (
     BulletCitationRow,
     CitationStoreEntry,
@@ -33,9 +32,9 @@ from apps.agent.pipeline.types import (
     PlannedFetchItem,
     RunContext,
     RunStatus,
-    RunType,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
+    RunType,
     SourceRegistryEntry,
     SourceRow,
 )
@@ -160,36 +159,36 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 },
             ],
             chunks=[
-                {"chunk_id": "doc_watch_chunk_000", "doc_id": "doc_watch", "chunk_index": 0, "text": "Watch Friday CPI for shelter inflation surprises.", "token_count": 6, "char_start": 0, "char_end": 43, "created_at": "2026-03-10T16:05:00Z"},
-                {"chunk_id": "doc_minority_chunk_000", "doc_id": "doc_minority", "chunk_index": 0, "text": "A minority of investors still expects a hard landing.", "token_count": 9, "char_start": 0, "char_end": 55, "created_at": "2026-03-10T15:35:00Z"},
-                {"chunk_id": "doc_prevailing_chunk_000", "doc_id": "doc_prevailing", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},
-                {"chunk_id": "doc_counter_invalid_chunk_000", "doc_id": "doc_counter_invalid", "chunk_index": 0, "text": "Bond traders push back on the soft-landing consensus as growth cools.", "token_count": 10, "char_start": 0, "char_end": 70, "created_at": "2026-03-10T14:35:00Z"},
-                {"chunk_id": "doc_counter_retry_chunk_000", "doc_id": "doc_counter_retry", "chunk_index": 0, "text": "Investors question the soft-landing narrative as growth data weakens.", "token_count": 9, "char_start": 0, "char_end": 68, "created_at": "2026-03-10T14:25:00Z"},
+                {"chunk_id": "doc_watch_chunk_000", "doc_id": "doc_watch", "chunk_index": 0, "text": "Watch Friday CPI for shelter inflation surprises.", "token_count": 6, "char_start": 0, "char_end": 43, "created_at": "2026-03-10T16:05:00Z"},  # noqa: E501
+                {"chunk_id": "doc_minority_chunk_000", "doc_id": "doc_minority", "chunk_index": 0, "text": "A minority of investors still expects a hard landing.", "token_count": 9, "char_start": 0, "char_end": 55, "created_at": "2026-03-10T15:35:00Z"},  # noqa: E501
+                {"chunk_id": "doc_prevailing_chunk_000", "doc_id": "doc_prevailing", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},  # noqa: E501
+                {"chunk_id": "doc_counter_invalid_chunk_000", "doc_id": "doc_counter_invalid", "chunk_index": 0, "text": "Bond traders push back on the soft-landing consensus as growth cools.", "token_count": 10, "char_start": 0, "char_end": 70, "created_at": "2026-03-10T14:35:00Z"},  # noqa: E501
+                {"chunk_id": "doc_counter_retry_chunk_000", "doc_id": "doc_counter_retry", "chunk_index": 0, "text": "Investors question the soft-landing narrative as growth data weakens.", "token_count": 9, "char_start": 0, "char_end": 68, "created_at": "2026-03-10T14:25:00Z"},  # noqa: E501
             ],
             fts_rows=[
-                {"text": "Watch Friday CPI for shelter inflation surprises.", "doc_id": "doc_watch", "chunk_id": "doc_watch_chunk_000", "publisher": "BLS Preview Desk", "source_id": "bls_preview", "published_at": "2026-03-10T16:00:00Z", "credibility_tier": 1},
-                {"text": "A minority of investors still expects a hard landing.", "doc_id": "doc_minority", "chunk_id": "doc_minority_chunk_000", "publisher": "Market Commentary", "source_id": "market_commentary", "published_at": "2026-03-10T15:30:00Z", "credibility_tier": 3},
-                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_prevailing", "chunk_id": "doc_prevailing_chunk_000", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
-                {"text": "Bond traders push back on the soft-landing consensus as growth cools.", "doc_id": "doc_counter_invalid", "chunk_id": "doc_counter_invalid_chunk_000", "publisher": "Reuters", "source_id": "reuters_business", "published_at": None, "credibility_tier": 2},
-                {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_counter_retry", "chunk_id": "doc_counter_retry_chunk_000", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
+                {"text": "Watch Friday CPI for shelter inflation surprises.", "doc_id": "doc_watch", "chunk_id": "doc_watch_chunk_000", "publisher": "BLS Preview Desk", "source_id": "bls_preview", "published_at": "2026-03-10T16:00:00Z", "credibility_tier": 1},  # noqa: E501
+                {"text": "A minority of investors still expects a hard landing.", "doc_id": "doc_minority", "chunk_id": "doc_minority_chunk_000", "publisher": "Market Commentary", "source_id": "market_commentary", "published_at": "2026-03-10T15:30:00Z", "credibility_tier": 3},  # noqa: E501
+                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_prevailing", "chunk_id": "doc_prevailing_chunk_000", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},  # noqa: E501
+                {"text": "Bond traders push back on the soft-landing consensus as growth cools.", "doc_id": "doc_counter_invalid", "chunk_id": "doc_counter_invalid_chunk_000", "publisher": "Reuters", "source_id": "reuters_business", "published_at": None, "credibility_tier": 2},  # noqa: E501
+                {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_counter_retry", "chunk_id": "doc_counter_retry_chunk_000", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},  # noqa: E501
             ],
         )
         registry = {
-            "bls_preview": {"id": "bls_preview", "name": "BLS Preview Desk", "url": "https://example.test/watch", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["macro_data"]},
-            "market_commentary": {"id": "market_commentary", "name": "Market Commentary", "url": "https://example.test/minority", "type": "rss", "credibility_tier": 3, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
-            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/prevailing", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},
-            "reuters_business": {"id": "reuters_business", "name": "Reuters", "url": "https://example.test/counter-invalid", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
-            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/counter-retry", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+            "bls_preview": {"id": "bls_preview", "name": "BLS Preview Desk", "url": "https://example.test/watch", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["macro_data"]},  # noqa: E501
+            "market_commentary": {"id": "market_commentary", "name": "Market Commentary", "url": "https://example.test/minority", "type": "rss", "credibility_tier": 3, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},  # noqa: E501
+            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/prevailing", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},  # noqa: E501
+            "reuters_business": {"id": "reuters_business", "name": "Reuters", "url": "https://example.test/counter-invalid", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},  # noqa: E501
+            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/counter-retry", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},  # noqa: E501
         }
 
         with patch("apps.agent.daily_brief.runner.build_evidence_pack_report") as evidence_pack_report_mock:
             evidence_pack_report_mock.return_value = {
                 "items": [
-                    {"chunk_id": "doc_watch_chunk_000", "source_id": "bls_preview", "publisher": "BLS Preview Desk", "credibility_tier": 1, "retrieval_score": 0.95, "semantic_score": 0.95, "recency_score": 0.90, "credibility_score": 1.0, "rank_in_pack": 1},
-                    {"chunk_id": "doc_minority_chunk_000", "source_id": "market_commentary", "publisher": "Market Commentary", "credibility_tier": 3, "retrieval_score": 0.90, "semantic_score": 0.90, "recency_score": 0.80, "credibility_score": 0.6, "rank_in_pack": 2},
-                    {"chunk_id": "doc_prevailing_chunk_000", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.88, "semantic_score": 0.88, "recency_score": 0.70, "credibility_score": 1.0, "rank_in_pack": 3},
-                    {"chunk_id": "doc_counter_invalid_chunk_000", "source_id": "reuters_business", "publisher": "Reuters", "credibility_tier": 2, "retrieval_score": 0.86, "semantic_score": 0.86, "recency_score": 0.68, "credibility_score": 0.8, "rank_in_pack": 4},
-                    {"chunk_id": "doc_counter_retry_chunk_000", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.84, "semantic_score": 0.84, "recency_score": 0.66, "credibility_score": 0.8, "rank_in_pack": 5},
+                    {"chunk_id": "doc_watch_chunk_000", "source_id": "bls_preview", "publisher": "BLS Preview Desk", "credibility_tier": 1, "retrieval_score": 0.95, "semantic_score": 0.95, "recency_score": 0.90, "credibility_score": 1.0, "rank_in_pack": 1},  # noqa: E501
+                    {"chunk_id": "doc_minority_chunk_000", "source_id": "market_commentary", "publisher": "Market Commentary", "credibility_tier": 3, "retrieval_score": 0.90, "semantic_score": 0.90, "recency_score": 0.80, "credibility_score": 0.6, "rank_in_pack": 2},  # noqa: E501
+                    {"chunk_id": "doc_prevailing_chunk_000", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.88, "semantic_score": 0.88, "recency_score": 0.70, "credibility_score": 1.0, "rank_in_pack": 3},  # noqa: E501
+                    {"chunk_id": "doc_counter_invalid_chunk_000", "source_id": "reuters_business", "publisher": "Reuters", "credibility_tier": 2, "retrieval_score": 0.86, "semantic_score": 0.86, "recency_score": 0.68, "credibility_score": 0.8, "rank_in_pack": 4},  # noqa: E501
+                    {"chunk_id": "doc_counter_retry_chunk_000", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.84, "semantic_score": 0.84, "recency_score": 0.66, "credibility_score": 0.8, "rank_in_pack": 5},  # noqa: E501
                 ],
                 "diversity_stats": {"unique_publishers": 5},
                 "diversity_check": "pass",
@@ -234,10 +233,10 @@ class DailyBriefRunnerTests(unittest.TestCase):
             "watch": [{"text": "Retried watch.", "citation_ids": ["cite_004"]}],
         }
         citation_store = {
-            "cite_001": {"citation_id": "cite_001", "source_id": "src1", "publisher": "Pub 1", "doc_id": "doc_001", "chunk_id": "chunk_001", "url": "https://example.test/1", "title": "Doc 1", "published_at": "2026-03-10T10:00:00Z", "fetched_at": "2026-03-10T10:05:00Z", "paywall_policy": "full", "quote_text": "Quote 1", "snippet_text": "Snippet 1"},
-            "cite_002": {"citation_id": "cite_002", "source_id": "src2", "publisher": "Pub 2", "doc_id": "doc_002", "chunk_id": "chunk_002", "url": "https://example.test/2", "title": "Doc 2", "published_at": "2026-03-10T11:00:00Z", "fetched_at": "2026-03-10T11:05:00Z", "paywall_policy": "full", "quote_text": "Quote 2", "snippet_text": "Snippet 2"},
-            "cite_003": {"citation_id": "cite_003", "source_id": "src3", "publisher": "Pub 3", "doc_id": "doc_003", "chunk_id": "chunk_003", "url": "https://example.test/3", "title": "Doc 3", "published_at": "2026-03-10T12:00:00Z", "fetched_at": "2026-03-10T12:05:00Z", "paywall_policy": "full", "quote_text": "Quote 3", "snippet_text": "Snippet 3"},
-            "cite_004": {"citation_id": "cite_004", "source_id": "src4", "publisher": "Pub 4", "doc_id": "doc_004", "chunk_id": "chunk_004", "url": "https://example.test/4", "title": "Doc 4", "published_at": "2026-03-10T13:00:00Z", "fetched_at": "2026-03-10T13:05:00Z", "paywall_policy": "full", "quote_text": "Quote 4", "snippet_text": "Snippet 4"},
+            "cite_001": {"citation_id": "cite_001", "source_id": "src1", "publisher": "Pub 1", "doc_id": "doc_001", "chunk_id": "chunk_001", "url": "https://example.test/1", "title": "Doc 1", "published_at": "2026-03-10T10:00:00Z", "fetched_at": "2026-03-10T10:05:00Z", "paywall_policy": "full", "quote_text": "Quote 1", "snippet_text": "Snippet 1"},  # noqa: E501
+            "cite_002": {"citation_id": "cite_002", "source_id": "src2", "publisher": "Pub 2", "doc_id": "doc_002", "chunk_id": "chunk_002", "url": "https://example.test/2", "title": "Doc 2", "published_at": "2026-03-10T11:00:00Z", "fetched_at": "2026-03-10T11:05:00Z", "paywall_policy": "full", "quote_text": "Quote 2", "snippet_text": "Snippet 2"},  # noqa: E501
+            "cite_003": {"citation_id": "cite_003", "source_id": "src3", "publisher": "Pub 3", "doc_id": "doc_003", "chunk_id": "chunk_003", "url": "https://example.test/3", "title": "Doc 3", "published_at": "2026-03-10T12:00:00Z", "fetched_at": "2026-03-10T12:05:00Z", "paywall_policy": "full", "quote_text": "Quote 3", "snippet_text": "Snippet 3"},  # noqa: E501
+            "cite_004": {"citation_id": "cite_004", "source_id": "src4", "publisher": "Pub 4", "doc_id": "doc_004", "chunk_id": "chunk_004", "url": "https://example.test/4", "title": "Doc 4", "published_at": "2026-03-10T13:00:00Z", "fetched_at": "2026-03-10T13:05:00Z", "paywall_policy": "full", "quote_text": "Quote 4", "snippet_text": "Snippet 4"},  # noqa: E501
         }
 
         with patch("apps.agent.daily_brief.runner.build_synthesis") as build_synthesis_mock, patch(
@@ -666,8 +665,13 @@ class DailyBriefRunnerTests(unittest.TestCase):
     def test_run_daily_brief_writes_expected_artifacts_from_live_payloads(self):
         fixture_payloads = load_active_fixture_payloads()
 
-        with patch("apps.agent.daily_brief.runner.fetch_live_payloads_for_source") as live_fetch_mock, tempfile.TemporaryDirectory() as tmpdir:
-            live_fetch_mock.side_effect = lambda *, source, fetched_at_utc: fixture_payloads.get(str(source["id"]), [])
+        with (
+            patch("apps.agent.daily_brief.runner.fetch_live_payloads_for_source") as live_fetch_mock,
+            tempfile.TemporaryDirectory() as tmpdir,
+        ):
+            live_fetch_mock.side_effect = (
+                lambda *, source, fetched_at_utc: fixture_payloads.get(str(source["id"]), [])
+            )
             result = run_daily_brief(
                 base_dir=Path(tmpdir),
                 run_id="run_live_ok",
@@ -714,7 +718,9 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 generated_at_utc="2026-03-10T16:00:00Z",
             )
 
-            synthesis_payload = json.loads((Path(result["artifact_dir"]) / "synthesis.json").read_text(encoding="utf-8"))
+            synthesis_payload = json.loads(
+                (Path(result["artifact_dir"]) / "synthesis.json").read_text(encoding="utf-8")
+            )
             html = Path(result["html_path"]).read_text(encoding="utf-8")
 
         self.assertIn("changed", synthesis_payload)
@@ -780,10 +786,10 @@ class DailyBriefRunnerTests(unittest.TestCase):
             "watch": [{"text": "Retried watch.", "citation_ids": ["cite_004"]}],
         }
         citation_store = {
-            "cite_001": {"citation_id": "cite_001", "source_id": "src1", "publisher": "Pub 1", "doc_id": "doc_001", "chunk_id": "chunk_001", "url": "https://example.test/1", "title": "Doc 1", "published_at": "2026-03-10T10:00:00Z", "fetched_at": "2026-03-10T10:05:00Z", "paywall_policy": "full", "quote_text": "Quote 1", "snippet_text": "Snippet 1"},
-            "cite_002": {"citation_id": "cite_002", "source_id": "src2", "publisher": "Pub 2", "doc_id": "doc_002", "chunk_id": "chunk_002", "url": "https://example.test/2", "title": "Doc 2", "published_at": "2026-03-10T11:00:00Z", "fetched_at": "2026-03-10T11:05:00Z", "paywall_policy": "full", "quote_text": "Quote 2", "snippet_text": "Snippet 2"},
-            "cite_003": {"citation_id": "cite_003", "source_id": "src3", "publisher": "Pub 3", "doc_id": "doc_003", "chunk_id": "chunk_003", "url": "https://example.test/3", "title": "Doc 3", "published_at": "2026-03-10T12:00:00Z", "fetched_at": "2026-03-10T12:05:00Z", "paywall_policy": "full", "quote_text": "Quote 3", "snippet_text": "Snippet 3"},
-            "cite_004": {"citation_id": "cite_004", "source_id": "src4", "publisher": "Pub 4", "doc_id": "doc_004", "chunk_id": "chunk_004", "url": "https://example.test/4", "title": "Doc 4", "published_at": "2026-03-10T13:00:00Z", "fetched_at": "2026-03-10T13:05:00Z", "paywall_policy": "full", "quote_text": "Quote 4", "snippet_text": "Snippet 4"},
+            "cite_001": {"citation_id": "cite_001", "source_id": "src1", "publisher": "Pub 1", "doc_id": "doc_001", "chunk_id": "chunk_001", "url": "https://example.test/1", "title": "Doc 1", "published_at": "2026-03-10T10:00:00Z", "fetched_at": "2026-03-10T10:05:00Z", "paywall_policy": "full", "quote_text": "Quote 1", "snippet_text": "Snippet 1"},  # noqa: E501
+            "cite_002": {"citation_id": "cite_002", "source_id": "src2", "publisher": "Pub 2", "doc_id": "doc_002", "chunk_id": "chunk_002", "url": "https://example.test/2", "title": "Doc 2", "published_at": "2026-03-10T11:00:00Z", "fetched_at": "2026-03-10T11:05:00Z", "paywall_policy": "full", "quote_text": "Quote 2", "snippet_text": "Snippet 2"},  # noqa: E501
+            "cite_003": {"citation_id": "cite_003", "source_id": "src3", "publisher": "Pub 3", "doc_id": "doc_003", "chunk_id": "chunk_003", "url": "https://example.test/3", "title": "Doc 3", "published_at": "2026-03-10T12:00:00Z", "fetched_at": "2026-03-10T12:05:00Z", "paywall_policy": "full", "quote_text": "Quote 3", "snippet_text": "Snippet 3"},  # noqa: E501
+            "cite_004": {"citation_id": "cite_004", "source_id": "src4", "publisher": "Pub 4", "doc_id": "doc_004", "chunk_id": "chunk_004", "url": "https://example.test/4", "title": "Doc 4", "published_at": "2026-03-10T13:00:00Z", "fetched_at": "2026-03-10T13:05:00Z", "paywall_policy": "full", "quote_text": "Quote 4", "snippet_text": "Snippet 4"},  # noqa: E501
         }
 
         with patch("apps.agent.daily_brief.runner.build_synthesis") as build_synthesis_mock, patch(

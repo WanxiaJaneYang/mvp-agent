@@ -1,5 +1,5 @@
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from evals import run_eval_suite
 
@@ -46,7 +46,12 @@ class EvalRunnerTests(unittest.TestCase):
             "validation_result": {
                 "status": "retry",
                 "synthesis": {
-                    "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+                    "prevailing": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                        }
+                    ]
                 },
                 "report": {"removed_bullets": 4},
                 "validation_attempts": 2,
@@ -88,13 +93,10 @@ class EvalRunnerTests(unittest.TestCase):
                     "source_id": "src_a",
                     "publisher": "Federal Reserve",
                     "published_at": "2026-03-10T10:00:00Z",
-                    "credibility_tier": 9
+                    "credibility_tier": 9,
                 }
             ],
-            "expected": {
-                "chunk_ids": ["chunk_001"],
-                "pack_size": 1
-            }
+            "expected": {"chunk_ids": ["chunk_001"], "pack_size": 1},
         }
 
         failure = run_eval_suite._run_case(case)

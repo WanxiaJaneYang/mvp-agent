@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
+from apps.agent.pipeline.types import PlannedFetchItem
+
 
 def plan_fetch_items(
     *,
@@ -10,8 +12,8 @@ def plan_fetch_items(
     candidate_payloads: Mapping[str, Sequence[Mapping[str, Any]]],
     default_per_source_cap: int = 10,
     global_cap: int = 200,
-) -> list[dict[str, Any]]:
-    planned: list[dict[str, Any]] = []
+) -> list[PlannedFetchItem]:
+    planned: list[PlannedFetchItem] = []
     for source in sources:
         source_id = str(source["id"])
         per_source_cap = int(source.get("per_fetch_cap", default_per_source_cap))

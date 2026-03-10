@@ -80,9 +80,9 @@ Install the supported local toolchain:
 python -m pip install -e ".[dev]"
 ```
 
-Lint and type-check commands are available through the toolchain, but they are informational today:
-- not CI-gated yet
-- currently fail on pre-existing repo-wide issues that are outside this tooling slice
+Lint and type-check commands are required and CI-gated:
+- pull requests to `master` must pass both commands
+- use the same local commands before pushing changes
 
 Run lint:
 

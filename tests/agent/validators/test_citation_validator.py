@@ -40,10 +40,30 @@ class CitationValidatorTests(unittest.TestCase):
             "watch": [{"text": "Watch payroll revisions.", "citation_ids": ["c4"]}],
         }
         store = {
-            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c1": {
+                "id": "c1",
+                "url": "u1",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "u2",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "u3",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c4": {
+                "id": "c4",
+                "url": "u4",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
         }
 
         report = validate_synthesis(synthesis, store)
@@ -60,9 +80,24 @@ class CitationValidatorTests(unittest.TestCase):
             "watch": [{"text": "Cited watch.", "citation_ids": ["c3"]}],
         }
         store = {
-            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c1": {
+                "id": "c1",
+                "url": "u1",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "u2",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "u3",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
         }
 
         report = validate_synthesis(synthesis, store)
@@ -80,10 +115,30 @@ class CitationValidatorTests(unittest.TestCase):
             "watch": [{"text": "Watch.", "citation_ids": ["c3"]}],
         }
         store = {
-            "c_missing": {"id": "c_missing", "url": "", "published_at": None, "paywall_policy": "full"},
-            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c_missing": {
+                "id": "c_missing",
+                "url": "",
+                "published_at": None,
+                "paywall_policy": "full",
+            },
+            "c1": {
+                "id": "c1",
+                "url": "u1",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "u2",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "u3",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
         }
 
         report = validate_synthesis(synthesis, store)
@@ -108,9 +163,24 @@ class CitationValidatorTests(unittest.TestCase):
                 "quote_span": {"text": "secret"},
                 "snippet_span": {"text": "headline"},
             },
-            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c2": {
+                "id": "c2",
+                "url": "u2",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "u3",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c4": {
+                "id": "c4",
+                "url": "u4",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
         }
 
         report = validate_synthesis(synthesis, store)
@@ -171,9 +241,21 @@ class CitationValidatorTests(unittest.TestCase):
                 "credibility_tier": 3,
                 "tags": ["market_narrative"],
             },
-            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src2": {
+                "base_url": "https://source2.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src3": {
+                "base_url": "https://source3.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src4": {
+                "base_url": "https://source4.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
         }
         store["c2"]["source_id"] = "src2"
         store["c3"]["source_id"] = "src3"
@@ -186,7 +268,9 @@ class CitationValidatorTests(unittest.TestCase):
 
     def test_numeric_claim_allows_two_independent_lower_tier_sources(self):
         synthesis = {
-            "prevailing": [{"text": "Oil rose 3% on supply concerns.", "citation_ids": ["c1", "c2"]}],
+            "prevailing": [
+                {"text": "Oil rose 3% on supply concerns.", "citation_ids": ["c1", "c2"]}
+            ],
             "counter": [{"text": "Counter.", "citation_ids": ["c3"]}],
             "minority": [{"text": "Minority.", "citation_ids": ["c4"]}],
             "watch": [{"text": "Watch.", "citation_ids": ["c5"]}],
@@ -209,11 +293,31 @@ class CitationValidatorTests(unittest.TestCase):
             "c5": self._citation("c5", url="https://source5.example/doc", source_id="src5"),
         }
         source_registry = {
-            "publisher_a": {"base_url": "https://publisher-a.example", "credibility_tier": 3, "tags": ["market_narrative"]},
-            "publisher_b": {"base_url": "https://publisher-b.example", "credibility_tier": 3, "tags": ["market_narrative"]},
-            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src5": {"base_url": "https://source5.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "publisher_a": {
+                "base_url": "https://publisher-a.example",
+                "credibility_tier": 3,
+                "tags": ["market_narrative"],
+            },
+            "publisher_b": {
+                "base_url": "https://publisher-b.example",
+                "credibility_tier": 3,
+                "tags": ["market_narrative"],
+            },
+            "src3": {
+                "base_url": "https://source3.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src4": {
+                "base_url": "https://source4.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src5": {
+                "base_url": "https://source5.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
         }
 
         report = validate_synthesis(synthesis, store, source_registry=source_registry)
@@ -245,9 +349,21 @@ class CitationValidatorTests(unittest.TestCase):
                 "credibility_tier": 2,
                 "tags": ["market_narrative"],
             },
-            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src2": {
+                "base_url": "https://source2.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src3": {
+                "base_url": "https://source3.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src4": {
+                "base_url": "https://source4.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
         }
 
         report = validate_synthesis(synthesis, store, source_registry=source_registry)
@@ -255,7 +371,9 @@ class CitationValidatorTests(unittest.TestCase):
         self.assertEqual(report.removed_bullets, 1)
         self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
 
-    def test_policy_claim_requires_tier_one_citation_when_official_source_is_available_in_evidence_pack(self):
+    def test_policy_claim_requires_tier_one_citation_when_official_source_is_available_in_evidence_pack(
+        self,
+    ):
         synthesis = {
             "prevailing": [{"text": "The Fed held rates steady.", "citation_ids": ["c1"]}],
             "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
@@ -284,9 +402,21 @@ class CitationValidatorTests(unittest.TestCase):
                 "credibility_tier": 1,
                 "tags": ["policy_centralbank", "rates", "us"],
             },
-            "src2": {"base_url": "https://source2.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src3": {"base_url": "https://source3.example", "credibility_tier": 2, "tags": ["market_narrative"]},
-            "src4": {"base_url": "https://source4.example", "credibility_tier": 2, "tags": ["market_narrative"]},
+            "src2": {
+                "base_url": "https://source2.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src3": {
+                "base_url": "https://source3.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
+            "src4": {
+                "base_url": "https://source4.example",
+                "credibility_tier": 2,
+                "tags": ["market_narrative"],
+            },
         }
 
         report = validate_synthesis(
@@ -307,9 +437,24 @@ class CitationValidatorTests(unittest.TestCase):
             "watch": [{"text": "Watch.", "citation_ids": ["c3"]}],
         }
         store = {
-            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
-            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c1": {
+                "id": "c1",
+                "url": "u1",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "u2",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "u3",
+                "published_at": "2026-02-19T00:00:00Z",
+                "paywall_policy": "full",
+            },
         }
 
         report = validate_synthesis(synthesis, store, replace_with_placeholder=False)
@@ -416,10 +561,26 @@ class CitationValidatorTests(unittest.TestCase):
             "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
         }
         store = {
-            "c1": {"id": "c1", "url": "https://source1.example/doc", "published_at": "2026-02-19T00:00:00Z"},
-            "c2": {"id": "c2", "url": "https://source2.example/doc", "published_at": "2026-02-19T00:00:00Z"},
-            "c3": {"id": "c3", "url": "https://source3.example/doc", "published_at": "2026-02-19T00:00:00Z"},
-            "c4": {"id": "c4", "url": "https://source4.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+            "c1": {
+                "id": "c1",
+                "url": "https://source1.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
+            "c2": {
+                "id": "c2",
+                "url": "https://source2.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "https://source3.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
+            "c4": {
+                "id": "c4",
+                "url": "https://source4.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
         }
 
         report = validate_synthesis(synthesis, store)
@@ -462,7 +623,10 @@ class CitationValidatorTests(unittest.TestCase):
 
         self.assertTrue(report.should_retry)
         self.assertIn("prevailing", report.empty_core_sections)
-        self.assertEqual(report.synthesis["prevailing"][0]["text"], "[Insufficient evidence to support this claim]")
+        self.assertEqual(
+            report.synthesis["prevailing"][0]["text"],
+            "[Insufficient evidence to support this claim]",
+        )
 
     def test_source_registry_missing_source_id_skips_registry_matching(self):
         synthesis = {
@@ -477,9 +641,21 @@ class CitationValidatorTests(unittest.TestCase):
                 "url": "https://federalreserve.gov/newsevents/some-path",
                 "published_at": "2026-02-19T00:00:00Z",
             },
-            "c2": {"id": "c2", "url": "https://source2.example/doc", "published_at": "2026-02-19T00:00:00Z"},
-            "c3": {"id": "c3", "url": "https://source3.example/doc", "published_at": "2026-02-19T00:00:00Z"},
-            "c4": {"id": "c4", "url": "https://source4.example/doc", "published_at": "2026-02-19T00:00:00Z"},
+            "c2": {
+                "id": "c2",
+                "url": "https://source2.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
+            "c3": {
+                "id": "c3",
+                "url": "https://source3.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
+            "c4": {
+                "id": "c4",
+                "url": "https://source4.example/doc",
+                "published_at": "2026-02-19T00:00:00Z",
+            },
         }
         source_registry = {
             "fed": {"base_url": "https://federalreserve.gov/newsevents"},

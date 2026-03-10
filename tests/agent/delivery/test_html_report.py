@@ -15,9 +15,15 @@ class HtmlReportTests(unittest.TestCase):
                 report_date="2026-03-10",
                 run_id="run_daily_fixture",
                 synthesis={
-                    "prevailing": [{"text": "Fed kept policy steady.", "citation_ids": ["cite_001"]}],
-                    "counter": [{"text": "Growth is cooling faster.", "citation_ids": ["cite_002"]}],
-                    "minority": [{"text": "Some investors expect a rebound.", "citation_ids": ["cite_003"]}],
+                    "prevailing": [
+                        {"text": "Fed kept policy steady.", "citation_ids": ["cite_001"]}
+                    ],
+                    "counter": [
+                        {"text": "Growth is cooling faster.", "citation_ids": ["cite_002"]}
+                    ],
+                    "minority": [
+                        {"text": "Some investors expect a rebound.", "citation_ids": ["cite_003"]}
+                    ],
                     "watch": [{"text": "Watch payroll revisions.", "citation_ids": ["cite_004"]}],
                 },
                 citation_store={
@@ -49,10 +55,30 @@ class HtmlReportTests(unittest.TestCase):
                 report_date="2026-03-10",
                 run_id="run_abstain",
                 synthesis={
-                    "prevailing": [{"text": "[Insufficient evidence to produce a validated output]", "citation_ids": []}],
-                    "counter": [{"text": "[Insufficient evidence to produce a validated output]", "citation_ids": []}],
-                    "minority": [{"text": "[Insufficient evidence to produce a validated output]", "citation_ids": []}],
-                    "watch": [{"text": "[Insufficient evidence to produce a validated output]", "citation_ids": []}],
+                    "prevailing": [
+                        {
+                            "text": "[Insufficient evidence to produce a validated output]",
+                            "citation_ids": [],
+                        }
+                    ],
+                    "counter": [
+                        {
+                            "text": "[Insufficient evidence to produce a validated output]",
+                            "citation_ids": [],
+                        }
+                    ],
+                    "minority": [
+                        {
+                            "text": "[Insufficient evidence to produce a validated output]",
+                            "citation_ids": [],
+                        }
+                    ],
+                    "watch": [
+                        {
+                            "text": "[Insufficient evidence to produce a validated output]",
+                            "citation_ids": [],
+                        }
+                    ],
                 },
                 citation_store={},
             )
@@ -71,11 +97,22 @@ class HtmlReportTests(unittest.TestCase):
                 report_date="2026-03-10",
                 run_id="run_changed",
                 synthesis={
-                    "prevailing": [{"text": "Fed kept policy steady.", "citation_ids": ["cite_001"]}],
-                    "counter": [{"text": "Growth is cooling faster.", "citation_ids": ["cite_002"]}],
-                    "minority": [{"text": "Some investors expect a rebound.", "citation_ids": ["cite_003"]}],
+                    "prevailing": [
+                        {"text": "Fed kept policy steady.", "citation_ids": ["cite_001"]}
+                    ],
+                    "counter": [
+                        {"text": "Growth is cooling faster.", "citation_ids": ["cite_002"]}
+                    ],
+                    "minority": [
+                        {"text": "Some investors expect a rebound.", "citation_ids": ["cite_003"]}
+                    ],
                     "watch": [{"text": "Watch payroll revisions.", "citation_ids": ["cite_004"]}],
-                    "changed": [{"text": "Prevailing changed versus yesterday: Fed kept policy steady.", "citation_ids": ["cite_001"]}],
+                    "changed": [
+                        {
+                            "text": "Prevailing changed versus yesterday: Fed kept policy steady.",
+                            "citation_ids": ["cite_001"],
+                        }
+                    ],
                 },
                 citation_store={
                     "cite_001": {"title": "Fed release", "url": "https://example.test/fed"},

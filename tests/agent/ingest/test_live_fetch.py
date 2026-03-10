@@ -3,7 +3,6 @@ from unittest.mock import patch
 
 from apps.agent.ingest.live_fetch import fetch_live_payloads_for_source, parse_rss_feed
 
-
 RSS_FEED = """<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
@@ -60,7 +59,10 @@ class LiveFetchTests(unittest.TestCase):
             "type": "rss",
         }
 
-        with patch("apps.agent.ingest.live_fetch.urlopen", return_value=_FakeResponse(RSS_FEED.encode("utf-8"))):
+        with patch(
+            "apps.agent.ingest.live_fetch.urlopen",
+            return_value=_FakeResponse(RSS_FEED.encode("utf-8")),
+        ):
             payloads = fetch_live_payloads_for_source(
                 source=source,
                 fetched_at_utc="2026-03-10T16:00:00Z",

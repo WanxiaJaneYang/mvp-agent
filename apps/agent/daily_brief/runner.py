@@ -6,8 +6,14 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from apps.agent.daily_brief.synthesis import (
+    SynthesisRetryPlan,
+    build_changed_section,
+    build_citation_store,
+    build_synthesis,
+)
 from apps.agent.delivery.html_report import render_daily_brief_html
 from apps.agent.ingest.dedup import classify_duplicate
 from apps.agent.ingest.extract import extract_payload
@@ -15,23 +21,24 @@ from apps.agent.ingest.fetch import plan_fetch_items
 from apps.agent.ingest.live_fetch import fetch_live_payloads_for_source
 from apps.agent.ingest.normalize import build_document_record
 from apps.agent.orchestrator import run_pipeline
-from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
-from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.identifiers import build_document_id, build_synthesis_id
+from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
+from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_OUTPUT_SECTIONS,
     BulletCitationRow,
     CitationValidationResult,
-    DailyBriefSectionBulletRow,
-    DailyBriefSynthesis,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
+    DailyBriefOutputSection,
+    DailyBriefSectionBulletRow,
+    DailyBriefSynthesis,
     DailyBriefSynthesisStageData,
     EvidencePackItem,
     FtsRow,
+    RunStatus,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
-    RunStatus,
     SourceRegistryEntry,
     SourceRow,
     StageResult,
@@ -41,17 +48,9 @@ from apps.agent.retrieval.evidence_pack import build_evidence_pack_report
 from apps.agent.retrieval.fts_index import build_fts_rows
 from apps.agent.runtime.budget_guard import BudgetCaps
 from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
-from apps.agent.runtime.source_scope import load_active_source_subset
-from apps.agent.runtime.source_scope import load_source_registry
+from apps.agent.runtime.source_scope import load_active_source_subset, load_source_registry
 from apps.agent.storage.sqlite_runtime import persist_daily_brief_runtime
 from apps.agent.synthesis.postprocess import finalize_validation_outcome
-from apps.agent.daily_brief.synthesis import (
-    SynthesisRetryPlan,
-    build_changed_section,
-    build_citation_store,
-    build_synthesis,
-)
-
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_FIXTURE_PATH = ROOT / "artifacts" / "runtime" / "daily_brief_fixture_payloads.json"
@@ -414,8 +413,13 @@ def build_daily_brief_corpus(
         doc_chunks = build_chunk_rows(document=document)
         chunks.extend(doc_chunks)
         for row in build_fts_rows(document=document, chunk_rows=doc_chunks):
-            enriched = dict(row)
-            enriched["credibility_tier"] = document["credibility_tier"]
+            enriched = cast(
+                FtsRow,
+                {
+                    **row,
+                    "credibility_tier": document["credibility_tier"],
+                },
+            )
             fts_rows.append(enriched)
 
     context.counters.docs_fetched = len(stage_data.planned_items)
@@ -481,7 +485,10 @@ def build_daily_brief_synthesis(
             and validation_attempt >= MAX_VALIDATION_ATTEMPTS
         )
         stage8_result = {
-            **current_result,
+            "status": current_result["status"],
+            "synthesis": current_result["synthesis"],
+            "citation_store": current_result["citation_store"],
+            "report": current_result["report"],
             "validation_attempts": validation_attempt,
             "max_validation_attempts": MAX_VALIDATION_ATTEMPTS,
             "retry_exhausted": retry_exhausted,
@@ -503,7 +510,9 @@ def build_daily_brief_synthesis(
         previous_synthesis=previous_synthesis,
     )
     if changed_section:
-        final_synthesis = dict(final_result["synthesis"])
+        final_synthesis: DailyBriefSynthesis = {
+            **final_result["synthesis"],
+        }
         final_synthesis["changed"] = changed_section
         final_result = {
             **final_result,
@@ -535,16 +544,22 @@ def _build_retry_plan(
     validation_result: CitationValidationResult,
     citation_store: Mapping[str, Mapping[str, Any]],
 ) -> SynthesisRetryPlan:
-    target_sections = tuple(
-        section
+    target_sections: tuple[DailyBriefOutputSection, ...] = tuple(
+        cast(DailyBriefOutputSection, section)
         for section in validation_result["report"].get("empty_core_sections", [])
         if section in {"prevailing", "counter", "minority", "watch"}
     )
     validated_synthesis = validation_result["synthesis"]
-    pinned_chunk_ids_by_section: dict[str, str] = {}
+    pinned_chunk_ids_by_section: dict[DailyBriefOutputSection, str] = {}
     blocked_chunk_ids: set[str] = set()
+    core_sections: tuple[DailyBriefOutputSection, ...] = (
+        "prevailing",
+        "counter",
+        "minority",
+        "watch",
+    )
 
-    for section in ("prevailing", "counter", "minority", "watch"):
+    for section in core_sections:
         validated_chunk_ids = _chunk_ids_for_section(
             synthesis=validated_synthesis,
             section=section,
@@ -564,7 +579,7 @@ def _build_retry_plan(
     if not target_sections:
         target_sections = tuple(
             section
-            for section in ("prevailing", "counter", "minority", "watch")
+            for section in core_sections
             if section not in pinned_chunk_ids_by_section
         )
         for section in target_sections:
@@ -625,16 +640,20 @@ def _build_source_row(*, source: SourceRegistryEntry, generated_at_utc: str) -> 
 
 def _build_runtime_document_record(
     *,
-    source: Mapping[str, Any],
+    source: SourceRegistryEntry,
     extracted: Mapping[str, Any],
     doc_id: str,
     run_id: str,
 ) -> RuntimeDocumentRecord:
-    document = build_document_record(source=source, extracted=extracted)
-    document["doc_id"] = doc_id
-    document["credibility_tier"] = source["credibility_tier"]
-    document["ingestion_run_id"] = run_id
-    return document
+    return cast(
+        RuntimeDocumentRecord,
+        {
+            **build_document_record(source=source, extracted=extracted),
+            "doc_id": doc_id,
+            "credibility_tier": source["credibility_tier"],
+            "ingestion_run_id": run_id,
+        },
+    )
 
 
 def _build_validation_registry(
@@ -642,7 +661,10 @@ def _build_validation_registry(
     registry: Mapping[str, SourceRegistryEntry],
     documents: Iterable[RuntimeDocumentRecord],
 ) -> dict[str, SourceRegistryEntry]:
-    normalized_registry = {source_id: dict(source) for source_id, source in registry.items()}
+    normalized_registry: dict[str, SourceRegistryEntry] = {
+        source_id: cast(SourceRegistryEntry, dict(source))
+        for source_id, source in registry.items()
+    }
     for document in documents:
         source_id = str(document["source_id"])
         source_meta = normalized_registry.get(source_id)
@@ -662,8 +684,13 @@ def _attach_doc_ids(
     doc_ids_by_chunk_id = {str(row["chunk_id"]): row["doc_id"] for row in fts_rows}
     enriched_items: list[EvidencePackItem] = []
     for item in evidence_pack_items:
-        enriched = dict(item)
-        enriched["doc_id"] = doc_ids_by_chunk_id[str(item["chunk_id"])]
+        enriched = cast(
+            EvidencePackItem,
+            {
+                **item,
+                "doc_id": doc_ids_by_chunk_id[str(item["chunk_id"])],
+            },
+        )
         enriched_items.append(enriched)
     return enriched_items
 

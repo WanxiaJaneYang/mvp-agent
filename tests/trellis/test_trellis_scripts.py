@@ -1,4 +1,5 @@
 import argparse
+import importlib
 import json
 import sys
 import tempfile
@@ -6,18 +7,27 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-
 TRELLIS_SCRIPTS = Path(__file__).resolve().parents[2] / ".trellis" / "scripts"
 if str(TRELLIS_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(TRELLIS_SCRIPTS))
 
-import task  # type: ignore[import-not-found]
-from common.cli_adapter import CLIAdapter  # type: ignore[import-not-found]
-from common.worktree import get_worktree_base_dir  # type: ignore[import-not-found]
+
+def _load_task_module():
+    return importlib.import_module("task")
+
+
+def _load_cli_adapter():
+    return importlib.import_module("common.cli_adapter").CLIAdapter
+
+
+def _load_get_worktree_base_dir():
+    return importlib.import_module("common.worktree").get_worktree_base_dir
 
 
 class TaskScriptTests(unittest.TestCase):
     def test_cmd_create_fails_when_task_directory_exists(self):
+        task = _load_task_module()
+
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             task_dir = repo_root / ".trellis" / "tasks" / "03-10-existing-task"
@@ -49,6 +59,8 @@ class TaskScriptTests(unittest.TestCase):
             )
 
     def test_current_task_match_requires_exact_directory_name(self):
+        task = _load_task_module()
+
         self.assertTrue(
             task._current_task_matches_dir_name(
                 ".trellis/tasks/03-10-sync-trellis",
@@ -65,6 +77,7 @@ class TaskScriptTests(unittest.TestCase):
 
 class CLIAdapterTests(unittest.TestCase):
     def test_cursor_platform_fails_fast_for_run_command(self):
+        CLIAdapter = _load_cli_adapter()
         adapter = CLIAdapter("cursor")
 
         with self.assertRaises(ValueError):
@@ -73,6 +86,8 @@ class CLIAdapterTests(unittest.TestCase):
 
 class WorktreeConfigTests(unittest.TestCase):
     def test_non_absolute_worktree_dir_is_repo_relative(self):
+        get_worktree_base_dir = _load_get_worktree_base_dir()
+
         with tempfile.TemporaryDirectory() as tmp:
             repo_root = Path(tmp)
             config_dir = repo_root / ".trellis"

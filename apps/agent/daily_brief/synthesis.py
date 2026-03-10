@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from apps.agent.pipeline.types import (
@@ -10,8 +10,10 @@ from apps.agent.pipeline.types import (
     DailyBriefBullet,
     DailyBriefOutputSection,
     DailyBriefSynthesis,
+    EvidencePackItem,
+    RuntimeChunkRow,
+    RuntimeDocumentRecord,
 )
-
 
 WATCH_KEYWORDS = (
     "ahead",
@@ -82,9 +84,9 @@ class SynthesisRetryPlan:
 
 def build_citation_store(
     *,
-    evidence_items: Iterable[Mapping[str, Any]],
-    documents_by_id: Mapping[str, Mapping[str, Any]],
-    chunks_by_id: Mapping[str, Mapping[str, Any]],
+    evidence_items: Iterable[EvidencePackItem],
+    documents_by_id: Mapping[str, RuntimeDocumentRecord],
+    chunks_by_id: Mapping[str, RuntimeChunkRow],
 ) -> dict[str, CitationStoreEntry]:
     citations: dict[str, CitationStoreEntry] = {}
     for index, item in enumerate(_sorted_evidence_items(evidence_items), start=1):
@@ -113,12 +115,14 @@ def build_citation_store(
 
 def build_synthesis(
     *,
-    evidence_items: Iterable[Mapping[str, Any]],
-    documents_by_id: Mapping[str, Mapping[str, Any]],
-    citation_store: Mapping[str, Mapping[str, Any]],
+    evidence_items: Iterable[EvidencePackItem],
+    documents_by_id: Mapping[str, RuntimeDocumentRecord],
+    citation_store: Mapping[str, CitationStoreEntry],
     retry_plan: SynthesisRetryPlan | None = None,
 ) -> DailyBriefSynthesis:
-    synthesis = {section: [] for section in DAILY_BRIEF_CORE_OUTPUT_SECTIONS}
+    synthesis: DailyBriefSynthesis = {}
+    for section in DAILY_BRIEF_CORE_OUTPUT_SECTIONS:
+        synthesis[section] = []
     candidates = _build_section_candidates(
         evidence_items=evidence_items,
         documents_by_id=documents_by_id,
@@ -142,7 +146,7 @@ def build_synthesis(
                 "citation_ids": [candidate.citation_id],
                 "confidence_label": _confidence_label(int(candidate.item["credibility_tier"])),
             }
-            synthesis[section].append(dict(bullet))
+            synthesis[section].append(bullet)
     return synthesis
 
 
@@ -169,17 +173,20 @@ def build_changed_section(
         if current_text == previous_text:
             continue
 
-        changed.append(
-            {
-                "text": _build_changed_bullet_text(
-                    section=section,
-                    current_text=current_text,
-                    previous_text=previous_text,
-                ),
-                "citation_ids": [str(citation_id) for citation_id in current_bullet.get("citation_ids", [])],
-                "confidence_label": current_bullet.get("confidence_label"),
-            }
-        )
+        changed_bullet: DailyBriefBullet = {
+            "text": _build_changed_bullet_text(
+                section=section,
+                current_text=current_text,
+                previous_text=previous_text,
+            ),
+            "citation_ids": [
+                str(citation_id) for citation_id in current_bullet.get("citation_ids", [])
+            ],
+        }
+        confidence_label = current_bullet.get("confidence_label")
+        if isinstance(confidence_label, str):
+            changed_bullet["confidence_label"] = confidence_label
+        changed.append(changed_bullet)
         if len(changed) >= CHANGED_SECTION_MAX_BULLETS:
             break
 
@@ -198,9 +205,9 @@ def _sorted_evidence_items(evidence_items: Iterable[Mapping[str, Any]]) -> list[
 
 def _build_section_candidates(
     *,
-    evidence_items: Iterable[Mapping[str, Any]],
-    documents_by_id: Mapping[str, Mapping[str, Any]],
-    citation_store: Mapping[str, Mapping[str, Any]],
+    evidence_items: Iterable[EvidencePackItem],
+    documents_by_id: Mapping[str, RuntimeDocumentRecord],
+    citation_store: Mapping[str, CitationStoreEntry],
 ) -> list[_SectionCandidate]:
     citations_by_chunk_id = {
         str(entry["chunk_id"]): (str(citation_id), entry)
@@ -235,7 +242,7 @@ def _assign_sections(
 ) -> dict[DailyBriefOutputSection, list[_SectionCandidate]]:
     ordered_candidates = list(candidates)
     candidates_by_chunk_id = {candidate.chunk_id: candidate for candidate in ordered_candidates}
-    blocked_chunk_ids = frozenset()
+    blocked_chunk_ids: frozenset[str] = frozenset()
     assignments: dict[DailyBriefOutputSection, list[_SectionCandidate]] = {}
     used_chunk_ids: set[str] = set()
     search_order: tuple[DailyBriefOutputSection, ...] = ("watch", "counter", "minority", "prevailing")

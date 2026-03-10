@@ -9,8 +9,9 @@ def _build_pdf_bytes(text: str) -> bytes:
     objects = [
         "<< /Type /Catalog /Pages 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
-        f"<< /Length {len(content_stream.encode('latin-1'))} >>\nstream\n{content_stream}\nendstream",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R "
+        "/Resources << /Font << /F1 5 0 R >> >> >>",
+        f"<< /Length {len(content_stream.encode('latin-1'))} >>\nstream\n{content_stream}\nendstream",  # noqa: E501
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     ]
 
@@ -27,7 +28,9 @@ def _build_pdf_bytes(text: str) -> bytes:
     xref_rows = ["0000000000 65535 f \n"]
     xref_rows.extend(f"{offset:010d} 00000 n \n" for offset in offsets[1:])
     xref = f"xref\n0 {len(objects) + 1}\n{''.join(xref_rows)}"
-    trailer = f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF"
+    trailer = (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF"
+    )
     return b"".join(parts) + xref.encode("latin-1") + trailer.encode("latin-1")
 
 
@@ -122,7 +125,9 @@ class ExtractPayloadTests(unittest.TestCase):
             "paywall_policy": "full",
         }
 
-        with self.assertRaisesRegex(ValueError, "PDF payload must include text, body_text, pdf_bytes, or pdf_base64"):
+        with self.assertRaisesRegex(
+            ValueError, "PDF payload must include text, body_text, pdf_bytes, or pdf_base64"
+        ):
             extract_payload(
                 source=source,
                 payload={
