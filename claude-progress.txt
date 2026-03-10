@@ -429,3 +429,105 @@
 - Outcome: PASS (M004 now has the missing deterministic abstain postprocess needed for downstream delivery contracts)
 - Next single step:
   - Open PR for issue `#39`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 25] Implemented issue #41 evidence-pack retrieval helper
+- Created:
+  - `apps/agent/retrieval/evidence_pack.py`
+  - `tests/agent/retrieval/test_evidence_pack.py`
+- Updated:
+  - `docs/plans/2026-03-10-issue-41-evidence-pack-design.md`
+  - `docs/plans/2026-03-10-issue-41-evidence-pack-implementation-plan.md`
+  - `claude-progress.txt`
+- Implemented:
+  - deterministic evidence-pack assembly from FTS-shaped rows
+  - retrieval scoring using keyword, recency, and credibility components
+  - bounded pack-size enforcement with stable rank ordering
+  - evidence-pack-item-compatible output rows for downstream synthesis work
+  - explicit validation for missing required fields and unsupported credibility tiers
+- Verification run + outcome:
+  - `python -m unittest tests.agent.retrieval.test_evidence_pack -v` -> PASS (7 tests)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (78 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (issue `#41` now has an executable retrieval helper that bridges indexed chunks to evidence-pack assembly)
+- Next single step:
+  - Open PR for issue `#41`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 26] Extended eval harness for retrieval and abstain coverage
+- Created:
+  - `tests/evals/test_run_eval_suite.py`
+  - `evals/golden/case11.json`
+  - `evals/golden/case12.json`
+- Updated:
+  - `evals/run_eval_suite.py`
+  - `evals/README.md`
+  - `claude-progress.txt`
+- Implemented:
+  - multi-type eval dispatch for `citation`, `retrieval`, and `postprocess` cases
+  - retrieval golden coverage for evidence-pack ordering and pack-size bounds
+  - postprocess golden coverage for deterministic abstain output
+  - per-case exception handling so malformed eval inputs report failures instead of aborting the suite
+  - explicit README TODO for future chained `retrieval -> validation -> abstain` eval cases
+- Verification run + outcome:
+  - `python -m unittest tests.evals.test_run_eval_suite -v` -> PASS (6 tests)
+  - `python evals/run_eval_suite.py` -> PASS (12 golden cases)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (78 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (issue `#35` now has executable eval coverage beyond citation validation)
+- Next single step:
+  - Open PR for issue `#35`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 27] Added v1 active source subset for runtime validation
+- Created:
+  - `artifacts/runtime/v1_active_sources.yaml`
+  - `apps/agent/runtime/source_scope.py`
+  - `tests/agent/runtime/test_source_scope.py`
+- Updated:
+  - `scripts/validate_artifacts.py`
+  - `README.md`
+  - `claude-progress.txt`
+- Implemented:
+  - explicit US-first runtime allowlist artifact for the v1 active source subset
+  - deterministic helper to resolve the subset against the full source registry
+  - validation that unknown active IDs fail clearly
+  - README guidance that runtime validation targets the active subset first
+  - artifact validation coverage for the new runtime subset artifact
+- Verification run + outcome:
+  - `python -m unittest tests.agent.runtime.test_source_scope -v` -> PASS (5 tests)
+  - `python scripts/validate_artifacts.py` -> PASS
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (83 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (issue `#33` now has an executable source-of-truth for the first runtime source surface)
+- Next single step:
+  - Open PR for issue `#33`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 28] Built the first executable daily-brief vertical slice
+- Created:
+  - `artifacts/runtime/daily_brief_fixture_payloads.json`
+  - `apps/agent/daily_brief/__init__.py`
+  - `apps/agent/daily_brief/synthesis.py`
+  - `apps/agent/delivery/__init__.py`
+  - `apps/agent/delivery/html_report.py`
+  - `scripts/run_daily_brief_fixture.py`
+  - `tests/agent/daily_brief/test_runner.py`
+  - `tests/agent/daily_brief/test_synthesis.py`
+  - `tests/agent/delivery/test_html_report.py`
+- Updated:
+  - `apps/agent/daily_brief/runner.py`
+  - `claude-progress.txt`
+- Implemented:
+  - deterministic fixture-driven daily-brief runner for the active v1 US-first source subset
+  - rule-based query selection, evidence-pack assembly, synthesis construction, citation validation, abstain fallback, local HTML rendering, and decision-record persistence
+  - SQLite-compatible JSON artifact emission for sources, documents, chunks, FTS rows, evidence-pack items, citations, synthesis bullets, bullet citations, and run summary
+  - standalone script entrypoint for the local vertical slice
+  - runtime validation host normalization to reconcile feed-host registry entries with article-host citations in this narrow slice
+- Verification run + outcome:
+  - `python scripts/run_daily_brief_fixture.py --base-dir "$env:TEMP\\mvp-agent-issue36-verify" --run-id run_issue36_verify --generated-at-utc 2026-03-10T16:00:00Z` -> PASS (`status: ok`)
+  - generated artifacts confirmed on disk:
+    - `%TEMP%\\mvp-agent-issue36-verify\\artifacts\\daily\\2026-03-10\\brief.html`
+    - `%TEMP%\\mvp-agent-issue36-verify\\artifacts\\decision_records\\2026-03-10\\run_issue36_verify.json`
+    - `%TEMP%\\mvp-agent-issue36-verify\\artifacts\\runtime\\daily_brief_runs\\2026-03-10\\run_issue36_verify\\synthesis_bullets.json`
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (`83` tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (issue `#36` now has the first runnable local daily-brief path)
+- Next single step:
+  - run final reviewer pass for the whole branch, prepare the clean PR branch, open the PR, and merge after CI

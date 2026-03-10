@@ -1,0 +1,61 @@
+{
+  "fed_press_releases": [
+    {
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260310a.htm",
+      "title": "Federal Reserve keeps policy settings unchanged",
+      "published_at": "2026-03-10T14:00:00Z",
+      "fetched_at": "2026-03-10T14:05:00Z",
+      "summary": "Officials said inflation progress remains uneven while liquidity conditions stay orderly.",
+      "body_text": "Federal Reserve officials kept policy settings unchanged and said inflation progress remains uneven while balance sheet runoff and liquidity conditions stay orderly.",
+      "doc_type": "policy_statement",
+      "language": "en"
+    }
+  ],
+  "us_bls_news": [
+    {
+      "url": "https://www.bls.gov/news.release/empsit.nr0.htm",
+      "title": "Employment growth slows in February",
+      "published_at": "2026-03-10T13:30:00Z",
+      "fetched_at": "2026-03-10T13:35:00Z",
+      "summary": "Payroll growth moderated and wage gains cooled.",
+      "body_text": "Payroll growth moderated in February and wage growth cooled, suggesting labor demand is easing without a sharp deterioration in employment.",
+      "doc_type": "news_release",
+      "language": "en"
+    }
+  ],
+  "us_bea_news": [
+    {
+      "url": "https://www.bea.gov/news/2026/personal-income-and-outlays-february-2026",
+      "title": "Consumer spending growth softens",
+      "published_at": "2026-03-10T12:30:00Z",
+      "fetched_at": "2026-03-10T12:40:00Z",
+      "summary": "Personal income rose while real spending growth softened.",
+      "body_text": "Personal income rose in February while real consumer spending growth softened, pointing to steadier but slower household demand.",
+      "doc_type": "news_release",
+      "language": "en"
+    }
+  ],
+  "reuters_business": [
+    {
+      "url": "https://www.reuters.com/world/us/stocks-investors-balance-growth-policy-2026-03-10/",
+      "title": "Investors weigh softer growth against steady policy",
+      "published_at": "2026-03-10T15:00:00Z",
+      "fetched_at": "2026-03-10T15:05:00Z",
+      "summary": "Markets weighed softer growth signals against expectations for a steady Fed.",
+      "body_text": "Investors weighed softer growth signals against expectations for a steady Federal Reserve as Treasury yields drifted lower and equities traded unevenly.",
+      "doc_type": "news",
+      "language": "en"
+    }
+  ],
+  "wsj_markets": [
+    {
+      "url": "https://www.wsj.com/markets/briefing-room-2026-03-10",
+      "title": "Markets look for confirmation that growth is cooling",
+      "published_at": "2026-03-10T15:15:00Z",
+      "fetched_at": "2026-03-10T15:20:00Z",
+      "summary": "Investors looked for confirmation that growth is cooling without tipping into contraction.",
+      "doc_type": "news",
+      "language": "en"
+    }
+  ]
+}

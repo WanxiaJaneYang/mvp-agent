@@ -1,0 +1,8 @@
+profile: v1_us_first
+purpose: Narrow runtime validation to a small US-first source surface before broader expansion.
+active_source_ids:
+  - fed_press_releases
+  - us_bls_news
+  - us_bea_news
+  - reuters_business
+  - wsj_markets

@@ -1,6 +1,6 @@
 # Evals
 
-`run_eval_suite.py` executes golden citation-validation cases.
+`run_eval_suite.py` executes deterministic golden eval cases for current runtime contracts.
 
 ## Run
 
@@ -12,5 +12,11 @@ python evals/run_eval_suite.py
 
 - Path: `evals/golden/case*.json`
 - Minimum required: 10
-- Type:
+- Supported types:
   - `citation`: validates stage-8 citation behavior (`ok`/`partial`/`retry`)
+  - `retrieval`: validates evidence-pack ordering and pack-size enforcement
+  - `postprocess`: validates abstain shaping for failed validation outcomes
+
+## TODO
+
+- Add chained `retrieval -> validation -> abstain` golden cases once the first integrated path is ready.

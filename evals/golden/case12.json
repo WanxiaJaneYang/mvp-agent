@@ -1,0 +1,23 @@
+{
+    "id": "POST-012",
+    "type": "postprocess",
+    "validation_result": {
+        "status": "retry",
+        "synthesis": {
+            "prevailing": [
+                {
+                    "text": "[Insufficient evidence to support this claim]",
+                    "citation_ids": []
+                }
+            ]
+        },
+        "report": {
+            "removed_bullets": 4
+        }
+    },
+    "expected": {
+        "status": "abstained",
+        "abstain_reason": "validation_retry_exhausted",
+        "core_section_text": "[Insufficient evidence to produce a validated output]"
+    }
+}

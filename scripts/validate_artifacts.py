@@ -12,6 +12,7 @@ def main() -> None:
     ]
     yaml_paths = [
         Path("artifacts/modelling/source_registry.yaml"),
+        Path("artifacts/runtime/v1_active_sources.yaml"),
     ]
 
     for path in json_paths:
