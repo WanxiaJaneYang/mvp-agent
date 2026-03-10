@@ -19,6 +19,7 @@ from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_OUTPUT_SECTIONS,
     BulletCitationRow,
+    CitationValidationResult,
     DailyBriefSectionBulletRow,
     DailyBriefSynthesis,
     DailyBriefCorpusStageData,
@@ -41,11 +42,13 @@ from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 from apps.agent.runtime.source_scope import load_active_source_subset
 from apps.agent.runtime.source_scope import load_source_registry
 from apps.agent.synthesis.postprocess import finalize_validation_outcome
-from apps.agent.daily_brief.synthesis import build_citation_store, build_synthesis
+from apps.agent.daily_brief.synthesis import SynthesisRetryPlan, build_citation_store, build_synthesis
 
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_FIXTURE_PATH = ROOT / "artifacts" / "runtime" / "daily_brief_fixture_payloads.json"
+MAX_VALIDATION_RETRIES = 1
+MAX_VALIDATION_ATTEMPTS = MAX_VALIDATION_RETRIES + 1
 STOPWORDS = {
     "a",
     "and",
@@ -231,6 +234,9 @@ def _execute_daily_brief_slice(
             "chunks_indexed": context.counters.chunks_indexed,
             "stage8_status": synthesis_data.stage8_result["status"],
             "final_status": synthesis_data.final_result["status"],
+            "validation_attempts": synthesis_data.stage8_result["validation_attempts"],
+            "max_validation_attempts": synthesis_data.stage8_result["max_validation_attempts"],
+            "validation_retry_exhausted": synthesis_data.stage8_result["retry_exhausted"],
             "budget_snapshot": budget_snapshot,
             "budget_ledger_rows": list(context.budget_ledger_rows),
             "guardrail_checks": guardrail_checks,
@@ -339,22 +345,47 @@ def build_daily_brief_synthesis(
         documents_by_id=documents_by_id,
         chunks_by_id=chunks_by_id,
     )
-    synthesis = build_synthesis(
-        evidence_items=evidence_pack_items,
-        documents_by_id=documents_by_id,
-        citation_store=citation_store,
-    )
-
     validation_registry = _build_validation_registry(
         registry=registry,
         documents=stage_data.documents,
     )
-    stage8_result = run_stage8_citation_validation(
-        synthesis,
-        citation_store,
-        source_registry=validation_registry,
-        available_source_ids={str(item["source_id"]) for item in evidence_pack_items},
-    )
+    available_source_ids = {str(item["source_id"]) for item in evidence_pack_items}
+    stage8_result: CitationValidationResult | None = None
+    retry_plan: SynthesisRetryPlan | None = None
+    for validation_attempt in range(1, MAX_VALIDATION_ATTEMPTS + 1):
+        synthesis = build_synthesis(
+            evidence_items=evidence_pack_items,
+            documents_by_id=documents_by_id,
+            citation_store=citation_store,
+            retry_plan=retry_plan,
+        )
+        current_result = run_stage8_citation_validation(
+            synthesis,
+            citation_store,
+            source_registry=validation_registry,
+            available_source_ids=available_source_ids,
+        )
+        retry_exhausted = (
+            current_result["status"] == "retry"
+            and validation_attempt >= MAX_VALIDATION_ATTEMPTS
+        )
+        stage8_result = {
+            **current_result,
+            "validation_attempts": validation_attempt,
+            "max_validation_attempts": MAX_VALIDATION_ATTEMPTS,
+            "retry_exhausted": retry_exhausted,
+        }
+        if current_result["status"] != "retry" or retry_exhausted:
+            break
+        retry_plan = _build_retry_plan(
+            synthesis=synthesis,
+            validation_result=current_result,
+            citation_store=citation_store,
+        )
+
+    if stage8_result is None:
+        raise ValueError("Daily brief synthesis did not produce a validation result.")
+
     final_result = finalize_validation_outcome(validation_result=stage8_result)
     synthesis_id = f"syn_{run_id}"
     return DailyBriefSynthesisStageData(
@@ -374,6 +405,84 @@ def build_daily_brief_synthesis(
             synthesis_id=synthesis_id,
         ),
     )
+
+
+def _build_retry_plan(
+    *,
+    synthesis: DailyBriefSynthesis,
+    validation_result: CitationValidationResult,
+    citation_store: Mapping[str, Mapping[str, Any]],
+) -> SynthesisRetryPlan:
+    target_sections = tuple(
+        section
+        for section in validation_result["report"].get("empty_core_sections", [])
+        if section in {"prevailing", "counter", "minority", "watch"}
+    )
+    validated_synthesis = validation_result["synthesis"]
+    pinned_chunk_ids_by_section: dict[str, str] = {}
+    blocked_chunk_ids: set[str] = set()
+
+    for section in ("prevailing", "counter", "minority", "watch"):
+        validated_chunk_ids = _chunk_ids_for_section(
+            synthesis=validated_synthesis,
+            section=section,
+            citation_store=citation_store,
+        )
+        if section in target_sections or not validated_chunk_ids:
+            blocked_chunk_ids.update(
+                _chunk_ids_for_section(
+                    synthesis=synthesis,
+                    section=section,
+                    citation_store=citation_store,
+                )
+            )
+            continue
+        pinned_chunk_ids_by_section[section] = validated_chunk_ids[0]
+
+    if not target_sections:
+        target_sections = tuple(
+            section
+            for section in ("prevailing", "counter", "minority", "watch")
+            if section not in pinned_chunk_ids_by_section
+        )
+        for section in target_sections:
+            blocked_chunk_ids.update(
+                _chunk_ids_for_section(
+                    synthesis=synthesis,
+                    section=section,
+                    citation_store=citation_store,
+                )
+            )
+
+    return SynthesisRetryPlan(
+        pinned_chunk_ids_by_section=pinned_chunk_ids_by_section,
+        target_sections=target_sections,
+        blocked_chunk_ids=frozenset(blocked_chunk_ids),
+    )
+
+
+def _chunk_ids_for_section(
+    *,
+    synthesis: Mapping[str, Any],
+    section: str,
+    citation_store: Mapping[str, Mapping[str, Any]],
+) -> list[str]:
+    bullets = synthesis.get(section, [])
+    if not isinstance(bullets, list):
+        return []
+
+    chunk_ids: list[str] = []
+    for bullet in bullets:
+        if not isinstance(bullet, Mapping):
+            continue
+        citation_ids = bullet.get("citation_ids", [])
+        if not isinstance(citation_ids, list):
+            continue
+        for citation_id in citation_ids:
+            citation = citation_store.get(str(citation_id))
+            if isinstance(citation, Mapping) and citation.get("chunk_id") is not None:
+                chunk_ids.append(str(citation["chunk_id"]))
+    return chunk_ids
 
 
 def _build_source_row(*, source: SourceRegistryEntry, generated_at_utc: str) -> SourceRow:
@@ -527,6 +636,11 @@ def _guardrail_checks(
         notes.append("Citation validation did not run because budget preflight stopped the run.")
     if final_status == "abstained":
         notes.append("Daily brief downgraded to abstain after citation validation.")
+    validation_attempts = 0
+    if stage8_result is not None:
+        validation_attempts = int(stage8_result.get("validation_attempts", 1))
+    if validation_attempts > 1:
+        notes.append(f"Citation validation required {validation_attempts} synthesis attempt(s).")
     removed_bullets = 0
     if stage8_result is not None:
         removed_bullets = int(stage8_result["report"]["removed_bullets"])

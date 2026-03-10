@@ -1,9 +1,134 @@
 import unittest
 
-from apps.agent.daily_brief.synthesis import build_citation_store, build_synthesis
+from apps.agent.daily_brief.synthesis import SynthesisRetryPlan, build_citation_store, build_synthesis
 
 
 class DailyBriefSynthesisTests(unittest.TestCase):
+    def test_build_synthesis_retry_plan_reassigns_failed_section_with_alternate_evidence(self):
+        evidence_items = [
+            {
+                "chunk_id": "doc_watch_chunk_000",
+                "doc_id": "doc_watch",
+                "source_id": "bls_preview",
+                "publisher": "BLS Preview Desk",
+                "credibility_tier": 1,
+                "rank_in_pack": 1,
+            },
+            {
+                "chunk_id": "doc_minority_chunk_000",
+                "doc_id": "doc_minority",
+                "source_id": "market_commentary",
+                "publisher": "Market Commentary",
+                "credibility_tier": 3,
+                "rank_in_pack": 2,
+            },
+            {
+                "chunk_id": "doc_prevailing_chunk_000",
+                "doc_id": "doc_prevailing",
+                "source_id": "fed_press_releases",
+                "publisher": "Federal Reserve",
+                "credibility_tier": 1,
+                "rank_in_pack": 3,
+            },
+            {
+                "chunk_id": "doc_counter_invalid_chunk_000",
+                "doc_id": "doc_counter_invalid",
+                "source_id": "reuters_business",
+                "publisher": "Reuters",
+                "credibility_tier": 2,
+                "rank_in_pack": 4,
+            },
+            {
+                "chunk_id": "doc_counter_retry_chunk_000",
+                "doc_id": "doc_counter_retry",
+                "source_id": "wsj_markets",
+                "publisher": "Wall Street Journal",
+                "credibility_tier": 2,
+                "rank_in_pack": 5,
+            },
+        ]
+        documents_by_id = {
+            "doc_watch": {
+                "canonical_url": "https://example.test/watch",
+                "title": "Watch Friday CPI for shelter inflation",
+                "published_at": "2026-03-10T16:00:00Z",
+                "fetched_at": "2026-03-10T16:05:00Z",
+                "paywall_policy": "full",
+                "rss_snippet": "Markets are watching Friday CPI for shelter inflation surprises.",
+            },
+            "doc_minority": {
+                "canonical_url": "https://example.test/minority",
+                "title": "Minority view warns inflation could reaccelerate",
+                "published_at": "2026-03-10T15:30:00Z",
+                "fetched_at": "2026-03-10T15:35:00Z",
+                "paywall_policy": "full",
+                "rss_snippet": "A minority of investors still expects inflation to reaccelerate.",
+            },
+            "doc_prevailing": {
+                "canonical_url": "https://example.test/prevailing",
+                "title": "Fed keeps policy steady",
+                "published_at": "2026-03-10T14:00:00Z",
+                "fetched_at": "2026-03-10T14:05:00Z",
+                "paywall_policy": "full",
+                "rss_snippet": "Fed officials kept policy steady while inflation progress remained uneven.",
+            },
+            "doc_counter_invalid": {
+                "canonical_url": "https://example.test/counter-invalid",
+                "title": "Bond traders push back on soft-landing consensus",
+                "published_at": None,
+                "fetched_at": "2026-03-10T14:35:00Z",
+                "paywall_policy": "full",
+                "rss_snippet": "Bond traders push back on the soft-landing consensus as growth cools.",
+            },
+            "doc_counter_retry": {
+                "canonical_url": "https://example.test/counter-retry",
+                "title": "Investors question the soft-landing narrative",
+                "published_at": "2026-03-10T14:20:00Z",
+                "fetched_at": "2026-03-10T14:25:00Z",
+                "paywall_policy": "full",
+                "rss_snippet": "Investors question the soft-landing narrative as growth data weakens.",
+            },
+        }
+        chunks_by_id = {
+            "doc_watch_chunk_000": {"text": "Watch Friday CPI for shelter inflation surprises."},
+            "doc_minority_chunk_000": {"text": "A minority of investors still expects inflation to reaccelerate."},
+            "doc_prevailing_chunk_000": {"text": "Fed officials kept policy steady while inflation progress remained uneven."},
+            "doc_counter_invalid_chunk_000": {"text": "Bond traders push back on the soft-landing consensus as growth cools."},
+            "doc_counter_retry_chunk_000": {"text": "Investors question the soft-landing narrative as growth data weakens."},
+        }
+
+        citations = build_citation_store(
+            evidence_items=evidence_items,
+            documents_by_id=documents_by_id,
+            chunks_by_id=chunks_by_id,
+        )
+        first_attempt = build_synthesis(
+            evidence_items=evidence_items,
+            documents_by_id=documents_by_id,
+            citation_store=citations,
+        )
+        retry_attempt = build_synthesis(
+            evidence_items=evidence_items,
+            documents_by_id=documents_by_id,
+            citation_store=citations,
+            retry_plan=SynthesisRetryPlan(
+                pinned_chunk_ids_by_section={
+                    "prevailing": "doc_prevailing_chunk_000",
+                    "minority": "doc_minority_chunk_000",
+                    "watch": "doc_watch_chunk_000",
+                },
+                target_sections=("counter",),
+                blocked_chunk_ids=frozenset({"doc_counter_invalid_chunk_000"}),
+            ),
+        )
+
+        self.assertEqual(first_attempt["counter"][0]["citation_ids"], ["cite_004"])
+        self.assertEqual(retry_attempt["counter"][0]["citation_ids"], ["cite_005"])
+        self.assertEqual(retry_attempt["prevailing"][0]["citation_ids"], ["cite_003"])
+        self.assertEqual(retry_attempt["minority"][0]["citation_ids"], ["cite_002"])
+        self.assertEqual(retry_attempt["watch"][0]["citation_ids"], ["cite_001"])
+        self.assertNotIn("meta", retry_attempt)
+
     def test_build_synthesis_assigns_sections_from_evidence_signals_not_rank(self):
         evidence_items = [
             {

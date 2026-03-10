@@ -31,6 +31,9 @@ def finalize_validation_outcome(*, validation_result: dict[str, object]) -> Fina
             "abstain_reason": None,
         }
 
+    if not bool(validation_result.get("retry_exhausted", False)):
+        raise ValueError("Validation retry policy must be exhausted before abstaining.")
+
     abstain_reason = "validation_retry_exhausted"
     return {
         "status": "abstained",

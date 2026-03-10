@@ -36,4 +36,7 @@ def run_stage8_citation_validation(
         "synthesis": report.synthesis,
         "citation_store": report.citation_store,
         "report": report.to_dict(),
+        "validation_attempts": 1,
+        "max_validation_attempts": 1,
+        "retry_exhausted": status == "retry",
     }
