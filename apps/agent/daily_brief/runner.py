@@ -22,6 +22,8 @@ from apps.agent.ingest.fetch import plan_fetch_items
 from apps.agent.ingest.live_fetch import fetch_live_payloads_for_source
 from apps.agent.ingest.normalize import build_document_record
 from apps.agent.orchestrator import run_pipeline
+from apps.agent.portfolio.input_store import load_portfolio_positions
+from apps.agent.portfolio.relevance import build_portfolio_relevance_flags
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.identifiers import build_document_id, build_synthesis_id
@@ -298,6 +300,14 @@ def _execute_daily_brief_slice(
         run_id=run_id,
         previous_synthesis=_load_previous_synthesis(base_dir=base_dir, report_date=report_date),
     )
+    portfolio_positions = load_portfolio_positions(base_dir=base_dir)
+    portfolio_relevance_flags = build_portfolio_relevance_flags(
+        positions=portfolio_positions,
+        documents=corpus_data.documents,
+        synthesis=synthesis_data.final_result["synthesis"],
+        synthesis_id=build_synthesis_id(run_id=run_id),
+        generated_at_utc=generated_at_utc,
+    )
     output_path = base_dir / "artifacts" / "daily" / report_date / "brief.html"
     budget_snapshot = _budget_snapshot(context=context)
     guardrail_checks = _guardrail_checks(
@@ -349,6 +359,14 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "synthesis_bullets.json", synthesis_data.synthesis_bullet_rows)
     _write_json(artifact_dir / "bullet_citations.json", synthesis_data.bullet_citation_rows)
     _write_json(
+        artifact_dir / "portfolio_positions.json",
+        [position.to_dict() for position in portfolio_positions],
+    )
+    _write_json(
+        artifact_dir / "portfolio_relevance.json",
+        [flag.to_dict() for flag in portfolio_relevance_flags],
+    )
+    _write_json(
         artifact_dir / "run_summary.json",
         {
             "run_id": run_id,
@@ -369,6 +387,8 @@ def _execute_daily_brief_slice(
             "budget_ledger_rows": list(context.budget_ledger_rows),
             "guardrail_checks": guardrail_checks,
             "diversity_stats": synthesis_data.evidence_pack_report["diversity_stats"],
+            "portfolio_positions_count": len(portfolio_positions),
+            "portfolio_relevance_count": len(portfolio_relevance_flags),
         },
     )
 
@@ -984,6 +1004,9 @@ def _persist_run_state(
         bullet_citations = json.loads(
             (artifact_dir / "bullet_citations.json").read_text(encoding="utf-8")
         )
+        portfolio_relevance = json.loads(
+            (artifact_dir / "portfolio_relevance.json").read_text(encoding="utf-8")
+        )
         run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
         return persist_daily_brief_runtime(
             base_dir=base_dir,
@@ -1000,6 +1023,7 @@ def _persist_run_state(
             bullet_citation_rows=bullet_citations,
             run_row=run_row,
             budget_ledger_rows=run_summary.get("budget_ledger_rows", []),
+            relevance_flag_rows=portfolio_relevance,
         )
 
     return persist_daily_brief_runtime(

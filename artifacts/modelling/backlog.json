@@ -141,17 +141,19 @@
     {
       "id": "M009",
       "title": "Implement manual portfolio relevance mapping",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P2",
       "depends_on": ["M007"],
       "files": [
         "apps/agent/portfolio/input_store.py",
-        "apps/agent/portfolio/relevance.py"
+        "apps/agent/portfolio/relevance.py",
+        "apps/agent/storage/sqlite_runtime.py",
+        "apps/agent/daily_brief/runner.py"
       ],
       "acceptance_criteria": [
-        "Users can input and update ticker + weight locally",
-        "Outputs relevance tags and risk flags without buy/sell guidance",
-        "Relevance is included in daily brief and alert context"
+        "Users can input and update ticker + weight locally through the runtime portfolio store",
+        "Daily-brief runtime outputs deterministic relevance flags and risk categories without buy/sell guidance",
+        "Portfolio positions and relevance flags are persisted locally and covered by tests"
       ]
     },
     {

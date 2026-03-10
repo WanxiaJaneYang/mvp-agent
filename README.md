@@ -17,10 +17,10 @@ Implemented in-tree today:
 - daily-brief runtime, scheduled HTML/email delivery, and citation/postprocess guardrails
 - alert scoring and policy-gate helpers
 - eval harness with 12 golden cases
+- manual portfolio relevance mapping with local runtime persistence
 
 Planned next:
 - alert delivery
-- portfolio relevance mapping
 
 Completed modelling artifacts:
 - `artifacts/modelling/source_registry.yaml`
@@ -59,6 +59,7 @@ apps/
     alerts/               # Alert scoring and policy gates
     daily_brief/          # Daily-brief runtime stages
     delivery/             # HTML, email, and schedule helpers
+    portfolio/            # Manual holdings input and relevance mapping
     runtime/              # Runtime modules (e.g., budget guard)
 evals/
   golden/                # Golden cases for current runtime contracts
@@ -142,5 +143,6 @@ python -m compileall -q apps tests scripts
 - This project is not a trading signal engine and should not produce buy/sell instructions.
 - Outputs are intended to provide evidence-grounded scenarios and risk flags.
 - Major-event alerts remain planned until alert delivery runtime is implemented.
+- Portfolio relevance remains a local-first risk-flag surface, not buy/sell guidance.
 - The live daily-brief slice starts with the current RSS-backed active subset and skips sources that are temporarily blocked or unavailable.
 - Daily-brief scheduling defaults to `07:05 Asia/Singapore`, with timezone overrides available from the runner scripts.

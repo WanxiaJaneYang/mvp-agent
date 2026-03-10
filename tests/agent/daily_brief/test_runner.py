@@ -20,6 +20,7 @@ from apps.agent.daily_brief.runner import (
     run_daily_brief,
     run_fixture_daily_brief,
 )
+from apps.agent.portfolio.input_store import PortfolioPosition, replace_portfolio_positions
 from apps.agent.daily_brief.synthesis import build_citation_store
 from apps.agent.pipeline.types import (
     BulletCitationRow,
@@ -687,6 +688,70 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertGreater(run_count, 1)
         self.assertTrue(all(doc_id.startswith("doc_") for doc_id, _url in document_rows))
         self.assertEqual(len({doc_id for doc_id, _url in document_rows}), len(document_rows))
+
+    def test_run_fixture_daily_brief_persists_portfolio_positions_and_relevance_rows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            replace_portfolio_positions(
+                base_dir=base_dir,
+                positions=[
+                    PortfolioPosition(
+                        ticker="TLT",
+                        weight_pct=35.0,
+                        asset_type="bond",
+                        notes="fed, inflation, rates, treasury",
+                    ),
+                    PortfolioPosition(
+                        ticker="QQQ",
+                        weight_pct=20.0,
+                        asset_type="etf",
+                        notes="technology, growth",
+                    ),
+                ],
+                recorded_at_utc="2026-03-10T15:30:00Z",
+            )
+
+            result = run_fixture_daily_brief(
+                base_dir=base_dir,
+                run_id="run_fixture_portfolio",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+            artifact_dir = Path(result["artifact_dir"])
+            portfolio_positions = json.loads(
+                (artifact_dir / "portfolio_positions.json").read_text(encoding="utf-8")
+            )
+            portfolio_relevance = json.loads(
+                (artifact_dir / "portfolio_relevance.json").read_text(encoding="utf-8")
+            )
+
+            connection = sqlite3.connect(Path(result["runtime_db_path"]))
+            try:
+                position_rows = connection.execute(
+                    """
+                    SELECT ticker, weight_pct, asset_type
+                    FROM portfolio_positions
+                    ORDER BY weight_pct DESC, ticker
+                    """
+                ).fetchall()
+                relevance_rows = connection.execute(
+                    """
+                    SELECT ticker, risk_flag
+                    FROM relevance_flags
+                    ORDER BY relevance_score DESC, ticker
+                    """
+                ).fetchall()
+            finally:
+                connection.close()
+
+        self.assertEqual(
+            position_rows,
+            [("TLT", 35.0, "bond"), ("QQQ", 20.0, "etf")],
+        )
+        self.assertEqual([row["ticker"] for row in portfolio_positions], ["TLT", "QQQ"])
+        self.assertGreater(len(portfolio_relevance), 0)
+        self.assertTrue(any(row["ticker"] == "TLT" for row in portfolio_relevance))
+        self.assertTrue(any(ticker == "TLT" for ticker, _risk_flag in relevance_rows))
 
     def test_run_daily_brief_writes_expected_artifacts_from_live_payloads(self):
         fixture_payloads = load_active_fixture_payloads()
