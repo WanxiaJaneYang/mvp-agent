@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -18,6 +19,15 @@ class RunStatus(str, Enum):
     FAILED = "failed"
     STOPPED_BUDGET = "stopped_budget"
     PARTIAL = "partial"
+
+
+DAILY_BRIEF_OUTPUT_SECTIONS: tuple[str, ...] = (
+    "prevailing",
+    "counter",
+    "minority",
+    "watch",
+    "changed",
+)
 
 
 @dataclass
@@ -67,3 +77,31 @@ class StageResult:
     status: RunStatus = RunStatus.OK
     error_summary: str | None = None
     retryable: bool = False
+
+
+@dataclass
+class DailyBriefInputStageData:
+    registry: dict[str, dict[str, Any]]
+    active_sources: list[dict[str, Any]]
+    planned_items: list[dict[str, Any]]
+    source_rows: list[dict[str, Any]]
+
+
+@dataclass
+class DailyBriefCorpusStageData:
+    source_rows: list[dict[str, Any]]
+    documents: list[dict[str, Any]]
+    chunks: list[dict[str, Any]]
+    fts_rows: list[dict[str, Any]]
+
+
+@dataclass
+class DailyBriefSynthesisStageData:
+    query_text: str
+    evidence_pack_items: list[dict[str, Any]]
+    citation_store: dict[str, dict[str, Any]]
+    stage8_result: dict[str, Any]
+    final_result: dict[str, Any]
+    citation_rows: list[dict[str, Any]]
+    synthesis_bullet_rows: list[dict[str, Any]]
+    bullet_citation_rows: list[dict[str, Any]]

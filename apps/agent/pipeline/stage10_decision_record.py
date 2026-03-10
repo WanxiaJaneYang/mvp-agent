@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from scripts.validate_decision_record_schema import validate_decision_record
+from apps.agent.pipeline.decision_record_validation import validate_decision_record
 
 SECTION_ALIASES = {
     "counterarguments": "counter",

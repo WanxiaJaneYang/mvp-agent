@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -5,6 +7,20 @@ from scripts.validate_decision_record_schema import validate_decision_record, va
 
 
 class DecisionRecordSchemaValidationTests(unittest.TestCase):
+    def test_script_entrypoint_passes(self):
+        repo_root = Path(__file__).resolve().parents[2]
+        script_path = repo_root / "scripts" / "validate_decision_record_schema.py"
+
+        completed = subprocess.run(
+            [sys.executable, str(script_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("Decision record schema validation passed.", completed.stdout)
+
     def test_valid_example_passes(self):
         errors = validate_example_file()
         self.assertEqual(errors, [])
