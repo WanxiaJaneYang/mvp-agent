@@ -5,6 +5,9 @@ description: "Read the frontend development guidelines before starting your deve
 
 Read the frontend development guidelines before starting your development task.
 
+If the repo still has no frontend source tree, stop and document the work as
+frontend-spec setup or not-yet-applicable instead of inventing conventions.
+
 Execute these steps:
 1. Read `.trellis/spec/frontend/index.md` to understand available guidelines
 2. Based on your task, read the relevant guideline files:

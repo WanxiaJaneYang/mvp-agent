@@ -1,51 +1,45 @@
 # Quality Guidelines
 
-> Code quality standards for backend development.
+> Backend quality standards for the current repo.
 
 ---
 
-## Overview
+## Required Verification
 
-<!--
-Document your project's quality standards here.
+Use the repo's Python validation flow:
 
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
+```bash
+python scripts/validate_artifacts.py
+python scripts/validate_decision_record_schema.py
+python -m compileall -q apps tests scripts
+python -m unittest discover -s tests -p "test_*.py" -v
+```
 
-(To be filled by the team)
-
----
-
-## Forbidden Patterns
-
-<!-- Patterns that should never be used and why -->
-
-(To be filled by the team)
+Run the relevant subset for small changes and the full suite for cross-cutting changes.
 
 ---
 
 ## Required Patterns
 
-<!-- Patterns that must always be used -->
-
-(To be filled by the team)
-
----
-
-## Testing Requirements
-
-<!-- What level of testing is expected -->
-
-(To be filled by the team)
+- Keep modules small and domain-focused.
+- Mirror runtime changes with tests under `tests/agent/`.
+- Update modelling docs when executable contracts drift.
+- Prefer deterministic, offline-friendly unit tests.
 
 ---
 
-## Code Review Checklist
+## Forbidden Patterns
 
-<!-- What reviewers should check -->
+- Do not add network-dependent unit tests.
+- Do not land runtime contract changes without test updates.
+- Do not introduce new workflow/tooling assumptions copied from JS repos.
+- Do not leave Trellis docs/specs behind when the repo conventions changed.
 
-(To be filled by the team)
+---
+
+## Review Checklist
+
+- Did the change follow existing `apps/agent/` package structure?
+- Were types/dataclasses/enums kept consistent?
+- Were modelling artifacts updated if schema or payload shape changed?
+- Do validators and tests still cover the changed behavior?

@@ -1,51 +1,36 @@
 # Logging Guidelines
 
-> How logging is done in this project.
+> Current logging expectations for this repo.
 
 ---
 
-## Overview
+## Current State
 
-<!--
-Document your project's logging conventions here.
-
-Questions to answer:
-- What logging library do you use?
-- What are the log levels and when to use each?
-- What should be logged?
-- What should NOT be logged (PII, secrets)?
--->
-
-(To be filled by the team)
+This repo does not yet have a shared application logger. The current codebase is intentionally low-noise:
+- library code returns values or raises errors
+- validation scripts print short pass/fail messages
+- tests assert behavior directly instead of inspecting logs
 
 ---
 
-## Log Levels
+## Rules
 
-<!-- When to use each level: debug, info, warn, error -->
-
-(To be filled by the team)
-
----
-
-## Structured Logging
-
-<!-- Log format, required fields -->
-
-(To be filled by the team)
+- Prefer deterministic return values and exceptions over debug prints in library code.
+- Keep script output concise and task-oriented.
+- Do not log secrets, full paywalled text, or noisy intermediate payload dumps.
 
 ---
 
-## What to Log
+## Examples
 
-<!-- Important events to log -->
-
-(To be filled by the team)
+- `scripts/validate_artifacts.py` prints a single success line
+- `scripts/validate_decision_record_schema.py` prints explicit validation errors, then exits non-zero
+- `apps/agent/*` modules generally avoid logging and stay test-friendly
 
 ---
 
-## What NOT to Log
+## Anti-Patterns
 
-<!-- Sensitive data, PII, secrets -->
-
-(To be filled by the team)
+- Do not add `print()` tracing inside reusable runtime helpers.
+- Do not dump full document bodies, secrets, or raw large payloads to stdout.
+- Do not introduce a logging framework casually; document it in this spec first if the repo adopts one.

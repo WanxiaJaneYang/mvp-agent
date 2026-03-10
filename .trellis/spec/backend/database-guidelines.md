@@ -1,51 +1,36 @@
 # Database Guidelines
 
-> Database patterns and conventions for this project.
+> Current persistence rules for a modelling-first repository.
 
 ---
 
-## Overview
+## Current State
 
-<!--
-Document your project's database conventions here.
+The authoritative database contract currently lives in:
+- `artifacts/modelling/data_model.md`
 
-Questions to answer:
-- What ORM/query library do you use?
-- How are migrations managed?
-- What are the naming conventions for tables/columns?
-- How do you handle transactions?
--->
-
-(To be filled by the team)
+There is **no full runtime persistence layer checked in yet**. Treat schema work as modelling-first until concrete storage code is introduced.
 
 ---
 
-## Query Patterns
+## Rules
 
-<!-- How should queries be written? Batch operations? -->
-
-(To be filled by the team)
-
----
-
-## Migrations
-
-<!-- How to create and run migrations -->
-
-(To be filled by the team)
+- If a change affects persistence shape, update `artifacts/modelling/data_model.md`.
+- Keep fixtures and validators aligned with the planned schema.
+- Do not add ad-hoc SQLite files, migrations, or local persistence helpers without also updating modelling docs and tests.
 
 ---
 
-## Naming Conventions
+## Examples
 
-<!-- Table names, column names, index names -->
-
-(To be filled by the team)
+- Planned run and ledger fields are documented in `artifacts/modelling/data_model.md`
+- Decision-record examples are validated via `scripts/validate_decision_record_schema.py`
+- Artifact structure is validated via `scripts/validate_artifacts.py`
 
 ---
 
-## Common Mistakes
+## Anti-Patterns
 
-<!-- Database-related mistakes your team has made -->
-
-(To be filled by the team)
+- Do not treat runtime code as the only source of truth for persistence contracts.
+- Do not land schema-shape changes without updating modelling artifacts.
+- Do not invent migration workflow docs until an actual migration tool exists in the repo.

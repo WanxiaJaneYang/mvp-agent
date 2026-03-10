@@ -1,109 +1,77 @@
 ---
 name: finish-work
-description: "Finish Work - Pre-Commit Checklist"
+description: "Finish Work - Pre-Completion Checklist"
 ---
 
-# Finish Work - Pre-Commit Checklist
+# Finish Work - Pre-Completion Checklist
 
-Before submitting or committing, use this checklist to ensure work completeness.
+Before treating a task as done, use this checklist to ensure the repo, specs, and Trellis state all line up.
 
-**Timing**: After code is written and tested, before commit
+**Timing**: After code or docs are updated and before you hand off, commit, merge, or record completion.
 
 ---
 
 ## Checklist
 
-### 1. Code Quality
+### 1. Verification
 
 ```bash
-# Must pass
-pnpm lint
-pnpm type-check
-pnpm test
+python scripts/validate_artifacts.py
+python scripts/validate_decision_record_schema.py
+python -m compileall -q apps tests scripts
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-- [ ] `pnpm lint` passes with 0 errors?
-- [ ] `pnpm type-check` passes with no type errors?
-- [ ] Tests pass?
-- [ ] No `console.log` statements (use logger)?
-- [ ] No non-null assertions (the `x!` operator)?
-- [ ] No `any` types?
+- [ ] Relevant validation commands passed for the files you touched?
+- [ ] Python code compiles cleanly?
+- [ ] Unit tests pass?
+- [ ] Modeling/schema validators still pass when relevant?
 
 ### 2. Code-Spec Sync
 
-**Code-Spec Docs**:
 - [ ] Does `.trellis/spec/backend/` need updates?
-  - New patterns, new modules, new conventions
 - [ ] Does `.trellis/spec/frontend/` need updates?
-  - New components, new hooks, new patterns
 - [ ] Does `.trellis/spec/guides/` need updates?
-  - New cross-layer flows, lessons from bugs
 
-**Key Question**: 
-> "If I fixed a bug or discovered something non-obvious, should I document it so future me (or others) won't hit the same issue?"
+**Rule**:
+If you changed a contract, convention, guardrail, or non-obvious workflow detail, update the relevant spec before treating the work as complete.
 
-If YES -> Update the relevant code-spec doc.
+### 3. Public Contract Changes
 
-### 2.5. Code-Spec Hard Block (Infra/Cross-Layer)
+If you modified a public contract:
+- [ ] Function signature or payload shape documented?
+- [ ] Callers and tests updated to match?
+- [ ] Modeling/spec docs updated if the contract is part of planned architecture?
 
-If this change touches infra or cross-layer contracts, this is a blocking checklist:
+### 4. Persistence or Schema Changes
 
-- [ ] Spec content is executable (real signatures/contracts), not principle-only text
-- [ ] Includes file path + command/API name + payload field names
-- [ ] Includes validation and error matrix
-- [ ] Includes Good/Base/Bad cases
-- [ ] Includes required tests and assertion points
-
-**Block Rule**:
-If infra/cross-layer changed but the related spec is still abstract, do NOT finish. Run `$update-spec` manually first.
-
-### 3. API Changes
-
-If you modified API endpoints:
-
-- [ ] Input schema updated?
-- [ ] Output schema updated?
-- [ ] API documentation updated?
-- [ ] Client code updated to match?
-
-### 4. Database Changes
-
-If you modified database schema:
-
-- [ ] Migration file created?
-- [ ] Schema file updated?
-- [ ] Related queries updated?
-- [ ] Seed data updated (if applicable)?
+If you modified database schema or persistence rules:
+- [ ] `artifacts/modelling/data_model.md` updated if runtime schema expectations changed?
+- [ ] Validation or fixture data updated?
+- [ ] Related scripts/tests updated?
 
 ### 5. Cross-Layer Verification
 
 If the change spans multiple layers:
+- [ ] Typed enums/dataclasses/dicts remain consistent across layers?
+- [ ] Errors are propagated intentionally?
+- [ ] Budget/paywall/citation guardrails still hold?
 
-- [ ] Data flows correctly through all layers?
-- [ ] Error handling works at each boundary?
-- [ ] Types are consistent across layers?
-- [ ] Loading states handled?
+### 6. Trellis State
 
-### 6. Manual Testing
-
-- [ ] Feature works in browser/app?
-- [ ] Edge cases tested?
-- [ ] Error states tested?
-- [ ] Works after page refresh?
+- [ ] Active Trellis task still reflects the work in progress?
+- [ ] Session recording will not create a hidden commit unless explicitly intended?
+- [ ] The work should be recorded in `.trellis/workspace/` when finished?
 
 ---
 
 ## Quick Check Flow
 
 ```bash
-# 1. Code checks
-pnpm lint && pnpm type-check
-
-# 2. View changes
+python -m compileall -q apps tests scripts
+python -m unittest discover -s tests -p "test_*.py" -v
 git status
 git diff --name-only
-
-# 3. Based on changed files, check relevant items above
 ```
 
 ---
@@ -112,37 +80,27 @@ git diff --name-only
 
 | Oversight | Consequence | Check |
 |-----------|-------------|-------|
-| Code-spec docs not updated | Others don't know the change | Check .trellis/spec/ |
-| Spec text is abstract only | Easy regressions in infra/cross-layer changes | Require signature/contract/matrix/cases/tests |
-| Migration not created | Schema out of sync | Check db/migrations/ |
-| Types not synced | Runtime errors | Check shared types |
-| Tests not updated | False confidence | Run full test suite |
-| Console.log left in | Noisy production logs | Search for console.log |
+| Code-spec docs not updated | Others don't know the change | Check `.trellis/spec/` |
+| Runtime/model schema drift | Planned contracts diverge from code | Check `artifacts/modelling/` and tests |
+| Types not synced | Runtime errors | Check enums, dataclasses, dict keys |
+| Tests not updated | False confidence | Run the relevant suite |
+| Hidden auto-commit behavior | Surprise commits in docs-only sessions | Check `add_session.py` flags |
 
 ---
 
 ## Relationship to Other Commands
 
-```
+```text
 Development Flow:
-  Write code -> Test -> $finish-work -> git commit -> $record-session
-                          |                              |
-                   Ensure completeness              Record progress
-                   
-Debug Flow:
-  Hit bug -> Fix -> $break-loop -> Knowledge capture
-                       |
-                  Deep analysis
+  Write code -> Verify -> $finish-work -> commit/handoff -> $record-session
 ```
 
-- `$finish-work` - Check work completeness (this skill)
-- `$record-session` - Record session and commits
-- `$break-loop` - Deep analysis after debugging
+- `$finish-work` - completeness check
+- `$record-session` - Trellis workspace/task recording
+- `$break-loop` - bug-analysis follow-up when needed
 
 ---
 
 ## Core Principle
 
-> **Delivery includes not just code, but also documentation, verification, and knowledge capture.**
-
-Complete work = Code + Docs + Tests + Verification
+Complete work = verified change + synced specs + correct Trellis state.
