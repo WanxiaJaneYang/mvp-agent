@@ -4,7 +4,7 @@ import json
 import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +43,12 @@ from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 from apps.agent.runtime.source_scope import load_active_source_subset
 from apps.agent.runtime.source_scope import load_source_registry
 from apps.agent.synthesis.postprocess import finalize_validation_outcome
-from apps.agent.daily_brief.synthesis import SynthesisRetryPlan, build_citation_store, build_synthesis
+from apps.agent.daily_brief.synthesis import (
+    SynthesisRetryPlan,
+    build_changed_section,
+    build_citation_store,
+    build_synthesis,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -227,6 +232,7 @@ def _execute_daily_brief_slice(
     context: Any,
     use_live_sources: bool = False,
 ) -> dict[str, Any]:
+    report_date = generated_at_utc[:10]
     input_data = prepare_daily_brief_inputs(
         fixture_path=fixture_path,
         generated_at_utc=generated_at_utc,
@@ -241,8 +247,8 @@ def _execute_daily_brief_slice(
         stage_data=corpus_data,
         registry=input_data.registry,
         run_id=run_id,
+        previous_synthesis=_load_previous_synthesis(base_dir=base_dir, report_date=report_date),
     )
-    report_date = generated_at_utc[:10]
     output_path = base_dir / "artifacts" / "daily" / report_date / "brief.html"
     budget_snapshot = _budget_snapshot(context=context)
     guardrail_checks = _guardrail_checks(
@@ -411,6 +417,7 @@ def build_daily_brief_synthesis(
     stage_data: DailyBriefCorpusStageData,
     registry: Mapping[str, SourceRegistryEntry],
     run_id: str,
+    previous_synthesis: Mapping[str, Any] | None = None,
 ) -> DailyBriefSynthesisStageData:
     query_text = build_daily_brief_query(documents=stage_data.documents)
     evidence_pack_report = build_evidence_pack_report(
@@ -473,6 +480,17 @@ def build_daily_brief_synthesis(
         raise ValueError("Daily brief synthesis did not produce a validation result.")
 
     final_result = finalize_validation_outcome(validation_result=stage8_result)
+    changed_section = build_changed_section(
+        current_synthesis=final_result["synthesis"],
+        previous_synthesis=previous_synthesis,
+    )
+    if changed_section:
+        final_synthesis = dict(final_result["synthesis"])
+        final_synthesis["changed"] = changed_section
+        final_result = {
+            **final_result,
+            "synthesis": final_synthesis,
+        }
     synthesis_id = f"syn_{run_id}"
     return DailyBriefSynthesisStageData(
         query_text=query_text,
@@ -787,6 +805,20 @@ def _artifact_dir(*, base_dir: Path, report_date: str, run_id: str) -> Path:
     artifact_dir = base_dir / "artifacts" / "runtime" / "daily_brief_runs" / report_date / run_id
     artifact_dir.mkdir(parents=True, exist_ok=True)
     return artifact_dir
+
+
+def _load_previous_synthesis(*, base_dir: Path, report_date: str) -> dict[str, Any] | None:
+    current_date = datetime.fromisoformat(report_date).date()
+    previous_date = (current_date - timedelta(days=1)).isoformat()
+    prior_dir = base_dir / "artifacts" / "runtime" / "daily_brief_runs" / previous_date
+    if not prior_dir.exists():
+        return None
+
+    candidate_paths = sorted(prior_dir.glob("*/synthesis.json"))
+    if not candidate_paths:
+        return None
+
+    return json.loads(candidate_paths[-1].read_text(encoding="utf-8"))
 
 
 def _persist_budget_stop_outputs(

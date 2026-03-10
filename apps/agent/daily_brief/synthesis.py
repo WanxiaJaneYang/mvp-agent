@@ -39,6 +39,8 @@ MINORITY_KEYWORDS = (
     "minority",
     "outlier",
 )
+INSUFFICIENT_EVIDENCE_TEXT = "[Insufficient evidence to produce a validated output]"
+CHANGED_SECTION_MAX_BULLETS = 3
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,46 @@ def build_synthesis(
         }
         synthesis[section].append(dict(bullet))
     return synthesis
+
+
+def build_changed_section(
+    *,
+    current_synthesis: Mapping[str, Any],
+    previous_synthesis: Mapping[str, Any] | None,
+) -> list[DailyBriefBullet]:
+    if not isinstance(previous_synthesis, Mapping):
+        return []
+
+    changed: list[DailyBriefBullet] = []
+    for section in DAILY_BRIEF_CORE_OUTPUT_SECTIONS:
+        current_bullet = _first_bullet(current_synthesis.get(section))
+        if current_bullet is None:
+            continue
+
+        current_text = str(current_bullet.get("text", "")).strip()
+        if not current_text or current_text == INSUFFICIENT_EVIDENCE_TEXT:
+            continue
+
+        previous_bullet = _first_bullet(previous_synthesis.get(section))
+        previous_text = "" if previous_bullet is None else str(previous_bullet.get("text", "")).strip()
+        if current_text == previous_text:
+            continue
+
+        changed.append(
+            {
+                "text": _build_changed_bullet_text(
+                    section=section,
+                    current_text=current_text,
+                    previous_text=previous_text,
+                ),
+                "citation_ids": [str(citation_id) for citation_id in current_bullet.get("citation_ids", [])],
+                "confidence_label": current_bullet.get("confidence_label"),
+            }
+        )
+        if len(changed) >= CHANGED_SECTION_MAX_BULLETS:
+            break
+
+    return changed
 
 
 def _sorted_evidence_items(evidence_items: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -305,6 +347,24 @@ def _build_bullet_text(*, section: str, document: Mapping[str, Any], publisher: 
             return f"{normalized_title}."
         return f"Watch {normalized_title.lower()}."
     return f"{normalized_title} ({publisher})."
+
+
+def _first_bullet(raw_bullets: Any) -> Mapping[str, Any] | None:
+    if not isinstance(raw_bullets, list) or not raw_bullets:
+        return None
+    bullet = raw_bullets[0]
+    if not isinstance(bullet, Mapping):
+        return None
+    return bullet
+
+
+def _build_changed_bullet_text(*, section: str, current_text: str, previous_text: str) -> str:
+    label = section.replace("_", " ").title()
+    if not previous_text:
+        return f"{label} is newly supported today: {current_text}"
+    if previous_text == INSUFFICIENT_EVIDENCE_TEXT:
+        return f"{label} gained support today: {current_text}"
+    return f"{label} changed versus yesterday: {current_text}"
 
 
 def _confidence_label(credibility_tier: int) -> str:

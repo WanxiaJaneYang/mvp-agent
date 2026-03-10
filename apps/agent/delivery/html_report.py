@@ -10,6 +10,7 @@ SECTION_TITLES = {
     "counter": "Counter",
     "minority": "Minority",
     "watch": "Watch",
+    "changed": "Changed Since Yesterday",
 }
 
 
@@ -29,6 +30,8 @@ def render_daily_brief_html(
     sections_html: list[str] = []
     for section, title in SECTION_TITLES.items():
         bullets = synthesis.get(section, [])
+        if section == "changed" and not bullets:
+            continue
         bullet_items = "".join(_render_bullet(bullet) for bullet in bullets)
         sections_html.append(f"<section><h2>{escape(title)}</h2><ul>{bullet_items}</ul></section>")
 

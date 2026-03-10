@@ -609,6 +609,44 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(run_summary["docs_fetched"], 5)
             self.assertEqual(result["pipeline_status"], "ok")
 
+    def test_run_fixture_daily_brief_includes_changed_section_when_previous_synthesis_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            previous_synthesis_path = (
+                base_dir
+                / "artifacts"
+                / "runtime"
+                / "daily_brief_runs"
+                / "2026-03-09"
+                / "run_prior"
+                / "synthesis.json"
+            )
+            previous_synthesis_path.parent.mkdir(parents=True, exist_ok=True)
+            previous_synthesis_path.write_text(
+                json.dumps(
+                    {
+                        "prevailing": [{"text": "Yesterday's prevailing view.", "citation_ids": ["cite_old_001"]}],
+                        "counter": [{"text": "Yesterday's counter view.", "citation_ids": ["cite_old_002"]}],
+                        "minority": [{"text": "Yesterday's minority view.", "citation_ids": ["cite_old_003"]}],
+                        "watch": [{"text": "Yesterday's watch view.", "citation_ids": ["cite_old_004"]}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_fixture_daily_brief(
+                base_dir=base_dir,
+                run_id="run_fixture_changed",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+            synthesis_payload = json.loads((Path(result["artifact_dir"]) / "synthesis.json").read_text(encoding="utf-8"))
+            html = Path(result["html_path"]).read_text(encoding="utf-8")
+
+        self.assertIn("changed", synthesis_payload)
+        self.assertGreater(len(synthesis_payload["changed"]), 0)
+        self.assertIn("Changed Since Yesterday", html)
+
     def test_run_fixture_daily_brief_persists_budget_preflight_truthfully(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = run_fixture_daily_brief(
