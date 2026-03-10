@@ -8,6 +8,7 @@ from apps.agent.pipeline.types import RunContext, RunStatus, RunType, StageResul
 from apps.agent.runtime.budget_guard import evaluate_budget_guard
 from apps.agent.runtime.cost_ledger import build_budget_ledger_rows
 
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -54,12 +55,21 @@ def run_pipeline(
             decision=decision,
             windows=budget_preflight["windows"],
         )
+        context.budget_snapshot = {
+            "hourly_spend_usd": decision.projected_spend["hourly"],
+            "hourly_cap_usd": decision.caps["hourly"],
+            "daily_spend_usd": decision.projected_spend["daily"],
+            "daily_cap_usd": decision.caps["daily"],
+            "monthly_spend_usd": decision.projected_spend["monthly"],
+            "monthly_cap_usd": decision.caps["monthly"],
+            "allowed": decision.allowed,
+        }
+        context.budget_ledger_rows = budget_ledger_rows
         if not decision.allowed:
             context.status = RunStatus.STOPPED_BUDGET
             context.ended_at = _utc_now_iso()
             context.error_summary = decision.reason
             stopped_result = context.to_dict()
-            stopped_result["budget_ledger_rows"] = budget_ledger_rows
             recorder(stopped_result)
             return stopped_result
 

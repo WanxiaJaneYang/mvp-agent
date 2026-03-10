@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from collections.abc import Iterable, Mapping
 from typing import Any
@@ -12,13 +14,79 @@ def build_evidence_pack(
     query_text: str,
     pack_size: int = 30,
 ) -> list[dict[str, Any]]:
-    query_terms = _tokenize(query_text)
-    candidate_rows = list(fts_rows)
-    if not query_terms or pack_size <= 0:
-        return []
+    return build_evidence_pack_report(
+        fts_rows=fts_rows,
+        query_text=query_text,
+        pack_size=pack_size,
+    )["items"]
 
+
+def build_evidence_pack_report(
+    *,
+    fts_rows: Iterable[Mapping[str, Any]],
+    query_text: str,
+    pack_size: int = 30,
+) -> dict[str, Any]:
+    query_terms = _tokenize(query_text)
+    if not query_terms or pack_size <= 0:
+        return {
+            "items": [],
+            "diversity_check": "fail",
+            "diversity_stats": _diversity_stats([]),
+            "notes": ["No matching evidence rows were available for evidence-pack construction."],
+        }
+
+    matching_rows = _matching_rows(fts_rows=fts_rows, query_terms=query_terms)
+    if not matching_rows:
+        return {
+            "items": [],
+            "diversity_check": "fail",
+            "diversity_stats": _diversity_stats([]),
+            "notes": ["No rows matched the evidence-pack query terms."],
+        }
+
+    published_timestamps = [row["published_timestamp"] for row in matching_rows]
+    oldest_timestamp = min(published_timestamps, default=0.0)
+    newest_timestamp = max(published_timestamps, default=0.0)
+
+    scored_rows = _score_rows(
+        matching_rows=matching_rows,
+        oldest_timestamp=oldest_timestamp,
+        newest_timestamp=newest_timestamp,
+    )
+    scored_rows.sort(
+        key=lambda row: (
+            -float(row["retrieval_score"]),
+            -float(row["_published_timestamp"]),
+            str(row["chunk_id"]),
+        )
+    )
+
+    selected_rows = _select_diverse_rows(scored_rows=scored_rows, pack_size=pack_size)
+    pack_rows = [_public_row(row=row, rank=index) for index, row in enumerate(selected_rows, start=1)]
+    diversity_stats = _diversity_stats(pack_rows)
+    violations = _diversity_violations(diversity_stats=diversity_stats)
+    notes = _diversity_notes(violations=violations, target_size=min(pack_size, len(scored_rows)), actual_size=len(pack_rows))
+    return {
+        "items": pack_rows,
+        "diversity_check": _diversity_level(violations=violations, items=pack_rows),
+        "diversity_stats": diversity_stats,
+        "notes": notes,
+    }
+
+
+def _tokenize(value: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", value.lower())
+
+
+def _keyword_score(*, text: str, query_terms: list[str]) -> float:
+    tokens = _tokenize(text)
+    return float(sum(tokens.count(term) for term in query_terms))
+
+
+def _matching_rows(*, fts_rows: Iterable[Mapping[str, Any]], query_terms: list[str]) -> list[dict[str, Any]]:
     matching_rows: list[dict[str, Any]] = []
-    for row in candidate_rows:
+    for row in fts_rows:
         _validate_row(row)
         keyword_score = _keyword_score(text=str(row["text"]), query_terms=query_terms)
         if keyword_score <= 0:
@@ -30,11 +98,15 @@ def build_evidence_pack(
                 "published_timestamp": _published_timestamp(row),
             }
         )
+    return matching_rows
 
-    published_timestamps = [row["published_timestamp"] for row in matching_rows]
-    oldest_timestamp = min(published_timestamps, default=0.0)
-    newest_timestamp = max(published_timestamps, default=0.0)
 
+def _score_rows(
+    *,
+    matching_rows: Iterable[Mapping[str, Any]],
+    oldest_timestamp: float,
+    newest_timestamp: float,
+) -> list[dict[str, Any]]:
     scored_rows: list[dict[str, Any]] = []
     for match in matching_rows:
         row = match["row"]
@@ -45,7 +117,6 @@ def build_evidence_pack(
         )
         credibility_score = _credibility_score(int(row["credibility_tier"]))
         retrieval_score = round(float(match["keyword_score"]) * 0.5 + recency_score * 0.3 + credibility_score * 0.2, 6)
-
         scored_rows.append(
             {
                 "chunk_id": row["chunk_id"],
@@ -59,41 +130,143 @@ def build_evidence_pack(
                 "_published_timestamp": match["published_timestamp"],
             }
         )
+    return scored_rows
 
-    scored_rows.sort(
-        key=lambda row: (
-            -float(row["retrieval_score"]),
-            -float(row["_published_timestamp"]),
-            str(row["chunk_id"]),
+
+def _select_diverse_rows(*, scored_rows: list[dict[str, Any]], pack_size: int) -> list[dict[str, Any]]:
+    target_size = min(pack_size, len(scored_rows))
+    if target_size <= 0:
+        return []
+
+    publisher_limit = max(1, int(math.floor(target_size * 0.4)))
+    tier4_limit = int(math.floor(target_size * 0.15))
+    min_high_tier = int(math.ceil(target_size * 0.5))
+
+    selected: list[dict[str, Any]] = []
+    publisher_counts: Counter[str] = Counter()
+    tier4_count = 0
+
+    def can_add(row: Mapping[str, Any]) -> bool:
+        publisher = str(row["publisher"])
+        if publisher_counts[publisher] >= publisher_limit:
+            return False
+        if int(row["credibility_tier"]) == 4 and tier4_count >= tier4_limit:
+            return False
+        return True
+
+    for row in scored_rows:
+        if len(selected) >= target_size:
+            break
+        if int(row["credibility_tier"]) > 2:
+            continue
+        if not can_add(row):
+            continue
+        selected.append(row)
+        publisher_counts[str(row["publisher"])] += 1
+        if int(row["credibility_tier"]) == 4:
+            tier4_count += 1
+        if sum(1 for item in selected if int(item["credibility_tier"]) <= 2) >= min_high_tier:
+            break
+
+    for row in scored_rows:
+        if len(selected) >= target_size:
+            break
+        if row in selected:
+            continue
+        if not can_add(row):
+            continue
+        selected.append(row)
+        publisher_counts[str(row["publisher"])] += 1
+        if int(row["credibility_tier"]) == 4:
+            tier4_count += 1
+
+    for row in scored_rows:
+        if len(selected) >= target_size:
+            break
+        if row in selected:
+            continue
+        selected.append(row)
+
+    return selected
+
+
+def _public_row(*, row: Mapping[str, Any], rank: int) -> dict[str, Any]:
+    return {
+        "chunk_id": row["chunk_id"],
+        "source_id": row["source_id"],
+        "publisher": row["publisher"],
+        "credibility_tier": row["credibility_tier"],
+        "retrieval_score": row["retrieval_score"],
+        "semantic_score": row["semantic_score"],
+        "recency_score": row["recency_score"],
+        "credibility_score": row["credibility_score"],
+        "rank_in_pack": rank,
+    }
+
+
+def _diversity_stats(items: Iterable[Mapping[str, Any]]) -> dict[str, float | int]:
+    rows = list(items)
+    total = len(rows)
+    if total == 0:
+        return {
+            "selected_count": 0,
+            "unique_publishers": 0,
+            "tier_1_pct": 0.0,
+            "tier_2_pct": 0.0,
+            "tier_3_pct": 0.0,
+            "tier_4_pct": 0.0,
+            "tier_1_2_pct": 0.0,
+            "max_publisher_pct": 0.0,
+        }
+
+    publisher_counts = Counter(str(item["publisher"]) for item in rows)
+    tier_counts = Counter(int(item["credibility_tier"]) for item in rows)
+    return {
+        "selected_count": total,
+        "unique_publishers": len(publisher_counts),
+        "tier_1_pct": round(tier_counts[1] / total * 100, 2),
+        "tier_2_pct": round(tier_counts[2] / total * 100, 2),
+        "tier_3_pct": round(tier_counts[3] / total * 100, 2),
+        "tier_4_pct": round(tier_counts[4] / total * 100, 2),
+        "tier_1_2_pct": round((tier_counts[1] + tier_counts[2]) / total * 100, 2),
+        "max_publisher_pct": round(max(publisher_counts.values()) / total * 100, 2),
+    }
+
+
+def _diversity_violations(*, diversity_stats: Mapping[str, Any]) -> list[str]:
+    violations: list[str] = []
+    if float(diversity_stats["max_publisher_pct"]) > 40.0:
+        violations.append("publisher_dominance")
+    if float(diversity_stats["tier_1_2_pct"]) < 50.0:
+        violations.append("tier_1_2_minimum")
+    if float(diversity_stats["tier_4_pct"]) > 15.0:
+        violations.append("tier_4_maximum")
+    return violations
+
+
+def _diversity_notes(*, violations: Iterable[str], target_size: int, actual_size: int) -> list[str]:
+    notes: list[str] = []
+    violation_set = set(violations)
+    if actual_size < target_size:
+        notes.append(
+            f"Evidence pack selected {actual_size} item(s) out of requested {target_size} after diversity filtering."
         )
-    )
-
-    pack_rows: list[dict[str, Any]] = []
-    for index, row in enumerate(scored_rows[:pack_size], start=1):
-        pack_rows.append(
-            {
-                "chunk_id": row["chunk_id"],
-                "source_id": row["source_id"],
-                "publisher": row["publisher"],
-                "credibility_tier": row["credibility_tier"],
-                "retrieval_score": row["retrieval_score"],
-                "semantic_score": row["semantic_score"],
-                "recency_score": row["recency_score"],
-                "credibility_score": row["credibility_score"],
-                "rank_in_pack": index,
-            }
-        )
-
-    return pack_rows
+    if "publisher_dominance" in violation_set:
+        notes.append("Publisher dominance cap could not be satisfied with the available evidence pool.")
+    if "tier_1_2_minimum" in violation_set:
+        notes.append("Tier 1/2 minimum share could not be satisfied with the available evidence pool.")
+    if "tier_4_maximum" in violation_set:
+        notes.append("Tier 4 maximum share could not be satisfied with the available evidence pool.")
+    return notes
 
 
-def _tokenize(value: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", value.lower())
-
-
-def _keyword_score(*, text: str, query_terms: list[str]) -> float:
-    tokens = _tokenize(text)
-    return float(sum(tokens.count(term) for term in query_terms))
+def _diversity_level(*, violations: Iterable[str], items: list[dict[str, Any]]) -> str:
+    violation_list = list(violations)
+    if not items:
+        return "fail"
+    if len(violation_list) >= 1:
+        return "fail"
+    return "pass"
 
 
 def _published_timestamp(row: Mapping[str, Any]) -> float:

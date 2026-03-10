@@ -20,6 +20,7 @@ def render_daily_brief_html(
     run_id: str,
     synthesis: Mapping[str, list[Mapping[str, Any]]],
     citation_store: Mapping[str, Mapping[str, Any]],
+    guardrail_checks: Mapping[str, Any] | None = None,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     abstained = _is_abstained(synthesis)
@@ -35,12 +36,14 @@ def render_daily_brief_html(
         _render_citation(citation_id=citation_id, citation=citation_store[citation_id])
         for citation_id in citation_store
     )
+    guardrails_html = _render_guardrails(guardrail_checks)
 
     html = (
         "<html><head><meta charset=\"utf-8\"><title>Daily Brief</title></head><body>"
         f"<header><h1>Daily Brief</h1><p>Date: {escape(report_date)}</p><p>Run: {escape(run_id)}</p>"
         f"<p>Status: {escape(status_title)}</p></header>"
         f"{''.join(sections_html)}"
+        f"{guardrails_html}"
         f"<section><h2>Citations</h2><ol>{citations_html}</ol></section>"
         "</body></html>"
     )
@@ -60,6 +63,29 @@ def _render_citation(*, citation_id: str, citation: Mapping[str, Any]) -> str:
     title = escape(str(citation.get("title") or citation_id))
     url = escape(str(citation.get("url") or ""))
     return f"<li id=\"{escape(citation_id)}\"><a href=\"{url}\">{title}</a></li>"
+
+
+def _render_guardrails(guardrail_checks: Mapping[str, Any] | None) -> str:
+    if guardrail_checks is None:
+        return ""
+
+    notes = "".join(
+        f"<li>{escape(str(note))}</li>"
+        for note in guardrail_checks.get("notes", [])
+        if isinstance(note, str)
+    )
+    return (
+        "<section><h2>Guardrails</h2><ul>"
+        f"<li>Budget: {escape(_label(str(guardrail_checks.get('budget_check', 'warn'))))}</li>"
+        f"<li>Diversity: {escape(_label(str(guardrail_checks.get('diversity_check', 'warn'))))}</li>"
+        f"<li>Citations: {escape(_label(str(guardrail_checks.get('citation_check', 'warn'))))}</li>"
+        f"{notes}"
+        "</ul></section>"
+    )
+
+
+def _label(value: str) -> str:
+    return value[:1].upper() + value[1:].lower()
 
 
 def _is_abstained(synthesis: Mapping[str, list[Mapping[str, Any]]]) -> bool:
