@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -588,6 +589,79 @@ class DailyBriefRunnerTests(unittest.TestCase):
             )
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
+
+    def test_run_fixture_daily_brief_persists_modeled_rows_to_sqlite(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_sqlite",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+            runtime_db_path = Path(result["runtime_db_path"])
+            self.assertTrue(runtime_db_path.exists())
+
+            connection = sqlite3.connect(runtime_db_path)
+            try:
+                documents = connection.execute(
+                    "SELECT doc_id, canonical_url FROM documents ORDER BY canonical_url"
+                ).fetchall()
+                chunks = connection.execute(
+                    "SELECT chunk_id, doc_id, chunk_index FROM chunks ORDER BY doc_id, chunk_index"
+                ).fetchall()
+                syntheses = connection.execute(
+                    "SELECT synthesis_id, kind, status FROM syntheses"
+                ).fetchall()
+                runs = connection.execute(
+                    "SELECT run_id, run_type, status FROM runs"
+                ).fetchall()
+            finally:
+                connection.close()
+
+        self.assertGreater(len(documents), 0)
+        self.assertTrue(all(doc_id.startswith("doc_") for doc_id, _url in documents))
+        self.assertNotIn("doc_001", {doc_id for doc_id, _url in documents})
+        self.assertGreater(len(chunks), 0)
+        self.assertTrue(all(chunk_id.startswith("chunk_") for chunk_id, _doc_id, _chunk_index in chunks))
+        self.assertEqual(len(syntheses), 1)
+        self.assertTrue(syntheses[0][0].startswith("syn_"))
+        self.assertEqual(syntheses[0][1:], ("daily_brief", "ok"))
+        self.assertEqual(runs, [("run_fixture_sqlite", "daily_brief", "ok")])
+
+    def test_run_fixture_daily_brief_reuses_stable_document_ids_across_runs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first_result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_sqlite_first",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+            second_result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_sqlite_second",
+                generated_at_utc="2026-03-11T16:00:00Z",
+            )
+
+            runtime_db_path = Path(second_result["runtime_db_path"])
+            self.assertEqual(runtime_db_path, Path(first_result["runtime_db_path"]))
+
+            connection = sqlite3.connect(runtime_db_path)
+            try:
+                document_rows = connection.execute(
+                    "SELECT doc_id, canonical_url FROM documents ORDER BY canonical_url"
+                ).fetchall()
+                document_count = connection.execute(
+                    "SELECT COUNT(*) FROM documents"
+                ).fetchone()[0]
+                run_count = connection.execute(
+                    "SELECT COUNT(*) FROM runs"
+                ).fetchone()[0]
+            finally:
+                connection.close()
+
+        self.assertEqual(document_count, len(document_rows))
+        self.assertGreater(run_count, 1)
+        self.assertTrue(all(doc_id.startswith("doc_") for doc_id, _url in document_rows))
+        self.assertEqual(len({doc_id for doc_id, _url in document_rows}), len(document_rows))
 
     def test_run_daily_brief_writes_expected_artifacts_from_live_payloads(self):
         fixture_payloads = load_active_fixture_payloads()

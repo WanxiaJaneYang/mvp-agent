@@ -4,6 +4,8 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+from apps.agent.pipeline.identifiers import build_chunk_id
+
 
 def chunk_document(*, document: Mapping[str, Any], max_chars: int = 800) -> list[dict[str, int | str]]:
     if document.get("metadata_only") or not document.get("body_text"):
@@ -43,7 +45,10 @@ def build_chunk_rows(*, document: Mapping[str, Any], max_chars: int = 800) -> li
         chunk_index = int(chunk["chunk_index"])
         chunk_rows.append(
             {
-                "chunk_id": f"{document['doc_id']}_chunk_{chunk_index:03d}",
+                "chunk_id": build_chunk_id(
+                    doc_id=str(document["doc_id"]),
+                    chunk_index=chunk_index,
+                ),
                 "doc_id": document["doc_id"],
                 "chunk_index": chunk_index,
                 "text": chunk["text"],
