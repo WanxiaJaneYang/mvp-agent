@@ -1,11 +1,12 @@
 ---
 name: record-session
-description: "Record work progress after human has tested and committed code"
+description: "Record work progress in the Trellis workspace without creating hidden commits by default"
 ---
 
-[!] **Prerequisite**: This skill should only be used AFTER the human has tested and committed the code.
+[!] **Purpose**: Update `.trellis/workspace/` and task tracking after implementation, review, or planning work.
 
-**AI must NOT execute git commit** - only read history (`git log`, `git status`, `git diff`).
+Session recording in this repo **does not auto-commit by default**.
+Use `--auto-commit` only when the user explicitly wants the workspace/task metadata committed as part of the current workflow.
 
 ---
 
@@ -14,45 +15,51 @@ description: "Record work progress after human has tested and committed code"
 ### Step 1: Get Context & Check Tasks
 
 ```bash
-python3 ./.trellis/scripts/get_context.py --mode record
+python ./.trellis/scripts/get_context.py --mode record
 ```
 
-[!] Archive tasks whose work is **actually done** — judge by work status, not the `status` field in task.json:
-- Code committed? → Archive it (don't wait for PR)
-- All acceptance criteria met? → Archive it
-- Don't skip archiving just because `status` still says `planning` or `in_progress`
+[!] Archive tasks whose work is **actually done**:
+- Acceptance criteria met and the task is no longer active -> archive it
+- If the task is still the active implementation umbrella, leave it open
+- Do not archive planning-only or audit sessions just because they were recorded
 
 ```bash
-python3 ./.trellis/scripts/task.py archive <task-name>
+python ./.trellis/scripts/task.py archive <task-name>
+python ./.trellis/scripts/task.py archive <task-name> --no-commit
 ```
 
-### Step 2: One-Click Add Session
+`task.py archive` still auto-commits `.trellis/tasks` by default.
+Use `--no-commit` when the current workflow should not mutate git state.
+
+### Step 2: Add the Session Entry
 
 ```bash
-# Method 1: Simple parameters
-python3 ./.trellis/scripts/add_session.py \
+# Planning or audit session
+python ./.trellis/scripts/add_session.py \
   --title "Session Title" \
-  --commit "hash1,hash2" \
+  --commit "-" \
   --summary "Brief summary of what was done"
 
-# Method 2: Pass detailed content via stdin
-cat << 'EOF' | python3 ./.trellis/scripts/add_session.py --title "Title" --commit "hash"
+# Implementation session with detailed notes via stdin
+cat << 'EOF' | python ./.trellis/scripts/add_session.py --title "Title" --commit "hash"
 | Feature | Description |
 |---------|-------------|
-| New API | Added user authentication endpoint |
-| Frontend | Updated login form |
-
-**Updated Files**:
-- `packages/api/modules/auth/router.ts`
-- `apps/web/modules/auth/components/login-form.tsx`
+| Runtime | Updated orchestration rules |
+| Tests | Added regression coverage |
 EOF
+
+# Explicitly opt into workspace auto-commit
+python ./.trellis/scripts/add_session.py \
+  --title "Session Title" \
+  --commit "hash1,hash2" \
+  --summary "Brief summary" \
+  --auto-commit
 ```
 
-**Auto-completes**:
-- [OK] Appends session to journal-N.md
-- [OK] Auto-detects line count, creates new file if >2000 lines
-- [OK] Updates index.md (Total Sessions +1, Last Active, line stats, history)
-- [OK] Auto-commits .trellis/workspace and .trellis/tasks changes
+**Default behavior**:
+- [OK] Appends session to `journal-N.md`
+- [OK] Updates workspace `index.md`
+- [OK] Leaves git state unchanged unless `--auto-commit` is supplied
 
 ---
 
@@ -60,7 +67,9 @@ EOF
 
 | Command | Purpose |
 |---------|---------|
-| `python3 ./.trellis/scripts/get_context.py --mode record` | Get context for record-session |
-| `python3 ./.trellis/scripts/add_session.py --title "..." --commit "..."` | **One-click add session (recommended)** |
-| `python3 ./.trellis/scripts/task.py archive <name>` | Archive completed task (auto-commits) |
-| `python3 ./.trellis/scripts/task.py list` | List active tasks |
+| `python ./.trellis/scripts/get_context.py --mode record` | Get context for record-session |
+| `python ./.trellis/scripts/add_session.py --title "..." --commit "-"` | Record planning/audit work |
+| `python ./.trellis/scripts/add_session.py --title "..." --commit "..." --auto-commit` | Record and explicitly auto-commit workspace/task metadata |
+| `python ./.trellis/scripts/task.py archive <name>` | Archive a completed task and auto-commit `.trellis/tasks` |
+| `python ./.trellis/scripts/task.py archive <name> --no-commit` | Archive a completed task without a git commit |
+| `python ./.trellis/scripts/task.py list` | List active tasks |

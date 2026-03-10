@@ -92,13 +92,16 @@ def write_prd_frontend_section() -> str:
 
 ### Frontend Guidelines
 
+If the repository does not yet contain frontend code, mark these files as
+**not yet applicable** instead of inventing conventions.
+
 | File | What to Document |
 |------|------------------|
 | `.trellis/spec/frontend/directory-structure.md` | Component/page/hook organization |
 | `.trellis/spec/frontend/component-guidelines.md` | Component patterns, props conventions |
 | `.trellis/spec/frontend/hook-guidelines.md` | Custom hook naming, patterns |
 | `.trellis/spec/frontend/state-management.md` | State library, patterns, what goes where |
-| `.trellis/spec/frontend/type-safety.md` | TypeScript conventions, type organization |
+| `.trellis/spec/frontend/type-safety.md` | Frontend type conventions when a real frontend exists |
 | `.trellis/spec/frontend/quality-guidelines.md` | Linting, testing, accessibility |
 """
 
@@ -162,8 +165,8 @@ python3 ./.trellis/scripts/task.py archive 00-bootstrap-guidelines
 After completing this task:
 
 1. AI will write code that matches your project style
-2. Relevant `/trellis:before-*-dev` commands will inject real context
-3. `/trellis:check-*` commands will validate against your actual standards
+2. Relevant Trellis spec files and skills will use real project context
+3. Review and verification checklists will match your actual standards
 4. Future developers (human or AI) will onboard faster
 """
 

@@ -1,12 +1,18 @@
 # Backend Development Guidelines
 
-> Best practices for backend development in this project.
+> Repo-specific backend guidance for the current Python codebase.
 
 ---
 
 ## Overview
 
-This directory contains guidelines for backend development. Fill in each file with your project's specific conventions.
+Backend work in this repo currently means:
+- Python modules under `apps/agent/`
+- mirrored unit tests under `tests/agent/`
+- modelling/schema artifacts under `artifacts/modelling/`
+- validation scripts under `scripts/`
+
+Read this index first, then the relevant detailed docs.
 
 ---
 
@@ -14,25 +20,29 @@ This directory contains guidelines for backend development. Fill in each file wi
 
 | Guide | Description | Status |
 |-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Database Guidelines](./database-guidelines.md) | ORM patterns, queries, migrations | To fill |
-| [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
+| [Directory Structure](./directory-structure.md) | Where Python runtime, tests, scripts, and modelling docs live | Active |
+| [Type Safety](./type-safety.md) | Typing, dataclasses, enums, and contract boundaries | Active |
+| [Database Guidelines](./database-guidelines.md) | Current modelling-first persistence rules | Active |
+| [Error Handling](./error-handling.md) | How code raises errors vs returns typed failure states | Active |
+| [Logging Guidelines](./logging-guidelines.md) | Current low-noise logging approach | Active |
+| [Quality Guidelines](./quality-guidelines.md) | Verification commands, testing rules, and forbidden patterns | Active |
 
 ---
 
-## How to Fill These Guidelines
+## Pre-Development Checklist
 
-For each guideline file:
-
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
+- Read `AGENTS.md` and `CLAUDE.md`
+- Read this file
+- Read the specific backend docs that match the task
+- For cross-layer changes, also read `../guides/pre-implementation-checklist.md`
 
 ---
 
-**Language**: All documentation should be written in **English**.
+## Current Examples
+
+- Runtime orchestration: `apps/agent/orchestrator.py`
+- Typed pipeline contracts: `apps/agent/pipeline/types.py`
+- Budget guard logic: `apps/agent/runtime/budget_guard.py`
+- Ingestion normalization: `apps/agent/ingest/normalize.py`
+- Runtime tests: `tests/agent/test_orchestrator.py`
+- Validation scripts: `scripts/validate_artifacts.py`

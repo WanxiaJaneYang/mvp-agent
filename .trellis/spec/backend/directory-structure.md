@@ -1,54 +1,50 @@
 # Directory Structure
 
-> How backend code is organized in this project.
-
----
-
-## Overview
-
-<!--
-Document your project's backend directory structure here.
-
-Questions to answer:
-- How are modules/packages organized?
-- Where does business logic live?
-- Where are API endpoints defined?
-- How are utilities and helpers organized?
--->
-
-(To be filled by the team)
+> How backend code is organized in this project today.
 
 ---
 
 ## Directory Layout
 
-```
-<!-- Replace with your actual structure -->
-src/
-├── ...
-└── ...
+```text
+apps/
+  agent/
+    ingest/        # fetch/extract/normalize/dedup helpers
+    pipeline/      # shared run/stage types and pipeline helpers
+    retrieval/     # chunking and retrieval helpers
+    runtime/       # budget and cost tracking helpers
+    synthesis/     # synthesis post-processing
+    validators/    # citation and output validators
+    orchestrator.py
+tests/
+  agent/           # mirrors apps/agent structure
+scripts/           # validation entry points used by CI
+artifacts/
+  modelling/       # planned contracts, schemas, fixtures, backlog
+docs/plans/        # design and implementation plans
 ```
 
 ---
 
-## Module Organization
+## Organization Rules
 
-<!-- How should new features/modules be organized? -->
-
-(To be filled by the team)
-
----
-
-## Naming Conventions
-
-<!-- File and folder naming rules -->
-
-(To be filled by the team)
+- Add runtime code under the closest `apps/agent/<domain>/` package.
+- Add tests under the mirrored `tests/agent/<domain>/` location.
+- Put executable verification entry points in `scripts/`.
+- Put planned schema/persistence contracts in `artifacts/modelling/`, not inline comments or ad-hoc docs.
 
 ---
 
 ## Examples
 
-<!-- Link to well-organized modules as examples -->
+- `apps/agent/orchestrator.py` pairs with `tests/agent/test_orchestrator.py`
+- `apps/agent/runtime/budget_guard.py` pairs with `tests/agent/runtime/test_budget_guard.py`
+- `apps/agent/ingest/normalize.py` pairs with `tests/agent/ingest/test_normalize.py`
 
-(To be filled by the team)
+---
+
+## Anti-Patterns
+
+- Do not introduce a generic `src/` tree; this repo already uses `apps/agent/`.
+- Do not place runtime contracts only in `docs/`; mirror them in code and tests.
+- Do not add new top-level packages when an existing domain package already fits.

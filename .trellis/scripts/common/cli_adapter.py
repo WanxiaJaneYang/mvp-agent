@@ -287,6 +287,10 @@ class CLIAdapter:
         elif self.platform == "codex":
             cmd = ["codex", "exec"]
             cmd.append(prompt)
+        elif self.platform == "cursor":
+            raise ValueError(
+                "Cursor workflows are IDE-only; CLI agent run is not supported."
+            )
         elif self.platform == "kiro":
             cmd = ["kiro", "run", prompt]
         elif self.platform == "gemini":

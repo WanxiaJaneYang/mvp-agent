@@ -189,6 +189,12 @@ def _resolve_task_dir(target_dir: str, repo_root: Path) -> Path:
     return repo_root / target_dir
 
 
+def _current_task_matches_dir_name(current: str, dir_name: str) -> bool:
+    """Return True only when current task points at the exact task directory."""
+    normalized = current.replace("\\", "/").rstrip("/")
+    return normalized.split("/")[-1] == dir_name
+
+
 # =============================================================================
 # JSONL Default Content Generators
 # =============================================================================
@@ -308,9 +314,10 @@ def cmd_create(args: argparse.Namespace) -> int:
     task_json_path = task_dir / FILE_TASK_JSON
 
     if task_dir.exists():
-        print(colored(f"Warning: Task directory already exists: {dir_name}", Colors.YELLOW), file=sys.stderr)
-    else:
-        task_dir.mkdir(parents=True)
+        print(colored(f"Error: Task directory already exists: {dir_name}", Colors.RED), file=sys.stderr)
+        return 1
+
+    task_dir.mkdir(parents=True)
 
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -765,7 +772,7 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
     # Clear if current task
     current = get_current_task(repo_root)
-    if current and dir_name in current:
+    if current and _current_task_matches_dir_name(current, dir_name):
         clear_current_task(repo_root)
 
     # Archive

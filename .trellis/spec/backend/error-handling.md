@@ -1,51 +1,46 @@
 # Error Handling
 
-> How errors are handled in this project.
+> How errors are handled in the current Python codebase.
 
 ---
 
-## Overview
+## Rules
 
-<!--
-Document your project's error handling conventions here.
-
-Questions to answer:
-- What error types do you define?
-- How are errors propagated?
-- How are errors logged?
-- How are errors returned to clients?
--->
-
-(To be filled by the team)
+- Raise `ValueError` for invalid caller inputs or impossible local configuration.
+- Return typed status objects for expected pipeline outcomes.
+- Add file/path context when surfacing validation failures from scripts.
 
 ---
 
-## Error Types
+## Patterns
 
-<!-- Custom error classes/types -->
+### Raise for invalid inputs
 
-(To be filled by the team)
+Examples:
+- `apps/agent/runtime/budget_guard.py`
+- `apps/agent/orchestrator.py`
+
+Use exceptions when the caller passed invalid state and execution should stop immediately.
+
+### Return status for expected runtime outcomes
+
+Examples:
+- `apps/agent/pipeline/types.py`
+- `apps/agent/orchestrator.py`
+
+Use `RunStatus` or `StageResult` when failure/partial/budget-stop is part of the normal contract.
+
+### Preserve context in scripts
+
+Example:
+- `scripts/validate_artifacts.py`
+
+When wrapping parse/file errors, include the file path in the raised error.
 
 ---
 
-## Error Handling Patterns
+## Anti-Patterns
 
-<!-- Try-catch patterns, error propagation -->
-
-(To be filled by the team)
-
----
-
-## API Error Responses
-
-<!-- Standard error response format -->
-
-(To be filled by the team)
-
----
-
-## Common Mistakes
-
-<!-- Error handling mistakes your team has made -->
-
-(To be filled by the team)
+- Do not swallow errors and keep running silently.
+- Do not use exceptions for expected stage statuses that already have typed result objects.
+- Do not raise generic errors without enough context to identify the failing file or field.

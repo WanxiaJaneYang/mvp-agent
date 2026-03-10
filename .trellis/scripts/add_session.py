@@ -5,6 +5,7 @@ Add a new session to journal file and update index.md.
 
 Usage:
     python3 add_session.py --title "Title" --commit "hash" --summary "Summary"
+    python3 add_session.py --title "Title" --commit "hash" --auto-commit
     echo "content" | python3 add_session.py --title "Title" --commit "hash"
 """
 
@@ -24,7 +25,11 @@ from common.paths import (
     get_workspace_dir,
 )
 from common.developer import ensure_developer
-from common.config import get_session_commit_message, get_max_journal_lines
+from common.config import (
+    get_max_journal_lines,
+    get_session_auto_commit,
+    get_session_commit_message,
+)
 
 
 # =============================================================================
@@ -304,7 +309,7 @@ def add_session(
     commit: str = "-",
     summary: str = "(Add summary)",
     extra_content: str = "(Add details)",
-    auto_commit: bool = True,
+    auto_commit: bool | None = None,
 ) -> int:
     """Add a new session."""
     repo_root = get_repo_root()
@@ -321,6 +326,8 @@ def add_session(
         return 1
 
     max_lines = get_max_journal_lines(repo_root)
+    if auto_commit is None:
+        auto_commit = get_session_auto_commit(repo_root)
 
     index_file = dev_dir / "index.md"
     today = datetime.now().strftime("%Y-%m-%d")
@@ -400,8 +407,17 @@ def main() -> int:
     parser.add_argument("--commit", default="-", help="Comma-separated commit hashes")
     parser.add_argument("--summary", default="(Add summary)", help="Brief summary")
     parser.add_argument("--content-file", help="Path to file with detailed content")
-    parser.add_argument("--no-commit", action="store_true",
-                        help="Skip auto-commit of workspace changes")
+    commit_group = parser.add_mutually_exclusive_group()
+    commit_group.add_argument(
+        "--auto-commit",
+        action="store_true",
+        help="Auto-commit .trellis/workspace and .trellis/tasks after recording the session",
+    )
+    commit_group.add_argument(
+        "--no-commit",
+        action="store_true",
+        help="Do not auto-commit workspace changes after recording the session",
+    )
 
     args = parser.parse_args()
 
@@ -413,9 +429,15 @@ def main() -> int:
     elif not sys.stdin.isatty():
         extra_content = sys.stdin.read()
 
+    auto_commit: bool | None = None
+    if args.auto_commit:
+        auto_commit = True
+    elif args.no_commit:
+        auto_commit = False
+
     return add_session(
         args.title, args.commit, args.summary, extra_content,
-        auto_commit=not args.no_commit,
+        auto_commit=auto_commit,
     )
 
 
