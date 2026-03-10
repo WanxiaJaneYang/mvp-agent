@@ -34,6 +34,8 @@ from apps.agent.pipeline.types import (
     SourceRegistryEntry,
     SourceRow,
 )
+from apps.agent.runtime.budget_guard import BudgetCaps
+from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 
 
 class DailyBriefRunnerTests(unittest.TestCase):
@@ -193,10 +195,136 @@ class DailyBriefRunnerTests(unittest.TestCase):
             citation_rows = json.loads((artifact_dir / "citations.json").read_text(encoding="utf-8"))
             synthesis_bullets = json.loads((artifact_dir / "synthesis_bullets.json").read_text(encoding="utf-8"))
             bullet_citations = json.loads((artifact_dir / "bullet_citations.json").read_text(encoding="utf-8"))
+            run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
             self.assertIsInstance(citation_rows, list)
             self.assertEqual(citation_rows[0]["citation_id"], "cite_001")
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
             self.assertEqual(bullet_citations[0]["citation_id"], "cite_001")
+            self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
+            self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
+
+    def test_run_fixture_daily_brief_persists_budget_preflight_truthfully(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_budget_truth",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                budget_preflight={
+                    "hourly_spend_usd": 0.02,
+                    "daily_spend_usd": 0.50,
+                    "monthly_spend_usd": 20.0,
+                    "next_estimated_cost_usd": 0.01,
+                    "caps": BudgetCaps(),
+                    "windows": {
+                        "hourly": BudgetWindowSnapshot(
+                            window_start="2026-03-10T16:00:00Z",
+                            window_end="2026-03-10T16:59:59Z",
+                            cost_usd=0.02,
+                        ),
+                        "daily": BudgetWindowSnapshot(
+                            window_start="2026-03-10T00:00:00Z",
+                            window_end="2026-03-10T23:59:59Z",
+                            cost_usd=0.50,
+                        ),
+                        "monthly": BudgetWindowSnapshot(
+                            window_start="2026-03-01T00:00:00Z",
+                            window_end="2026-03-31T23:59:59Z",
+                            cost_usd=20.0,
+                        ),
+                    },
+                },
+            )
+
+            decision_record = json.loads(Path(result["decision_record_path"]).read_text(encoding="utf-8"))
+            run_summary = json.loads((Path(result["artifact_dir"]) / "run_summary.json").read_text(encoding="utf-8"))
+            html = Path(result["html_path"]).read_text(encoding="utf-8")
+
+        self.assertEqual(decision_record["budget_snapshot"]["hourly_spend_usd"], 0.03)
+        self.assertEqual(decision_record["budget_snapshot"]["daily_spend_usd"], 0.51)
+        self.assertEqual(decision_record["budget_snapshot"]["monthly_spend_usd"], 20.01)
+        self.assertTrue(decision_record["budget_snapshot"]["allowed"])
+        self.assertEqual(decision_record["guardrail_checks"]["budget_check"], "pass")
+        self.assertEqual(run_summary["budget_snapshot"]["hourly_spend_usd"], 0.03)
+        self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
+        self.assertIn("Budget: Pass", html)
+
+    def test_run_fixture_daily_brief_reports_diversity_failure_in_outputs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_path = Path(tmpdir) / "fixture_payloads.json"
+            fixture_path.write_text(
+                json.dumps(
+                    {
+                        "wsj_markets": [
+                            {
+                                "url": "https://example.test/wsj-only",
+                                "title": "Cooling growth draws focus",
+                                "published_at": "2026-03-10T15:15:00Z",
+                                "fetched_at": "2026-03-10T15:20:00Z",
+                                "summary": "Cooling growth becomes the focus.",
+                                "doc_type": "news",
+                                "language": "en",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                fixture_path=fixture_path,
+                run_id="run_fixture_diversity_fail",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+            decision_record = json.loads(Path(result["decision_record_path"]).read_text(encoding="utf-8"))
+            run_summary = json.loads((Path(result["artifact_dir"]) / "run_summary.json").read_text(encoding="utf-8"))
+            html = Path(result["html_path"]).read_text(encoding="utf-8")
+
+        self.assertEqual(result["status"], "abstained")
+        self.assertEqual(decision_record["guardrail_checks"]["diversity_check"], "fail")
+        self.assertEqual(run_summary["guardrail_checks"]["diversity_check"], "fail")
+        self.assertIn("Diversity: Fail", html)
+
+    def test_run_fixture_daily_brief_stops_before_stage_on_budget_preflight(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_budget_stop",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                budget_preflight={
+                    "hourly_spend_usd": 0.09,
+                    "daily_spend_usd": 0.50,
+                    "monthly_spend_usd": 20.0,
+                    "next_estimated_cost_usd": 0.02,
+                    "caps": BudgetCaps(),
+                    "windows": {
+                        "hourly": BudgetWindowSnapshot(
+                            window_start="2026-03-10T16:00:00Z",
+                            window_end="2026-03-10T16:59:59Z",
+                            cost_usd=0.09,
+                        ),
+                        "daily": BudgetWindowSnapshot(
+                            window_start="2026-03-10T00:00:00Z",
+                            window_end="2026-03-10T23:59:59Z",
+                            cost_usd=0.50,
+                        ),
+                        "monthly": BudgetWindowSnapshot(
+                            window_start="2026-03-01T00:00:00Z",
+                            window_end="2026-03-31T23:59:59Z",
+                            cost_usd=20.0,
+                        ),
+                    },
+                },
+            )
+
+            decision_record = json.loads(Path(result["decision_record_path"]).read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "stopped_budget")
+        self.assertEqual(result["pipeline_status"], "stopped_budget")
+        self.assertEqual(decision_record["guardrail_checks"]["budget_check"], "fail")
+        self.assertFalse(decision_record["budget_snapshot"]["allowed"])
+        self.assertIsNone(result["html_path"])
 
     def test_run_fixture_daily_brief_abstains_when_evidence_is_insufficient(self):
         with tempfile.TemporaryDirectory() as tmpdir:

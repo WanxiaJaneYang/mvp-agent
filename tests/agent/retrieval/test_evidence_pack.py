@@ -1,9 +1,102 @@
 import unittest
 
 from apps.agent.retrieval.evidence_pack import build_evidence_pack
+from apps.agent.retrieval.evidence_pack import build_evidence_pack_report
 
 
 class EvidencePackTests(unittest.TestCase):
+    def test_report_enforces_publisher_cap_when_alternatives_exist(self):
+        fts_rows = [
+            {
+                "chunk_id": "chunk_001",
+                "doc_id": "doc_001",
+                "text": "inflation inflation inflation",
+                "source_id": "src_reuters_a",
+                "publisher": "Reuters",
+                "published_at": "2026-03-10T10:00:00Z",
+                "credibility_tier": 2,
+            },
+            {
+                "chunk_id": "chunk_002",
+                "doc_id": "doc_002",
+                "text": "inflation inflation rates",
+                "source_id": "src_reuters_b",
+                "publisher": "Reuters",
+                "published_at": "2026-03-10T09:00:00Z",
+                "credibility_tier": 2,
+            },
+            {
+                "chunk_id": "chunk_003",
+                "doc_id": "doc_003",
+                "text": "inflation rates cooling",
+                "source_id": "src_reuters_c",
+                "publisher": "Reuters",
+                "published_at": "2026-03-10T08:00:00Z",
+                "credibility_tier": 2,
+            },
+            {
+                "chunk_id": "chunk_004",
+                "doc_id": "doc_004",
+                "text": "inflation update from fed",
+                "source_id": "src_fed",
+                "publisher": "Federal Reserve",
+                "published_at": "2026-03-10T07:00:00Z",
+                "credibility_tier": 1,
+            },
+            {
+                "chunk_id": "chunk_005",
+                "doc_id": "doc_005",
+                "text": "inflation update from bls",
+                "source_id": "src_bls",
+                "publisher": "BLS",
+                "published_at": "2026-03-10T06:00:00Z",
+                "credibility_tier": 1,
+            },
+            {
+                "chunk_id": "chunk_006",
+                "doc_id": "doc_006",
+                "text": "inflation update from ecb",
+                "source_id": "src_ecb",
+                "publisher": "ECB",
+                "published_at": "2026-03-10T05:00:00Z",
+                "credibility_tier": 1,
+            },
+        ]
+
+        report = build_evidence_pack_report(fts_rows=fts_rows, query_text="inflation", pack_size=5)
+
+        self.assertEqual(report["diversity_check"], "pass")
+        self.assertEqual(report["diversity_stats"]["max_publisher_pct"], 40.0)
+        self.assertEqual(sum(1 for item in report["items"] if item["publisher"] == "Reuters"), 2)
+
+    def test_report_flags_fail_when_candidate_pool_cannot_meet_diversity_rules(self):
+        fts_rows = [
+            {
+                "chunk_id": "chunk_001",
+                "doc_id": "doc_001",
+                "text": "inflation inflation inflation",
+                "source_id": "src_only_a",
+                "publisher": "Single Publisher",
+                "published_at": "2026-03-10T10:00:00Z",
+                "credibility_tier": 2,
+            },
+            {
+                "chunk_id": "chunk_002",
+                "doc_id": "doc_002",
+                "text": "inflation rates stay high",
+                "source_id": "src_only_b",
+                "publisher": "Single Publisher",
+                "published_at": "2026-03-10T09:00:00Z",
+                "credibility_tier": 2,
+            },
+        ]
+
+        report = build_evidence_pack_report(fts_rows=fts_rows, query_text="inflation", pack_size=2)
+
+        self.assertEqual(report["diversity_check"], "fail")
+        self.assertGreater(report["diversity_stats"]["max_publisher_pct"], 40.0)
+        self.assertTrue(any("publisher dominance" in note.lower() for note in report["notes"]))
+
     def test_orders_results_by_retrieval_score(self):
         fts_rows = [
             {

@@ -230,9 +230,11 @@ class RunContext:
     ended_at: str | None = None
     error_summary: str | None = None
     counters: RunCounters = field(default_factory=RunCounters)
+    budget_snapshot: dict[str, object] | None = None
+    budget_ledger_rows: list[dict[str, object]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "run_id": self.run_id,
             "run_type": self.run_type.value,
             "started_at": self.started_at,
@@ -249,6 +251,11 @@ class RunContext:
             "error_summary": self.error_summary,
             "created_at": self.started_at,
         }
+        if self.budget_snapshot is not None:
+            payload["budget_snapshot"] = dict(self.budget_snapshot)
+        if self.budget_ledger_rows:
+            payload["budget_ledger_rows"] = [dict(row) for row in self.budget_ledger_rows]
+        return payload
 
 
 @dataclass
@@ -278,6 +285,7 @@ class DailyBriefCorpusStageData:
 class DailyBriefSynthesisStageData:
     query_text: str
     evidence_pack_items: list[EvidencePackItem]
+    evidence_pack_report: dict[str, Any]
     citation_store: dict[str, CitationStoreEntry]
     stage8_result: CitationValidationResult
     final_result: FinalSynthesisResult

@@ -185,6 +185,45 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(lifecycle_events[-1]["status"], "stopped_budget")
         self.assertEqual(len(result["budget_ledger_rows"]), 3)
 
+    def test_budget_preflight_surfaces_decision_on_allowed_run(self):
+        result = run_pipeline(
+            run_id="run_preflight_allowed",
+            run_type=RunType.DAILY_BRIEF,
+            stages=[lambda context: StageResult(status=RunStatus.OK)],
+            recorder=lambda snapshot: None,
+            budget_preflight={
+                "hourly_spend_usd": 0.02,
+                "daily_spend_usd": 0.50,
+                "monthly_spend_usd": 20.0,
+                "next_estimated_cost_usd": 0.01,
+                "caps": BudgetCaps(),
+                "windows": {
+                    "hourly": BudgetWindowSnapshot(
+                        window_start="2026-03-10T09:00:00Z",
+                        window_end="2026-03-10T09:59:59Z",
+                        cost_usd=0.02,
+                    ),
+                    "daily": BudgetWindowSnapshot(
+                        window_start="2026-03-10T00:00:00Z",
+                        window_end="2026-03-10T23:59:59Z",
+                        cost_usd=0.50,
+                    ),
+                    "monthly": BudgetWindowSnapshot(
+                        window_start="2026-03-01T00:00:00Z",
+                        window_end="2026-03-31T23:59:59Z",
+                        cost_usd=20.0,
+                    ),
+                },
+            },
+        )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["budget_snapshot"]["hourly_spend_usd"], 0.03)
+        self.assertEqual(result["budget_snapshot"]["daily_spend_usd"], 0.51)
+        self.assertEqual(result["budget_snapshot"]["monthly_spend_usd"], 20.01)
+        self.assertTrue(result["budget_snapshot"]["allowed"])
+        self.assertEqual(len(result["budget_ledger_rows"]), 3)
+
 
 if __name__ == "__main__":
     unittest.main()
