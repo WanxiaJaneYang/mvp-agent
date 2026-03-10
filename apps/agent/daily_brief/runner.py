@@ -6,9 +6,16 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from smtplib import SMTP
 from typing import Any
 
+from apps.agent.delivery.email_sender import EmailDeliveryConfig, send_daily_brief_email
 from apps.agent.delivery.html_report import render_daily_brief_html
+from apps.agent.delivery.scheduler import (
+    DailyBriefSchedule,
+    compute_next_scheduled_run,
+    scheduled_local_date,
+)
 from apps.agent.ingest.dedup import classify_duplicate
 from apps.agent.ingest.extract import extract_payload
 from apps.agent.ingest.fetch import plan_fetch_items
@@ -118,6 +125,9 @@ def run_fixture_daily_brief(
     run_id: str = "run_daily_fixture",
     generated_at_utc: str | None = None,
     budget_preflight: Mapping[str, Any] | None = None,
+    delivery_schedule: DailyBriefSchedule | None = None,
+    email_config: EmailDeliveryConfig | None = None,
+    smtp_class: Any = SMTP,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -131,6 +141,9 @@ def run_fixture_daily_brief(
                 run_id=run_id,
                 generated_at_utc=timestamp,
                 context=context,
+                delivery_schedule=delivery_schedule,
+                email_config=email_config,
+                smtp_class=smtp_class,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -182,6 +195,9 @@ def run_daily_brief(
     run_id: str = "run_daily_live",
     generated_at_utc: str | None = None,
     budget_preflight: Mapping[str, Any] | None = None,
+    delivery_schedule: DailyBriefSchedule | None = None,
+    email_config: EmailDeliveryConfig | None = None,
+    smtp_class: Any = SMTP,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -196,6 +212,9 @@ def run_daily_brief(
                 generated_at_utc=timestamp,
                 context=context,
                 use_live_sources=True,
+                delivery_schedule=delivery_schedule,
+                email_config=email_config,
+                smtp_class=smtp_class,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -249,8 +268,20 @@ def _execute_daily_brief_slice(
     generated_at_utc: str,
     context: Any,
     use_live_sources: bool = False,
+    delivery_schedule: DailyBriefSchedule | None = None,
+    email_config: EmailDeliveryConfig | None = None,
+    smtp_class: Any = SMTP,
 ) -> dict[str, Any]:
     report_date = generated_at_utc[:10]
+    schedule = delivery_schedule or DailyBriefSchedule()
+    local_report_date = scheduled_local_date(
+        generated_at_utc=generated_at_utc,
+        schedule=schedule,
+    )
+    next_scheduled_run_at_utc = compute_next_scheduled_run(
+        now_utc=generated_at_utc,
+        schedule=schedule,
+    )
     input_data = prepare_daily_brief_inputs(
         fixture_path=fixture_path,
         generated_at_utc=generated_at_utc,
@@ -283,6 +314,16 @@ def _execute_daily_brief_slice(
         citation_store=synthesis_data.stage8_result["citation_store"],
         guardrail_checks=guardrail_checks,
     )
+    email_delivery = None
+    if email_config is not None:
+        email_delivery = send_daily_brief_email(
+            config=email_config,
+            report_date=local_report_date,
+            run_id=run_id,
+            html_body=output_path.read_text(encoding="utf-8"),
+            status_title="Abstained" if synthesis_data.final_result["status"] == "abstained" else "Validated",
+            smtp_class=smtp_class,
+        )
 
     decision_record = build_and_persist_decision_record(
         base_dir=base_dir,
@@ -321,6 +362,9 @@ def _execute_daily_brief_slice(
             "validation_attempts": synthesis_data.stage8_result["validation_attempts"],
             "max_validation_attempts": synthesis_data.stage8_result["max_validation_attempts"],
             "validation_retry_exhausted": synthesis_data.stage8_result["retry_exhausted"],
+            "scheduled_for_local_date": local_report_date,
+            "next_scheduled_run_at_utc": next_scheduled_run_at_utc,
+            "email_delivery": email_delivery,
             "budget_snapshot": budget_snapshot,
             "budget_ledger_rows": list(context.budget_ledger_rows),
             "guardrail_checks": guardrail_checks,
@@ -335,6 +379,9 @@ def _execute_daily_brief_slice(
         "artifact_dir": str(artifact_dir),
         "query_text": synthesis_data.query_text,
         "abstain_reason": synthesis_data.final_result.get("abstain_reason"),
+        "scheduled_for_local_date": local_report_date,
+        "next_scheduled_run_at_utc": next_scheduled_run_at_utc,
+        "email_delivery": email_delivery,
     }
 
 
@@ -901,7 +948,7 @@ def _persist_run_state(
     execution: Mapping[str, Any],
     pipeline_result: Mapping[str, Any],
 ) -> Path:
-    report_date = generated_at_utc[:10]
+    report_date = str(execution.get("scheduled_for_local_date") or generated_at_utc[:10])
     run_row = dict(pipeline_result)
     artifact_dir_value = execution.get("artifact_dir")
 
