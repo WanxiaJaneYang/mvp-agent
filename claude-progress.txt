@@ -451,3 +451,27 @@
 - Outcome: PASS (issue `#41` now has an executable retrieval helper that bridges indexed chunks to evidence-pack assembly)
 - Next single step:
   - Open PR for issue `#41`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
+
+[2026-03-10 Session 26] Extended eval harness for retrieval and abstain coverage
+- Created:
+  - `tests/evals/test_run_eval_suite.py`
+  - `evals/golden/case11.json`
+  - `evals/golden/case12.json`
+- Updated:
+  - `evals/run_eval_suite.py`
+  - `evals/README.md`
+  - `claude-progress.txt`
+- Implemented:
+  - multi-type eval dispatch for `citation`, `retrieval`, and `postprocess` cases
+  - retrieval golden coverage for evidence-pack ordering and pack-size bounds
+  - postprocess golden coverage for deterministic abstain output
+  - per-case exception handling so malformed eval inputs report failures instead of aborting the suite
+  - explicit README TODO for future chained `retrieval -> validation -> abstain` eval cases
+- Verification run + outcome:
+  - `python -m unittest tests.evals.test_run_eval_suite -v` -> PASS (6 tests)
+  - `python evals/run_eval_suite.py` -> PASS (12 golden cases)
+  - `python -m unittest discover -s tests -p "test_*.py" -v` -> PASS (78 tests)
+  - `python -m compileall -q apps tests scripts evals` -> PASS
+- Outcome: PASS (issue `#35` now has executable eval coverage beyond citation validation)
+- Next single step:
+  - Open PR for issue `#35`, perform reviewer pass, address findings if any, merge, and summarize the outcome on the issue
