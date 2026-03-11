@@ -6,14 +6,14 @@ Status: `PASSING`, `FAILING`, `IN_PROGRESS`
 
 - [PASSING] **A) source_registry.yaml** - Source definitions with credibility tiers, fetch intervals, paywall policies
 - [PASSING] **B) data_model.md** - SQLite schema (sources/documents/chunks/citations/portfolio/alerts/runs) + FTS plan
-- [PASSING] **C) pipeline.md** - Daily pipeline stages (fetch -> extract -> normalize -> chunk -> index -> retrieve -> synthesize -> validate -> deliver)
-- [PASSING] **D) citation_contract.md** - Citation format, validation rules, abstain behavior
+- [PASSING] **C) pipeline.md** - Daily pipeline stages (fetch -> extract -> normalize -> chunk -> index -> evidence build -> issue plan -> claim compose -> validate -> deliver)
+- [PASSING] **D) citation_contract.md** - Citation format, issue/claim grounding rules, abstain behavior
 - [PASSING] **E) alert_scoring.md** - v1 thresholds, rate limits, bundling policy
 - [PASSING] **F) backlog.json** - Build tickets with acceptance criteria (valid JSON)
 
 ## Validation & Testing
 
-- [PASSING] **G) Citation validator** - Validate every bullet has >=1 citation
+- [PASSING] **G) Citation validator** - Validate every delivered claim has citation coverage
 - [PASSING] **H) Budget guard** - Enforce daily/hourly/monthly caps
 - [PASSING] **I) Eval cases** - At least 10 golden test cases in `evals/`
 
@@ -31,7 +31,8 @@ Modelling phase complete when:
 - [FAILING] **S2) Retrieval memory for validated outputs** - Add embedding + retrieval flow for approved historical syntheses
 - [FAILING] **S3) Role-lane orchestration** - Add phased prompts/checks (research, risk, editorial, reviewer) in one runtime
 - [FAILING] **S4) Pre-delivery gate hardening** - Enforce deterministic fail/abstain gates for citation/paywall/diversity/budget
-- [FAILING] **S5) Operational report templates** - Standardize daily brief, event-risk brief, and portfolio-delta outputs
+- [IN_PROGRESS] **S5) Operational report templates** - Standardize issue-centered daily brief, event-risk brief, and portfolio-delta outputs
 - [FAILING] **S6) Reliability metrics** - Track citation failure, retry, abstain, budget-per-report, and latency-to-delivery
+- [IN_PROGRESS] **S7) Model-layer redesign** - Introduce provider-agnostic issue planner and claim composer contracts
 
 
