@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
-from zoneinfo import ZoneInfoNotFoundError
-
+from datetime import datetime, timedelta, timezone, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 FALLBACK_TIMEZONES = {
     "UTC": timezone.utc,
@@ -20,7 +18,7 @@ class DailyBriefSchedule:
     delivery_hour: int = 7
     delivery_minute: int = 5
 
-    def zone(self) -> ZoneInfo:
+    def zone(self) -> tzinfo:
         if not 0 <= self.delivery_hour <= 23:
             raise ValueError("delivery_hour must be between 0 and 23.")
         if not 0 <= self.delivery_minute <= 59:

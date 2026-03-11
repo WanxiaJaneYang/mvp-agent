@@ -3,8 +3,8 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from datetime import datetime, timezone
 from collections.abc import Iterable, Mapping
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -63,10 +63,16 @@ def build_evidence_pack_report(
     )
 
     selected_rows = _select_diverse_rows(scored_rows=scored_rows, pack_size=pack_size)
-    pack_rows = [_public_row(row=row, rank=index) for index, row in enumerate(selected_rows, start=1)]
+    pack_rows = [
+        _public_row(row=row, rank=index) for index, row in enumerate(selected_rows, start=1)
+    ]
     diversity_stats = _diversity_stats(pack_rows)
     violations = _diversity_violations(diversity_stats=diversity_stats)
-    notes = _diversity_notes(violations=violations, target_size=min(pack_size, len(scored_rows)), actual_size=len(pack_rows))
+    notes = _diversity_notes(
+        violations=violations,
+        target_size=min(pack_size, len(scored_rows)),
+        actual_size=len(pack_rows),
+    )
     return {
         "items": pack_rows,
         "diversity_check": _diversity_level(violations=violations, items=pack_rows),
@@ -84,7 +90,9 @@ def _keyword_score(*, text: str, query_terms: list[str]) -> float:
     return float(sum(tokens.count(term) for term in query_terms))
 
 
-def _matching_rows(*, fts_rows: Iterable[Mapping[str, Any]], query_terms: list[str]) -> list[dict[str, Any]]:
+def _matching_rows(
+    *, fts_rows: Iterable[Mapping[str, Any]], query_terms: list[str]
+) -> list[dict[str, Any]]:
     matching_rows: list[dict[str, Any]] = []
     for row in fts_rows:
         _validate_row(row)
@@ -116,7 +124,9 @@ def _score_rows(
             newest_timestamp=newest_timestamp,
         )
         credibility_score = _credibility_score(int(row["credibility_tier"]))
-        retrieval_score = round(float(match["keyword_score"]) * 0.5 + recency_score * 0.3 + credibility_score * 0.2, 6)
+        retrieval_score = round(
+            float(match["keyword_score"]) * 0.5 + recency_score * 0.3 + credibility_score * 0.2, 6
+        )
         scored_rows.append(
             {
                 "chunk_id": row["chunk_id"],
@@ -133,7 +143,9 @@ def _score_rows(
     return scored_rows
 
 
-def _select_diverse_rows(*, scored_rows: list[dict[str, Any]], pack_size: int) -> list[dict[str, Any]]:
+def _select_diverse_rows(
+    *, scored_rows: list[dict[str, Any]], pack_size: int
+) -> list[dict[str, Any]]:
     target_size = min(pack_size, len(scored_rows))
     if target_size <= 0:
         return []
@@ -252,11 +264,17 @@ def _diversity_notes(*, violations: Iterable[str], target_size: int, actual_size
             f"Evidence pack selected {actual_size} item(s) out of requested {target_size} after diversity filtering."
         )
     if "publisher_dominance" in violation_set:
-        notes.append("Publisher dominance cap could not be satisfied with the available evidence pool.")
+        notes.append(
+            "Publisher dominance cap could not be satisfied with the available evidence pool."
+        )
     if "tier_1_2_minimum" in violation_set:
-        notes.append("Tier 1/2 minimum share could not be satisfied with the available evidence pool.")
+        notes.append(
+            "Tier 1/2 minimum share could not be satisfied with the available evidence pool."
+        )
     if "tier_4_maximum" in violation_set:
-        notes.append("Tier 4 maximum share could not be satisfied with the available evidence pool.")
+        notes.append(
+            "Tier 4 maximum share could not be satisfied with the available evidence pool."
+        )
     return notes
 
 
@@ -274,7 +292,11 @@ def _published_timestamp(row: Mapping[str, Any]) -> float:
     if not published_at:
         return 0.0
     try:
-        return datetime.fromisoformat(str(published_at).replace("Z", "+00:00")).astimezone(timezone.utc).timestamp()
+        return (
+            datetime.fromisoformat(str(published_at).replace("Z", "+00:00"))
+            .astimezone(timezone.utc)
+            .timestamp()
+        )
     except ValueError as exc:
         raise ValueError(f"Invalid evidence-pack row published_at value: {published_at}") from exc
 
@@ -287,7 +309,9 @@ def _recency_score(
 ) -> float:
     if newest_timestamp <= oldest_timestamp:
         return 1.0
-    return round((published_timestamp - oldest_timestamp) / (newest_timestamp - oldest_timestamp), 6)
+    return round(
+        (published_timestamp - oldest_timestamp) / (newest_timestamp - oldest_timestamp), 6
+    )
 
 
 def _credibility_score(credibility_tier: int) -> float:

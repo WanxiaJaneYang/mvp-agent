@@ -20,7 +20,7 @@ def build_budget_ledger_rows(
     decision: BudgetDecision,
     windows: Mapping[str, BudgetWindowSnapshot],
 ) -> list[dict[str, object]]:
-    rows = []
+    rows: list[dict[str, object]] = []
     for window_type in ("hourly", "daily", "monthly"):
         window = windows[window_type]
         rows.append(

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-
 AlertCategory = Literal["policy", "macro_release", "corporate_event", "narrative_shift"]
 AlertDecisionBand = Literal["send", "bundle", "suppress"]
 

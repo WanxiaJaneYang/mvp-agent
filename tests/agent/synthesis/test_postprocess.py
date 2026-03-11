@@ -64,7 +64,9 @@ class SynthesisPostprocessTests(unittest.TestCase):
         validation_result = {
             "status": "partial",
             "synthesis": {
-                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+                "prevailing": [
+                    {"text": "[Insufficient evidence to support this claim]", "citation_ids": []}
+                ]
             },
             "report": {"removed_bullets": 1},
         }
@@ -79,7 +81,9 @@ class SynthesisPostprocessTests(unittest.TestCase):
         validation_result = {
             "status": "retry",
             "synthesis": {
-                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+                "prevailing": [
+                    {"text": "[Insufficient evidence to support this claim]", "citation_ids": []}
+                ]
             },
             "report": {
                 "removed_bullets": 4,
@@ -97,7 +101,9 @@ class SynthesisPostprocessTests(unittest.TestCase):
         validation_result = {
             "status": "retry",
             "synthesis": {
-                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+                "prevailing": [
+                    {"text": "[Insufficient evidence to support this claim]", "citation_ids": []}
+                ]
             },
             "report": {
                 "removed_bullets": 4,

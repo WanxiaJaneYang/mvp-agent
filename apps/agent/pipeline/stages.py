@@ -6,8 +6,7 @@ from apps.agent.pipeline.types import RunContext, RunStatus, StageResult
 
 
 class PipelineStage(Protocol):
-    def __call__(self, context: RunContext) -> StageResult:
-        ...
+    def __call__(self, context: RunContext) -> StageResult: ...
 
 
 def should_retry(result: StageResult) -> bool:

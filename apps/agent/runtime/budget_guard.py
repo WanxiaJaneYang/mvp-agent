@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Dict, List, Optional
 
 
@@ -93,4 +93,3 @@ def evaluate_budget_guard(
         projected_spend=projected,
         caps={k: float(v) for k, v in cap_map.items()},
     )
-

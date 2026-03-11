@@ -6,7 +6,6 @@ from typing import Literal
 
 from apps.agent.alerts.scoring import AlertCategory, AlertScoreInputs, AlertScoreResult, compute_alert_score
 
-
 AlertPolicyAction = Literal["send", "bundle", "suppress"]
 SuppressionReason = Literal[
     "below_threshold",

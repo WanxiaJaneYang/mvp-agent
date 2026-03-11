@@ -215,7 +215,9 @@ class DecisionRecordSchemaValidationTests(unittest.TestCase):
         errors = validate_decision_record(record)
         self.assertTrue(any("decision_rationale.summary" in error for error in errors))
         self.assertTrue(any("decision_rationale.key_drivers" in error for error in errors))
-        self.assertTrue(any("rejected_alternatives[].candidate_summary" in error for error in errors))
+        self.assertTrue(
+            any("rejected_alternatives[].candidate_summary" in error for error in errors)
+        )
         self.assertTrue(any("rejected_alternatives[].reason_code" in error for error in errors))
 
     def test_rejected_alternative_reason_code_must_be_allowed_enum(self):
