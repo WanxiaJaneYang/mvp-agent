@@ -137,6 +137,7 @@ Provider-backed demo modes:
 - `codex-oauth`
   - uses the local `codex login` session
   - does not require `OPENAI_API_KEY`
+  - can return `ok` or a validator-driven `abstained` result depending on model output quality
 
 The current provider-agnostic seam is covered in `tests/agent/daily_brief/test_runner.py` for both `run_fixture_daily_brief(...)` and `run_daily_brief(...)`.
 
