@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the deterministic daily-brief fixture slice.")
@@ -27,15 +29,34 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Recipient address for email delivery. Repeat for multiple recipients.",
     )
+    parser.add_argument(
+        "--provider",
+        choices=("deterministic", "openai"),
+        default="deterministic",
+        help="Daily-brief synthesis provider mode.",
+    )
+    parser.add_argument(
+        "--openai-model",
+        default=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+        help="OpenAI model name when --provider openai is used.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
+    from apps.agent.daily_brief.openai_runtime import build_openai_daily_brief_providers
     from apps.agent.daily_brief.runner import run_fixture_daily_brief
     from apps.agent.delivery.email_sender import EmailDeliveryConfig
     from apps.agent.delivery.scheduler import DailyBriefSchedule
 
     args = parse_args()
+    issue_planner = None
+    claim_composer = None
+    if args.provider == "openai":
+        try:
+            issue_planner, claim_composer = build_openai_daily_brief_providers(model=args.openai_model)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
     email_config = None
     if args.smtp_host or args.sender_email or args.recipient_email:
         if not args.smtp_host or not args.sender_email or not args.recipient_email:
@@ -57,6 +78,8 @@ def main() -> None:
             delivery_minute=args.delivery_minute,
         ),
         email_config=email_config,
+        issue_planner=issue_planner,
+        claim_composer=claim_composer,
     )
     print(json.dumps(result, indent=2))
     if result["status"] == "failed":
