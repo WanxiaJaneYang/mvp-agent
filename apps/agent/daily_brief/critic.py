@@ -6,7 +6,6 @@ from typing import Any
 from apps.agent.daily_brief.model_interfaces import CriticInput, CriticProvider
 from apps.agent.pipeline.types import CriticReport
 
-
 PARAPHRASE_VERBS = (
     " according to ",
     " reported ",

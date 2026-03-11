@@ -110,7 +110,10 @@ class DailyBriefCriticTests(unittest.TestCase):
                     "prevailing": [
                         {
                             "claim_id": "claim_prevailing",
-                            "text": "Softer growth is raising later-cut expectations without forcing an immediate pivot.",
+                            "text": (
+                                "Softer growth is raising later-cut expectations without "
+                                "forcing an immediate pivot."
+                            ),
                             "citation_ids": ["cite_001"],
                             "confidence_label": "medium",
                             "why_it_matters": "Rate-sensitive assets remain exposed to data surprises.",
@@ -150,10 +153,26 @@ class DailyBriefCriticTests(unittest.TestCase):
         report = review_brief_locally(
             synthesis=synthesis,
             citation_store={
-                "cite_001": {"publisher": "Reuters", "title": "Growth slows", "published_at": "2026-03-12T08:00:00Z"},
-                "cite_002": {"publisher": "Federal Reserve", "title": "Policy steady", "published_at": "2026-03-12T09:00:00Z"},
-                "cite_003": {"publisher": "WSJ", "title": "Sharper slowdown view", "published_at": "2026-03-12T10:00:00Z"},
-                "cite_004": {"publisher": "BLS", "title": "CPI release schedule", "published_at": "2026-03-12T11:00:00Z"},
+                "cite_001": {
+                    "publisher": "Reuters",
+                    "title": "Growth slows",
+                    "published_at": "2026-03-12T08:00:00Z",
+                },
+                "cite_002": {
+                    "publisher": "Federal Reserve",
+                    "title": "Policy steady",
+                    "published_at": "2026-03-12T09:00:00Z",
+                },
+                "cite_003": {
+                    "publisher": "WSJ",
+                    "title": "Sharper slowdown view",
+                    "published_at": "2026-03-12T10:00:00Z",
+                },
+                "cite_004": {
+                    "publisher": "BLS",
+                    "title": "CPI release schedule",
+                    "published_at": "2026-03-12T11:00:00Z",
+                },
             },
         )
 
