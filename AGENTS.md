@@ -24,13 +24,17 @@ Keep this managed block so 'trellis update' can refresh the instructions.
 ### Core workflow
 Use `explore -> plan -> code -> verify -> commit` for implementation tasks.
 
+### Delivery workflow
+Use `issue -> PR -> merge` as the default delivery path for all finalized work.
+This applies to design changes, planning documents, implementation work, and bug fixes.
+
 ### Operating standards
 1. Inspect repository state first (`git status`, current branch, pending local changes).
 2. Keep changes minimal and aligned with existing architecture and conventions.
 3. Run relevant validation for touched areas.
 4. Update docs when behavior, commands, or workflow changes.
 5. Summarize what changed, what was validated, and any residual risk.
-6. When a step is finalized, commit it and include it in a new MR (or the active MR) without leaving completed local-only work unpushed.
+6. When a step is finalized, make sure it is tracked through an issue first, then committed into a PR (or the active PR), and merged instead of leaving completed local-only work unpushed.
 7. For independent tasks that are unlikely to conflict, use separate branches and separate MRs instead of combining them in one MR.
 
 ### Repo-specific non-negotiables
