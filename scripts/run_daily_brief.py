@@ -30,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--provider",
-        choices=("deterministic", "openai"),
+        choices=("deterministic", "openai", "codex-oauth"),
         default="deterministic",
         help="Daily-brief synthesis provider mode.",
     )
@@ -43,19 +43,19 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    from apps.agent.daily_brief.openai_runtime import build_openai_daily_brief_providers
+    from apps.agent.daily_brief.provider_registry import build_daily_brief_providers
     from apps.agent.daily_brief.runner import run_daily_brief
     from apps.agent.delivery.email_sender import EmailDeliveryConfig
     from apps.agent.delivery.scheduler import DailyBriefSchedule
 
     args = parse_args()
-    issue_planner = None
-    claim_composer = None
-    if args.provider == "openai":
-        try:
-            issue_planner, claim_composer = build_openai_daily_brief_providers(model=args.openai_model)
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
+    try:
+        issue_planner, claim_composer = build_daily_brief_providers(
+            provider=args.provider,
+            openai_model=args.openai_model,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     email_config = None
     if args.smtp_host or args.sender_email or args.recipient_email:
         if not args.smtp_host or not args.sender_email or not args.recipient_email:
