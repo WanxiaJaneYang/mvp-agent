@@ -3,14 +3,14 @@ from __future__ import annotations
 import unittest
 from types import SimpleNamespace
 
-from apps.agent.daily_brief.openai_claim_composer import OpenAIClaimComposer
-from apps.agent.daily_brief.openai_issue_planner import OpenAIIssuePlanner
 from apps.agent.daily_brief.codex_runtime import (
-    CODEX_LOGIN_REQUIRED_MESSAGE,
     CODEX_CLI_REQUIRED_MESSAGE,
+    CODEX_LOGIN_REQUIRED_MESSAGE,
     CodexExecJsonClient,
     build_codex_daily_brief_providers,
 )
+from apps.agent.daily_brief.openai_claim_composer import OpenAIClaimComposer
+from apps.agent.daily_brief.openai_issue_planner import OpenAIIssuePlanner
 
 
 class CodexRuntimeTests(unittest.TestCase):
@@ -94,7 +94,10 @@ class CodexRuntimeTests(unittest.TestCase):
             runtime.create_json_response(
                 {
                     "task": "daily_brief_issue_planner",
-                    "response_format": {"type": "json_schema", "json_schema": {"name": "issue_map_list", "schema": {"type": "array"}}},
+                    "response_format": {
+                        "type": "json_schema",
+                        "json_schema": {"name": "issue_map_list", "schema": {"type": "array"}},
+                    },
                     "messages": [{"role": "user", "content": "Plan issues."}],
                     "input": {"evidence_pack": []},
                 }
