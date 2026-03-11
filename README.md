@@ -117,6 +117,13 @@ Run the deterministic fixture-backed daily brief slice:
 python scripts/run_daily_brief_fixture.py
 ```
 
+Run the fixture slice with real OpenAI issue planning and claim composition:
+
+```bash
+set OPENAI_API_KEY=...
+python scripts/run_daily_brief_fixture.py --provider openai --openai-model gpt-4o-mini
+```
+
 Run the fixture slice with the modeled Asia/Singapore schedule and email delivery:
 
 ```bash
