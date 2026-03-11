@@ -162,11 +162,18 @@ class DailyBriefBullet(TypedDict, total=False):
     confidence_label: str
     validator_action: str
     claim_span_citations: list[list[str]]
+    evidence: list["ClaimEvidenceItem"]
 
-
-class DailyBriefMeta(TypedDict):
+class DailyBriefMeta(TypedDict, total=False):
     status: str
     reason: str
+
+
+class ClaimEvidenceItem(TypedDict, total=False):
+    citation_id: str
+    publisher: str
+    published_at: str | None
+    support_text: str
 
 
 class IssueMap(TypedDict):
@@ -191,19 +198,21 @@ class StructuredClaim(TypedDict):
     why_it_matters: str
 
 
-class DailyBriefIssue(TypedDict):
+class DailyBriefIssue(TypedDict, total=False):
     issue_id: str
     issue_question: str
+    title: str
     summary: str
-    prevailing: list[StructuredClaim]
-    counter: list[StructuredClaim]
-    minority: list[StructuredClaim]
-    watch: list[StructuredClaim]
+    prevailing: list[DailyBriefBullet]
+    counter: list[DailyBriefBullet]
+    minority: list[DailyBriefBullet]
+    watch: list[DailyBriefBullet]
 
 
-class DailyBriefSynthesisV2(TypedDict):
+class DailyBriefSynthesisV2(TypedDict, total=False):
     issues: list[DailyBriefIssue]
     meta: DailyBriefMeta
+    changed: list[DailyBriefBullet]
 
 
 class DailyBriefSynthesis(TypedDict, total=False):
@@ -215,6 +224,9 @@ class DailyBriefSynthesis(TypedDict, total=False):
     meta: DailyBriefMeta
 
 
+ValidatedDailyBriefSynthesis = DailyBriefSynthesis | DailyBriefSynthesisV2
+
+
 class CitationValidationReport(TypedDict):
     total_bullets: int
     cited_bullets: int
@@ -222,13 +234,13 @@ class CitationValidationReport(TypedDict):
     validation_passed: bool
     should_retry: bool
     empty_core_sections: list[str]
-    synthesis: DailyBriefSynthesis
+    synthesis: ValidatedDailyBriefSynthesis
     citation_store: dict[str, CitationStoreEntry]
 
 
 class CitationValidationResult(TypedDict):
     status: CitationValidationStatus
-    synthesis: DailyBriefSynthesis
+    synthesis: ValidatedDailyBriefSynthesis
     citation_store: dict[str, CitationStoreEntry]
     report: CitationValidationReport
     validation_attempts: int
@@ -238,7 +250,7 @@ class CitationValidationResult(TypedDict):
 
 class FinalSynthesisResult(TypedDict):
     status: FinalSynthesisStatus
-    synthesis: DailyBriefSynthesis
+    synthesis: ValidatedDailyBriefSynthesis
     report: CitationValidationReport | None
     abstain_reason: str | None
 

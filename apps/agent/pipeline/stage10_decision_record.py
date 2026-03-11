@@ -40,6 +40,42 @@ def _normalize_section(section: str) -> str:
     return SECTION_ALIASES.get(section, section)
 
 
+def _iter_claim_bullets(synthesis: Mapping[str, Any]) -> list[dict[str, Any]]:
+    claims: list[dict[str, Any]] = []
+    issues = synthesis.get("issues")
+    if isinstance(issues, list):
+        for issue_index, issue in enumerate(issues):
+            if not isinstance(issue, Mapping):
+                continue
+            issue_id = issue.get("issue_id")
+            issue_title = issue.get("title") or issue.get("issue_question")
+            for section, bullets in issue.items():
+                if not isinstance(bullets, list):
+                    continue
+                for bullet in bullets:
+                    if not isinstance(bullet, Mapping):
+                        continue
+                    claims.append(
+                        {
+                            "section": str(section),
+                            "bullet": bullet,
+                            "issue_id": issue_id,
+                            "issue_title": issue_title,
+                            "issue_index": issue_index,
+                        }
+                    )
+        return claims
+
+    for section, bullets in synthesis.items():
+        if not isinstance(bullets, list):
+            continue
+        for bullet in bullets:
+            if not isinstance(bullet, Mapping):
+                continue
+            claims.append({"section": str(section), "bullet": bullet})
+    return claims
+
+
 def build_and_persist_decision_record(
     *,
     base_dir: Path,
@@ -59,28 +95,28 @@ def build_and_persist_decision_record(
 
     claims: list[dict[str, Any]] = []
     claim_counter = 1
-    for section, bullets in synthesis.items():
-        if not isinstance(bullets, list):
+    for claim_input in _iter_claim_bullets(synthesis):
+        bullet = claim_input["bullet"]
+        citation_ids = bullet.get("citation_ids")
+        if not isinstance(citation_ids, list):
+            citation_ids = []
+        claim: dict[str, Any] = {
+            "claim_id": f"c_{claim_counter:03d}",
+            "section": _normalize_section(str(claim_input["section"])),
+            "text": str(bullet.get("text", "")),
+            "citation_ids": citation_ids,
+            "coverage_status": "supported" if len(citation_ids) >= 1 else "insufficient_evidence",
+        }
+        if claim["section"] not in ALLOWED_CLAIM_SECTIONS:
             continue
-        for bullet in bullets:
-            if not isinstance(bullet, Mapping):
-                continue
-            citation_ids = bullet.get("citation_ids")
-            if not isinstance(citation_ids, list):
-                citation_ids = []
-            claim = {
-                "claim_id": f"c_{claim_counter:03d}",
-                "section": _normalize_section(str(section)),
-                "text": str(bullet.get("text", "")),
-                "citation_ids": citation_ids,
-                "coverage_status": "supported"
-                if len(citation_ids) >= 1
-                else "insufficient_evidence",
-            }
-            if claim["section"] not in ALLOWED_CLAIM_SECTIONS:
-                continue
-            claims.append(claim)
-            claim_counter += 1
+        if claim_input.get("issue_id") is not None:
+            claim["issue_id"] = str(claim_input["issue_id"])
+        if claim_input.get("issue_title") is not None:
+            claim["issue_title"] = str(claim_input["issue_title"])
+        if claim_input.get("issue_index") is not None:
+            claim["issue_index"] = int(claim_input["issue_index"])
+        claims.append(claim)
+        claim_counter += 1
 
     rejected_alternatives: list[dict[str, str]] = []
     if removed_bullets > 0:

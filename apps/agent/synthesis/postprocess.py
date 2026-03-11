@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import cast
+
 from apps.agent.pipeline.types import (
     CitationValidationResult,
     DailyBriefBullet,
-    DailyBriefSynthesis,
+    DailyBriefMeta,
+    DailyBriefSynthesisV2,
     FinalSynthesisResult,
 )
 
@@ -19,18 +22,25 @@ def _build_abstain_bullet() -> DailyBriefBullet:
     }
 
 
-def build_abstain_synthesis(*, reason: str) -> DailyBriefSynthesis:
-    synthesis: DailyBriefSynthesis = {
-        "prevailing": [_build_abstain_bullet()],
-        "counter": [_build_abstain_bullet()],
-        "minority": [_build_abstain_bullet()],
-        "watch": [_build_abstain_bullet()],
+def build_abstain_synthesis(*, reason: str) -> DailyBriefSynthesisV2:
+    return {
+        "issues": [
+            {
+                "issue_id": "issue_abstain",
+                "issue_question": "Insufficient evidence for a validated issue review",
+                "title": "Insufficient evidence for a validated issue review",
+                "summary": "The available evidence did not support a full literature review.",
+                "prevailing": [_build_abstain_bullet()],
+                "counter": [_build_abstain_bullet()],
+                "minority": [_build_abstain_bullet()],
+                "watch": [_build_abstain_bullet()],
+            }
+        ],
+        "meta": {
+            "status": "abstained",
+            "reason": reason,
+        },
     }
-    synthesis["meta"] = {
-        "status": "abstained",
-        "reason": reason,
-    }
-    return synthesis
 
 
 def finalize_validation_outcome(
@@ -56,9 +66,20 @@ def finalize_validation_outcome(
         raise ValueError("Validation retry policy must be exhausted before abstaining.")
 
     abstain_reason = "validation_retry_exhausted"
+    validated_synthesis = validation_result["synthesis"]
+    if isinstance(validated_synthesis.get("issues"), list):
+        abstained_synthesis = cast(DailyBriefSynthesisV2, dict(validated_synthesis))
+        current_meta = validated_synthesis.get("meta")
+        meta = dict(current_meta) if isinstance(current_meta, dict) else {}
+        meta["status"] = "abstained"
+        meta["reason"] = abstain_reason
+        abstained_synthesis["meta"] = cast(DailyBriefMeta, meta)
+        synthesis = abstained_synthesis
+    else:
+        synthesis = build_abstain_synthesis(reason=abstain_reason)
     return {
         "status": "abstained",
-        "synthesis": build_abstain_synthesis(reason=abstain_reason),
+        "synthesis": synthesis,
         "report": validation_result["report"],
         "abstain_reason": abstain_reason,
     }

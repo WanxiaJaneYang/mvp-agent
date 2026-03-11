@@ -7,10 +7,14 @@ from typing import Any
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_CORE_OUTPUT_SECTIONS,
     CitationStoreEntry,
+    ClaimEvidenceItem,
     DailyBriefBullet,
+    DailyBriefIssue,
     DailyBriefOutputSection,
     DailyBriefSynthesis,
+    DailyBriefSynthesisV2,
     EvidencePackItem,
+    IssueMap,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
     StructuredClaim,
@@ -161,7 +165,7 @@ def build_changed_section(
 
     changed: list[DailyBriefBullet] = []
     for section in DAILY_BRIEF_CORE_OUTPUT_SECTIONS:
-        current_bullet = _first_bullet(current_synthesis.get(section))
+        current_bullet = _first_synthesis_bullet(current_synthesis, section)
         if current_bullet is None:
             continue
 
@@ -169,7 +173,7 @@ def build_changed_section(
         if not current_text or current_text == INSUFFICIENT_EVIDENCE_TEXT:
             continue
 
-        previous_bullet = _first_bullet(previous_synthesis.get(section))
+        previous_bullet = _first_synthesis_bullet(previous_synthesis, section)
         previous_text = "" if previous_bullet is None else str(previous_bullet.get("text", "")).strip()
         if current_text == previous_text:
             continue
@@ -196,26 +200,86 @@ def build_changed_section(
 
 def build_synthesis_from_structured_claims(
     *,
+    issue_map: Iterable[IssueMap],
     structured_claims: Iterable[StructuredClaim],
-) -> DailyBriefSynthesis:
-    synthesis: DailyBriefSynthesis = {
-        "prevailing": [],
-        "counter": [],
-        "minority": [],
-        "watch": [],
-    }
+    citation_store: Mapping[str, CitationStoreEntry],
+) -> DailyBriefSynthesisV2:
+    claims_by_issue_id: dict[str, list[StructuredClaim]] = {}
     for claim in structured_claims:
-        claim_kind = claim["claim_kind"]
-        if claim_kind not in {"prevailing", "counter", "minority", "watch"}:
-            continue
-        synthesis[claim_kind].append(
-            DailyBriefBullet(
-                text=claim["claim_text"],
-                citation_ids=list(claim["supporting_citation_ids"]),
-                confidence_label=str(claim["confidence"]),
+        claims_by_issue_id.setdefault(str(claim["issue_id"]), []).append(claim)
+
+    issues: list[DailyBriefIssue] = []
+    for issue in issue_map:
+        issue_id = str(issue["issue_id"])
+        issue_claims = claims_by_issue_id.get(issue_id, [])
+        issues.append(
+            DailyBriefIssue(
+                issue_id=issue_id,
+                issue_question=str(issue["issue_question"]),
+                title=str(issue["issue_question"]),
+                summary=str(issue.get("thesis_hint") or issue["issue_question"]),
+                prevailing=_bullets_for_issue(issue_claims, "prevailing", citation_store),
+                counter=_bullets_for_issue(issue_claims, "counter", citation_store),
+                minority=_bullets_for_issue(issue_claims, "minority", citation_store),
+                watch=_bullets_for_issue(issue_claims, "watch", citation_store),
             )
         )
-    return synthesis
+
+    return DailyBriefSynthesisV2(
+        issues=issues,
+        meta={"status": "validated"},
+    )
+
+
+def _bullets_for_issue(
+    issue_claims: Iterable[StructuredClaim],
+    claim_kind: str,
+    citation_store: Mapping[str, CitationStoreEntry],
+) -> list[DailyBriefBullet]:
+    bullets: list[DailyBriefBullet] = []
+    for claim in issue_claims:
+        if claim["claim_kind"] != claim_kind:
+            continue
+        supporting_citation_ids = list(claim["supporting_citation_ids"])
+        bullet: DailyBriefBullet = {
+            "text": str(claim["claim_text"]),
+            "citation_ids": supporting_citation_ids,
+            "confidence_label": str(claim["confidence"]),
+        }
+        evidence = _build_evidence_items(
+            citation_ids=supporting_citation_ids,
+            citation_store=citation_store,
+        )
+        if evidence:
+            bullet["evidence"] = evidence
+        bullets.append(bullet)
+    return bullets
+
+
+def _build_evidence_items(
+    *,
+    citation_ids: Iterable[str],
+    citation_store: Mapping[str, CitationStoreEntry],
+) -> list[ClaimEvidenceItem]:
+    evidence: list[ClaimEvidenceItem] = []
+    for citation_id in citation_ids:
+        citation = citation_store.get(str(citation_id))
+        if citation is None:
+            continue
+        evidence.append(
+            ClaimEvidenceItem(
+                citation_id=str(citation_id),
+                publisher=str(citation.get("publisher") or ""),
+                published_at=citation.get("published_at"),
+                support_text=str(
+                    citation.get("snippet_text")
+                    or citation.get("quote_text")
+                    or citation.get("title")
+                    or ""
+                ),
+            )
+        )
+    return evidence
 
 
 def _sorted_evidence_items(evidence_items: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -560,6 +624,18 @@ def _first_bullet(raw_bullets: Any) -> Mapping[str, Any] | None:
     if not isinstance(bullet, Mapping):
         return None
     return bullet
+
+
+def _first_synthesis_bullet(
+    synthesis: Mapping[str, Any],
+    section: DailyBriefOutputSection,
+) -> Mapping[str, Any] | None:
+    issue_items = synthesis.get("issues")
+    if isinstance(issue_items, list) and issue_items:
+        first_issue = issue_items[0]
+        if isinstance(first_issue, Mapping):
+            return _first_bullet(first_issue.get(section))
+    return _first_bullet(synthesis.get(section))
 
 
 def _build_changed_bullet_text(*, section: str, current_text: str, previous_text: str) -> str:

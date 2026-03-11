@@ -6,6 +6,84 @@ from apps.agent.delivery.html_report import render_daily_brief_html
 
 
 class HtmlReportTests(unittest.TestCase):
+    def test_render_daily_brief_html_renders_issue_centered_review_with_evidence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
+
+            result = render_daily_brief_html(
+                output_path=output_path,
+                report_date="2026-03-10",
+                run_id="run_daily_fixture",
+                synthesis={
+                    "issues": [
+                        {
+                            "issue_id": "issue_001",
+                            "issue_question": "Will oil prices keep rising over the next few weeks?",
+                            "summary": (
+                                "The evidence is split between short-term supply pressure "
+                                "and softer demand expectations."
+                            ),
+                            "prevailing": [
+                                {
+                                    "text": "The prevailing argument emphasizes near-term supply pressure.",
+                                    "citation_ids": ["cite_001"],
+                                    "evidence": [
+                                        {
+                                            "citation_id": "cite_001",
+                                            "publisher": "Reuters",
+                                            "published_at": "2026-03-10T14:00:00Z",
+                                            "support_text": "Supply disruptions stayed in focus for oil traders.",
+                                        }
+                                    ],
+                                }
+                            ],
+                            "counter": [
+                                {
+                                    "text": "The main counterargument stresses softer demand expectations.",
+                                    "citation_ids": ["cite_002"],
+                                    "evidence": [
+                                        {
+                                            "citation_id": "cite_002",
+                                            "publisher": "Wall Street Journal",
+                                            "published_at": "2026-03-10T15:00:00Z",
+                                            "support_text": "Demand concerns may cap the rally.",
+                                        }
+                                    ],
+                                }
+                            ],
+                            "minority": [
+                                {
+                                    "text": "A minority view looks further out.",
+                                    "citation_ids": ["cite_003"],
+                                    "evidence": [],
+                                }
+                            ],
+                            "watch": [
+                                {
+                                    "text": "Watch OPEC guidance next week.",
+                                    "citation_ids": ["cite_004"],
+                                    "evidence": [],
+                                }
+                            ],
+                        }
+                    ]
+                },
+                citation_store={
+                    "cite_001": {"title": "Reuters oil item", "url": "https://example.test/reuters"},
+                    "cite_002": {"title": "WSJ oil item", "url": "https://example.test/wsj"},
+                    "cite_003": {"title": "Fed oil item", "url": "https://example.test/fed"},
+                    "cite_004": {"title": "BEA oil item", "url": "https://example.test/bea"},
+                },
+            )
+
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertEqual(result, output_path)
+        self.assertIn("Will oil prices keep rising over the next few weeks?", html)
+        self.assertIn("What to Watch", html)
+        self.assertIn("Supply disruptions stayed in focus for oil traders.", html)
+        self.assertIn("https://example.test/reuters", html)
+
     def test_render_daily_brief_html_writes_core_sections_and_citations(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"

@@ -32,6 +32,67 @@ class CitationValidatorTests(unittest.TestCase):
             citation["snippet_text"] = snippet_text
         return citation
 
+    def test_issue_centered_synthesis_with_no_issues_triggers_retry(self):
+        report = validate_synthesis({"issues": []}, {})
+
+        self.assertTrue(report.should_retry)
+        self.assertIn("issues", report.empty_core_sections)
+
+    def test_issue_centered_synthesis_validates_nested_arguments_and_preserves_shape(self):
+        synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will oil prices keep rising?",
+                    "summary": "The market is split over near-term supply pressure.",
+                    "prevailing": [{"text": "Supply risks support more upside.", "citation_ids": ["c1"]}],
+                    "counter": [{"text": "Demand may soften soon.", "citation_ids": ["c2"]}],
+                    "minority": [{"text": "Long-term upside may outlast the short-term move.", "citation_ids": ["c3"]}],
+                    "watch": [{"text": "Watch inventory data.", "citation_ids": ["c4"]}],
+                }
+            ],
+            "metadata": {"generated_at": "2026-03-11T00:00:00Z"},
+        }
+        store = {
+            "c1": self._citation("c1", url="https://source1.example/doc"),
+            "c2": self._citation("c2", url="https://source2.example/doc"),
+            "c3": self._citation("c3", url="https://source3.example/doc"),
+            "c4": self._citation("c4", url="https://source4.example/doc"),
+        }
+
+        report = validate_synthesis(synthesis, store)
+
+        self.assertTrue(report.validation_passed)
+        self.assertEqual(report.removed_bullets, 0)
+        self.assertEqual(report.synthesis["issues"][0]["issue_id"], "issue_001")
+        self.assertEqual(report.synthesis["issues"][0]["prevailing"][0]["citation_ids"], ["c1"])
+        self.assertEqual(report.synthesis["metadata"], synthesis["metadata"])
+
+    def test_issue_centered_synthesis_retries_when_issue_loses_required_section(self):
+        synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will oil prices keep rising?",
+                    "summary": "The market is split over near-term supply pressure.",
+                    "prevailing": [{"text": "Supply risks support more upside.", "citation_ids": []}],
+                    "counter": [{"text": "Demand may soften soon.", "citation_ids": ["c2"]}],
+                    "minority": [{"text": "Long-term upside may outlast the short-term move.", "citation_ids": ["c3"]}],
+                    "watch": [{"text": "Watch inventory data.", "citation_ids": ["c4"]}],
+                }
+            ]
+        }
+        store = {
+            "c2": self._citation("c2", url="https://source2.example/doc"),
+            "c3": self._citation("c3", url="https://source3.example/doc"),
+            "c4": self._citation("c4", url="https://source4.example/doc"),
+        }
+
+        report = validate_synthesis(synthesis, store, replace_with_placeholder=False)
+
+        self.assertTrue(report.should_retry)
+        self.assertIn("issue_001.prevailing", report.empty_core_sections)
+
     def test_valid_core_sections_pass_without_removals(self):
         synthesis = {
             "prevailing": [{"text": "Fed held rates.", "citation_ids": ["c1"]}],

@@ -12,32 +12,40 @@ class SynthesisPostprocessTests(unittest.TestCase):
         self.assertEqual(
             synthesis,
             {
-                "prevailing": [
+                "issues": [
                     {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
-                    }
-                ],
-                "counter": [
-                    {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
-                    }
-                ],
-                "minority": [
-                    {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
-                    }
-                ],
-                "watch": [
-                    {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
+                        "issue_id": "issue_abstain",
+                        "issue_question": "Insufficient evidence for a validated issue review",
+                        "title": "Insufficient evidence for a validated issue review",
+                        "summary": "The available evidence did not support a full literature review.",
+                        "prevailing": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
+                        "counter": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
+                        "minority": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
+                        "watch": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
                     }
                 ],
                 "meta": {

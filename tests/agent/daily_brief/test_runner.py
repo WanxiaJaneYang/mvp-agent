@@ -233,8 +233,11 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(synthesis.stage8_result["status"], "ok")
         self.assertEqual(synthesis.stage8_result["validation_attempts"], 2)
         self.assertFalse(synthesis.stage8_result["retry_exhausted"])
-        self.assertEqual(synthesis.final_result["synthesis"]["counter"][0]["citation_ids"], ["cite_005"])
-        self.assertNotIn("meta", synthesis.final_result["synthesis"])
+        self.assertEqual(
+            synthesis.final_result["synthesis"]["issues"][0]["counter"][0]["citation_ids"],
+            ["cite_005"],
+        )
+        self.assertEqual(synthesis.final_result["synthesis"]["meta"]["status"], "validated")
 
     def test_build_daily_brief_synthesis_retries_once_before_returning_validated_output(self):
         stage_inputs = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
@@ -490,8 +493,11 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertGreater(len(synthesis.evidence_pack_items), 0)
         self.assertIn(synthesis.final_result["status"], {"ok", "abstained"})
         self.assertGreater(len(synthesis.synthesis_bullet_rows), 0)
-        self.assertIsInstance(synthesis.final_result["synthesis"]["prevailing"][0], dict)
-        self.assertIn("citation_ids", synthesis.final_result["synthesis"]["prevailing"][0])
+        self.assertIsInstance(synthesis.final_result["synthesis"]["issues"][0]["prevailing"][0], dict)
+        self.assertIn(
+            "citation_ids",
+            synthesis.final_result["synthesis"]["issues"][0]["prevailing"][0],
+        )
 
     def test_load_active_fixture_payloads_filters_to_runtime_subset(self):
         fixture_payloads = {
@@ -613,7 +619,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
             self.assertEqual(
                 bullet_citations[0]["citation_id"],
-                synthesis_payload["prevailing"][0]["citation_ids"][0],
+                synthesis_payload["issues"][0]["prevailing"][0]["citation_ids"][0],
             )
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
