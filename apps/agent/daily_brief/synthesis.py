@@ -13,6 +13,7 @@ from apps.agent.pipeline.types import (
     EvidencePackItem,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
+    StructuredClaim,
 )
 
 WATCH_KEYWORDS = (
@@ -191,6 +192,30 @@ def build_changed_section(
             break
 
     return changed
+
+
+def build_synthesis_from_structured_claims(
+    *,
+    structured_claims: Iterable[StructuredClaim],
+) -> DailyBriefSynthesis:
+    synthesis: DailyBriefSynthesis = {
+        "prevailing": [],
+        "counter": [],
+        "minority": [],
+        "watch": [],
+    }
+    for claim in structured_claims:
+        claim_kind = claim["claim_kind"]
+        if claim_kind not in {"prevailing", "counter", "minority", "watch"}:
+            continue
+        synthesis[claim_kind].append(
+            DailyBriefBullet(
+                text=claim["claim_text"],
+                citation_ids=list(claim["supporting_citation_ids"]),
+                confidence_label=str(claim["confidence"]),
+            )
+        )
+    return synthesis
 
 
 def _sorted_evidence_items(evidence_items: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:

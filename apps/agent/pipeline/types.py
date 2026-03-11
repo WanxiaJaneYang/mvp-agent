@@ -338,6 +338,8 @@ class DailyBriefSynthesisStageData:
     query_text: str
     evidence_pack_items: list[EvidencePackItem]
     evidence_pack_report: dict[str, Any]
+    issue_map: list[IssueMap]
+    structured_claims: list[StructuredClaim]
     citation_store: dict[str, CitationStoreEntry]
     stage8_result: CitationValidationResult
     final_result: FinalSynthesisResult
