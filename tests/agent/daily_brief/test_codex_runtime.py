@@ -55,7 +55,15 @@ class CodexRuntimeTests(unittest.TestCase):
         def _runner(command, **kwargs):
             captured["command"] = command
             captured["kwargs"] = kwargs
-            return SimpleNamespace(returncode=0, stdout='[{"issue_id":"issue_001"}]\n', stderr="")
+            return SimpleNamespace(
+                returncode=0,
+                stdout=(
+                    '{"type":"thread.started","thread_id":"thread_001"}\n'
+                    '{"type":"item.completed","item":{"id":"item_001","type":"agent_message","text":"[{\\"issue_id\\":\\"issue_001\\"}]"}}\n'
+                    '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n'
+                ),
+                stderr="",
+            )
 
         runtime = CodexExecJsonClient(
             runner=_runner,
@@ -89,10 +97,10 @@ class CodexRuntimeTests(unittest.TestCase):
         self.assertEqual(payload, '[{"issue_id":"issue_001"}]')
         self.assertEqual(
             captured["command"][:4],
-            [r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd", "exec", "--json", "--output-last-message"],
+            [r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd", "exec", "--json", "-"],
         )
-        self.assertIn("daily_brief_issue_planner", captured["command"][4])
-        self.assertIn("json_schema", captured["command"][4])
+        self.assertIn("daily_brief_issue_planner", captured["kwargs"]["input"])
+        self.assertIn("json_schema", captured["kwargs"]["input"])
         self.assertEqual(captured["kwargs"]["timeout"], 12.5)
         self.assertTrue(captured["kwargs"]["text"])
         self.assertTrue(captured["kwargs"]["capture_output"])

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
 import subprocess
 from collections.abc import Callable, Mapping
 from json import JSONDecodeError
+from pathlib import Path
 from typing import Any, cast
 
 from apps.agent.daily_brief.model_interfaces import ClaimComposerInput, ClaimComposerProvider, IssuePlannerProvider
@@ -42,9 +42,10 @@ class CodexExecJsonClient:
         )
         try:
             completed = self._runner(
-                [resolved_executable, "exec", "--json", "--output-last-message", prompt],
+                [resolved_executable, "exec", "--json", "-"],
                 capture_output=True,
                 text=True,
+                input=prompt,
                 timeout=self._timeout_seconds,
                 check=False,
             )
@@ -171,6 +172,20 @@ def _build_exec_prompt(*, request_payload: Mapping[str, Any]) -> str:
 
 
 def _extract_last_message(stdout: str) -> str:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if len(lines) > 1:
+        for line in reversed(lines):
+            try:
+                parsed_line = json.loads(line)
+            except JSONDecodeError:
+                continue
+            if isinstance(parsed_line, Mapping) and parsed_line.get("type") == "item.completed":
+                item = parsed_line.get("item")
+                if isinstance(item, Mapping) and item.get("type") == "agent_message":
+                    text = item.get("text")
+                    if isinstance(text, str) and text.strip():
+                        return text.strip()
+
     try:
         parsed = json.loads(stdout)
     except JSONDecodeError:
