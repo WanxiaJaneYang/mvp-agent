@@ -124,6 +124,13 @@ set OPENAI_API_KEY=...
 python scripts/run_daily_brief_fixture.py --provider openai --openai-model gpt-4o-mini
 ```
 
+Provider-backed demo status:
+- available today: the fixture and live runners both accept injected `issue_planner` / `claim_composer` providers, and the CLI exposes `--provider openai`
+- pending for the codex-oauth demo path: a codex runtime/factory module plus CLI wiring in `scripts/run_daily_brief_fixture.py` and `scripts/run_daily_brief.py` to expose a provider mode such as `codex-oauth`
+- merge dependency for issue `#118`: land the codex provider registry/runtime pieces first, then point the README demo command at that new provider mode without changing the runner seam
+
+The current provider-agnostic seam is covered in `tests/agent/daily_brief/test_runner.py` for both `run_fixture_daily_brief(...)` and `run_daily_brief(...)`.
+
 Run the fixture slice with the modeled Asia/Singapore schedule and email delivery:
 
 ```bash

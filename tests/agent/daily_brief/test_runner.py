@@ -1362,7 +1362,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 issue_planner=_Planner(),
             )
 
-    def test_run_fixture_daily_brief_forwards_providers_to_execute_slice(self):
+    def test_run_fixture_daily_brief_forwards_opaque_provider_objects_to_execute_slice(self):
         class _Planner(IssuePlannerProvider):
             def plan_issues(self, *, brief_input):
                 return []
@@ -1375,6 +1375,9 @@ class DailyBriefRunnerTests(unittest.TestCase):
             def review_brief(self, *, brief_input):
                 return {"status": "pass", "reason_codes": [], "flagged_claim_ids": []}
 
+        planner = _Planner()
+        composer = _Composer()
+        critic = _Critic()
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch("apps.agent.daily_brief.runner._execute_daily_brief_slice") as execute_mock:
                 execute_mock.return_value = {
@@ -1392,14 +1395,56 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 run_fixture_daily_brief(
                     base_dir=Path(temp_dir),
                     generated_at_utc="2026-03-10T16:00:00Z",
-                    issue_planner=_Planner(),
-                    claim_composer=_Composer(),
-                    critic=_Critic(),
+                    issue_planner=planner,
+                    claim_composer=composer,
+                    critic=critic,
                 )
 
-        self.assertIsInstance(execute_mock.call_args.kwargs["issue_planner"], _Planner)
-        self.assertIsInstance(execute_mock.call_args.kwargs["claim_composer"], _Composer)
-        self.assertIsInstance(execute_mock.call_args.kwargs["critic"], _Critic)
+        self.assertIs(execute_mock.call_args.kwargs["issue_planner"], planner)
+        self.assertIs(execute_mock.call_args.kwargs["claim_composer"], composer)
+        self.assertIs(execute_mock.call_args.kwargs["critic"], critic)
+
+    def test_run_daily_brief_forwards_opaque_provider_objects_to_execute_slice(self):
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                return []
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                return []
+
+        class _Critic(CriticProvider):
+            def review_brief(self, *, brief_input):
+                return {"status": "pass", "reason_codes": [], "flagged_claim_ids": []}
+
+        planner = _Planner()
+        composer = _Composer()
+        critic = _Critic()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("apps.agent.daily_brief.runner._execute_daily_brief_slice") as execute_mock:
+                execute_mock.return_value = {
+                    "status": "ok",
+                    "html_path": str(Path(temp_dir) / "brief.html"),
+                    "decision_record_path": str(Path(temp_dir) / "decision_record.json"),
+                    "artifact_dir": str(Path(temp_dir) / "artifacts"),
+                    "query_text": "inflation growth",
+                    "abstain_reason": None,
+                    "scheduled_for_local_date": "2026-03-11",
+                    "next_scheduled_run_at_utc": "2026-03-12T00:00:00Z",
+                    "email_delivery": None,
+                }
+
+                run_daily_brief(
+                    base_dir=Path(temp_dir),
+                    generated_at_utc="2026-03-10T16:00:00Z",
+                    issue_planner=planner,
+                    claim_composer=composer,
+                    critic=critic,
+                )
+
+        self.assertIs(execute_mock.call_args.kwargs["issue_planner"], planner)
+        self.assertIs(execute_mock.call_args.kwargs["claim_composer"], composer)
+        self.assertIs(execute_mock.call_args.kwargs["critic"], critic)
 
     def test_build_daily_brief_synthesis_calls_critic_after_validation(self):
         class _Critic(CriticProvider):
