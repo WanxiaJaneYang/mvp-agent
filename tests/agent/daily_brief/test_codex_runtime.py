@@ -8,12 +8,21 @@ from apps.agent.daily_brief.codex_runtime import (
     CODEX_LOGIN_REQUIRED_MESSAGE,
     CodexExecJsonClient,
     build_codex_daily_brief_providers,
+    resolve_codex_executable,
 )
 from apps.agent.daily_brief.openai_claim_composer import OpenAIClaimComposer
 from apps.agent.daily_brief.openai_issue_planner import OpenAIIssuePlanner
 
 
 class CodexRuntimeTests(unittest.TestCase):
+    def test_resolve_codex_executable_prefers_discovered_windows_launcher_path(self) -> None:
+        resolved = resolve_codex_executable(
+            executable="codex",
+            which_resolver=lambda name: r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd" if name == "codex" else None,
+        )
+
+        self.assertEqual(resolved, r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd")
+
     def test_build_codex_daily_brief_providers_requires_codex_cli(self) -> None:
         with self.assertRaisesRegex(ValueError, CODEX_CLI_REQUIRED_MESSAGE):
             build_codex_daily_brief_providers(
@@ -48,7 +57,11 @@ class CodexRuntimeTests(unittest.TestCase):
             captured["kwargs"] = kwargs
             return SimpleNamespace(returncode=0, stdout='[{"issue_id":"issue_001"}]\n', stderr="")
 
-        runtime = CodexExecJsonClient(runner=_runner, timeout_seconds=12.5)
+        runtime = CodexExecJsonClient(
+            runner=_runner,
+            timeout_seconds=12.5,
+            which_resolver=lambda _name: r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd",
+        )
 
         payload = runtime.create_json_response(
             {
@@ -74,12 +87,34 @@ class CodexRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(payload, '[{"issue_id":"issue_001"}]')
-        self.assertEqual(captured["command"][:4], ["codex", "exec", "--json", "--output-last-message"])
+        self.assertEqual(
+            captured["command"][:4],
+            [r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd", "exec", "--json", "--output-last-message"],
+        )
         self.assertIn("daily_brief_issue_planner", captured["command"][4])
         self.assertIn("json_schema", captured["command"][4])
         self.assertEqual(captured["kwargs"]["timeout"], 12.5)
         self.assertTrue(captured["kwargs"]["text"])
         self.assertTrue(captured["kwargs"]["capture_output"])
+
+    def test_codex_exec_runtime_raises_provider_specific_error_on_file_not_found(self) -> None:
+        runtime = CodexExecJsonClient(
+            runner=lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("codex")),
+            which_resolver=lambda _name: None,
+        )
+
+        with self.assertRaisesRegex(ValueError, CODEX_CLI_REQUIRED_MESSAGE):
+            runtime.create_json_response(
+                {
+                    "task": "daily_brief_issue_planner",
+                    "response_format": {
+                        "type": "json_schema",
+                        "json_schema": {"name": "issue_map_list", "schema": {"type": "array"}},
+                    },
+                    "messages": [{"role": "user", "content": "Plan issues."}],
+                    "input": {"evidence_pack": []},
+                }
+            )
 
     def test_codex_exec_runtime_rejects_failed_command(self) -> None:
         runtime = CodexExecJsonClient(

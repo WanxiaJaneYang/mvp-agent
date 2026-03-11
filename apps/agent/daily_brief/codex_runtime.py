@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+import shutil
 import subprocess
 from collections.abc import Callable, Mapping
 from json import JSONDecodeError
@@ -15,6 +17,7 @@ CODEX_CLI_REQUIRED_MESSAGE = "Codex runtime requires the `codex` CLI to be insta
 CODEX_LOGIN_REQUIRED_MESSAGE = "Codex runtime requires an active `codex login` session."
 
 CodexRunner = Callable[..., subprocess.CompletedProcess[str] | Any]
+WhichResolver = Callable[[str], str | None]
 
 
 class CodexExecJsonClient:
@@ -23,21 +26,30 @@ class CodexExecJsonClient:
         *,
         runner: CodexRunner | None = None,
         executable: str = CODEX_EXECUTABLE,
+        which_resolver: WhichResolver | None = None,
         timeout_seconds: float = 60.0,
     ) -> None:
         self._runner = runner or subprocess.run
         self._executable = executable
+        self._which_resolver = which_resolver or shutil.which
         self._timeout_seconds = timeout_seconds
 
     def create_json_response(self, request_payload: Mapping[str, Any]) -> str:
         prompt = _build_exec_prompt(request_payload=request_payload)
-        completed = self._runner(
-            [self._executable, "exec", "--json", "--output-last-message", prompt],
-            capture_output=True,
-            text=True,
-            timeout=self._timeout_seconds,
-            check=False,
+        resolved_executable = resolve_codex_executable(
+            executable=self._executable,
+            which_resolver=self._which_resolver,
         )
+        try:
+            completed = self._runner(
+                [resolved_executable, "exec", "--json", "--output-last-message", prompt],
+                capture_output=True,
+                text=True,
+                timeout=self._timeout_seconds,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise ValueError(CODEX_CLI_REQUIRED_MESSAGE) from exc
         if int(getattr(completed, "returncode", 1)) != 0:
             error_text = str(getattr(completed, "stderr", "") or getattr(completed, "stdout", "")).strip()
             raise ValueError(error_text or "Codex exec failed.")
@@ -54,12 +66,24 @@ def build_codex_daily_brief_providers(
     cli_checker: Callable[[], bool] | None = None,
     login_checker: Callable[[], bool] | None = None,
     executable: str = CODEX_EXECUTABLE,
+    which_resolver: WhichResolver | None = None,
     timeout_seconds: float = 60.0,
 ) -> tuple[IssuePlannerProvider, ClaimComposerProvider]:
     resolved_runner = codex_runner or subprocess.run
-    resolved_cli_checker = cli_checker or (lambda: _codex_cli_available(runner=resolved_runner, executable=executable))
+    resolved_which_resolver = which_resolver or shutil.which
+    resolved_cli_checker = cli_checker or (
+        lambda: _codex_cli_available(
+            runner=resolved_runner,
+            executable=executable,
+            which_resolver=resolved_which_resolver,
+        )
+    )
     resolved_login_checker = login_checker or (
-        lambda: _codex_login_available(runner=resolved_runner, executable=executable)
+        lambda: _codex_login_available(
+            runner=resolved_runner,
+            executable=executable,
+            which_resolver=resolved_which_resolver,
+        )
     )
     if not resolved_cli_checker():
         raise ValueError(CODEX_CLI_REQUIRED_MESSAGE)
@@ -69,6 +93,7 @@ def build_codex_daily_brief_providers(
     runtime_client = CodexExecJsonClient(
         runner=resolved_runner,
         executable=executable,
+        which_resolver=resolved_which_resolver,
         timeout_seconds=timeout_seconds,
     )
     response_loader = runtime_client.create_json_response
@@ -83,25 +108,44 @@ def build_codex_daily_brief_providers(
     )
 
 
-def _codex_cli_available(*, runner: CodexRunner, executable: str) -> bool:
-    completed = runner(
-        [executable, "--version"],
-        capture_output=True,
-        text=True,
-        timeout=10.0,
-        check=False,
-    )
+def resolve_codex_executable(*, executable: str, which_resolver: WhichResolver | None = None) -> str:
+    candidate_path = Path(executable)
+    if candidate_path.is_absolute() or candidate_path.parent != Path("."):
+        return str(candidate_path)
+
+    resolved = (which_resolver or shutil.which)(executable)
+    if resolved:
+        return resolved
+    return executable
+
+
+def _codex_cli_available(*, runner: CodexRunner, executable: str, which_resolver: WhichResolver) -> bool:
+    resolved_executable = resolve_codex_executable(executable=executable, which_resolver=which_resolver)
+    try:
+        completed = runner(
+            [resolved_executable, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10.0,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False
     return int(getattr(completed, "returncode", 1)) == 0
 
 
-def _codex_login_available(*, runner: CodexRunner, executable: str) -> bool:
-    completed = runner(
-        [executable, "login", "status"],
-        capture_output=True,
-        text=True,
-        timeout=10.0,
-        check=False,
-    )
+def _codex_login_available(*, runner: CodexRunner, executable: str, which_resolver: WhichResolver) -> bool:
+    resolved_executable = resolve_codex_executable(executable=executable, which_resolver=which_resolver)
+    try:
+        completed = runner(
+            [resolved_executable, "login", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10.0,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False
     return int(getattr(completed, "returncode", 1)) == 0
 
 
