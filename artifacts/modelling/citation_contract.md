@@ -105,6 +105,7 @@ Each issue must include evidence pointers similar to:
 - `issue_question` must be specific enough to anchor a debate
 - evidence IDs must resolve to known chunks/documents
 - supporting/opposing/minority/watch evidence sets must belong to the same issue context
+- provider transport (`openai`, `codex-oauth`, future adapters) must not change the issue-map schema
 
 ---
 
@@ -132,6 +133,7 @@ Each claim must include fields similar to:
 - every claim has at least one supporting citation
 - `counter` and `minority` claims must still reference the same `issue_id`
 - `why_it_matters` and `novelty_vs_prior_brief` are also grounded outputs and may be removed if unsupported
+- provider transport (`openai`, `codex-oauth`, future adapters) must not change the claim-object schema
 
 ---
 
@@ -197,6 +199,18 @@ Before delivering any synthesis output, the system MUST run a deterministic vali
 | Citation missing required fields | Remove citation; if no valid citations remain, drop claim |
 | Paywalled source cited with full-text quote | Strip `quote_span`, keep metadata-only citation |
 | Claim drift across one issue | Mark issue invalid and retry or abstain |
+
+---
+
+## 7.1 Provider Runtime Invariants
+
+The citation contract sits above the provider runtime boundary.
+
+That means:
+- a provider may use API calls, local CLI execution, or another bounded transport
+- but it must still return the same schema-valid issue-map and claim-object payloads
+- provider-specific auth state must never be copied into artifacts, citations, or decision records
+- provider failures must be recorded as runtime errors, not silently converted into unsupported claims
 
 **Validator output:**
 
