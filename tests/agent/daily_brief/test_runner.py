@@ -8,20 +8,18 @@ from pathlib import Path
 from typing import get_args, get_type_hints
 from unittest.mock import patch
 
-from apps.agent.delivery.email_sender import EmailDeliveryConfig
-from apps.agent.delivery.scheduler import DailyBriefSchedule
 from apps.agent.daily_brief.runner import (
-    build_daily_brief_query,
-    prepare_daily_brief_inputs,
     build_daily_brief_corpus,
+    build_daily_brief_query,
     build_daily_brief_synthesis,
     load_active_fixture_payloads,
     load_active_live_payloads,
+    prepare_daily_brief_inputs,
     run_daily_brief,
     run_fixture_daily_brief,
 )
-from apps.agent.portfolio.input_store import PortfolioPosition, replace_portfolio_positions
-from apps.agent.daily_brief.synthesis import build_citation_store
+from apps.agent.delivery.email_sender import EmailDeliveryConfig
+from apps.agent.delivery.scheduler import DailyBriefSchedule
 from apps.agent.pipeline.types import (
     BulletCitationRow,
     CitationStoreEntry,
@@ -36,12 +34,13 @@ from apps.agent.pipeline.types import (
     PlannedFetchItem,
     RunContext,
     RunStatus,
-    RunType,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
+    RunType,
     SourceRegistryEntry,
     SourceRow,
 )
+from apps.agent.portfolio.input_store import PortfolioPosition, replace_portfolio_positions
 from apps.agent.runtime.budget_guard import BudgetCaps
 from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 

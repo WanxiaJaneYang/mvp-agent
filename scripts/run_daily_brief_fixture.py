@@ -5,15 +5,9 @@ import json
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-from apps.agent.daily_brief.runner import run_fixture_daily_brief
-from apps.agent.delivery.email_sender import EmailDeliveryConfig
-from apps.agent.delivery.scheduler import DailyBriefSchedule
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the deterministic daily-brief fixture slice.")
@@ -37,6 +31,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    from apps.agent.daily_brief.runner import run_fixture_daily_brief
+    from apps.agent.delivery.email_sender import EmailDeliveryConfig
+    from apps.agent.delivery.scheduler import DailyBriefSchedule
+
     args = parse_args()
     email_config = None
     if args.smtp_host or args.sender_email or args.recipient_email:
