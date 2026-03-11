@@ -80,7 +80,10 @@ def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
     bounded_input = {
         "run_id": brief_input["run_id"],
         "generated_at_utc": brief_input["generated_at_utc"],
-        "evidence_pack": [_normalize_evidence_item(item) for item in brief_input["evidence_pack"][:MAX_EVIDENCE_PACK_ITEMS]],
+        "evidence_pack": [
+            _normalize_evidence_item(item)
+            for item in brief_input["evidence_pack"][:MAX_EVIDENCE_PACK_ITEMS]
+        ],
         "prior_brief_context": _normalize_prior_brief_context(brief_input.get("prior_brief_context")),
     }
     return {
