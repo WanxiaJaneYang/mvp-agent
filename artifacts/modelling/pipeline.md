@@ -1,30 +1,31 @@
-# Pipeline v1 (Daily + Alert Runs)
+# Pipeline v2 (Daily Brief + Alert Runs)
 
-Purpose: define the end-to-end local-first pipeline for ingestion, retrieval, synthesis, validation, and delivery with deterministic failure handling.
+Purpose: define the end-to-end local-first pipeline for ingestion, retrieval, issue planning, claim composition, validation, and delivery with deterministic failure handling.
 
 Status: Modelling deliverable C (`pipeline.md`).
 
 ## 1. Run Types
 
-- `ingestion`: fetch and normalize new source content.
-- `daily_brief`: create the daily synthesis report.
-- `alert_scan`: score potential major events.
-- `alert_dispatch`: enforce alert limits and deliver approved alerts.
-- `maintenance`: cleanup, compaction, and integrity checks.
+- `ingestion`: fetch and normalize new source content
+- `daily_brief`: create the daily issue-centered literature review
+- `alert_scan`: score potential major events
+- `alert_dispatch`: enforce alert limits and deliver approved alerts
+- `maintenance`: cleanup, compaction, and integrity checks
 
 ## 2. Hard Limits (must stop the run)
 
-- Budget caps: monthly `100`, daily `3`, hourly `0.10` USD.
-- Max new documents/day: `200`.
-- Default per-source cap/day: `10` (except approved exceptions like SEC/wires).
-- Max evidence pack size: `30` chunks.
-- Max alerts/day: `3` and cooldown `60` minutes.
-- Max synthesis length: daily ~`1200` words, alert ~`400` words.
+- Budget caps: monthly `100`, daily `3`, hourly `0.10` USD
+- Max new documents/day: `200`
+- Default per-source cap/day: `10` (except approved exceptions like SEC/wires)
+- Max evidence pack size: `30` chunks
+- Max alerts/day: `3` and cooldown `60` minutes
+- Max daily brief length: about `1200` words
+- Max alert length: about `400` words
 
 When any hard limit is exceeded:
-- Set run status to `stopped_budget` or `failed`.
-- Persist reason to `runs.error_summary`.
-- Do not auto-retry the same run.
+- set run status to `stopped_budget` or `failed`
+- persist reason to `runs.error_summary`
+- do not auto-retry the same run
 
 ## 3. Stage-by-Stage Flow
 
@@ -36,152 +37,184 @@ Inputs:
 - budget ledger windows (hour/day/month)
 
 Actions:
-- Validate required config and registry shape.
-- Check budget windows before model/tool work.
-- Compute run limits for this execution.
+- validate required config and registry shape
+- check budget windows before model/tool work
+- compute run limits for this execution
 
 Failure handling:
-- Missing config/schema mismatch -> fail fast.
-- Budget exceeded -> stop before fetch/model calls.
+- missing config/schema mismatch -> fail fast
+- budget exceeded -> stop before fetch/model calls
 
 ### Stage 1: Fetch
 
 Actions:
-- Pull candidate docs from RSS/HTML/PDF sources.
-- Enforce per-source and global caps.
-- Store fetch metadata and raw payload pointers.
+- pull candidate docs from RSS/HTML/PDF sources
+- enforce per-source and global caps
+- store fetch metadata and raw payload pointers
 
 Failure handling:
-- Source timeout/network error -> record source-level error, continue other sources.
-- Robots/paywall blocking -> keep metadata/snippet only.
+- source timeout/network error -> record source-level error, continue other sources
+- robots/paywall blocking -> keep metadata/snippet only
 
 ### Stage 2: Extract
 
 Actions:
-- Parse payload to normalized text blocks.
-- Keep paywalled documents as metadata-only.
+- parse payload to normalized text blocks
+- keep paywalled documents as metadata-only
 
 Failure handling:
-- Parser failure -> mark doc status `error`, continue.
+- parser failure -> mark doc status `error`, continue
 
 ### Stage 3: Normalize + Enrich
 
 Actions:
-- Standardize metadata (`publisher`, `published_at`, `doc_type`, tags/entities).
-- Assign credibility tier from source registry.
+- standardize metadata (`publisher`, `published_at`, `doc_type`, tags/entities)
+- assign credibility tier from source registry
 
 Failure handling:
-- Missing required metadata -> mark doc `error` and skip chunking.
+- missing required metadata -> mark doc `error` and skip chunking
 
 ### Stage 4: Deduplicate
 
 Actions:
-- Exact dedup by canonical URL and content hash.
-- Skip already-ingested docs.
+- exact dedup by canonical URL and content hash
+- skip already-ingested docs
 
 Failure handling:
-- Conflicting IDs/hash collision -> keep earliest, mark duplicate and continue.
+- conflicting IDs/hash collision -> keep earliest, mark duplicate and continue
 
 ### Stage 5: Chunk + Index
 
 Actions:
-- Split full-text docs into retrieval chunks.
-- Insert into `chunks` and `chunks_fts`.
-- Keep embedding fields nullable in v1.
+- split full-text docs into retrieval chunks
+- insert into `chunks` and `chunks_fts`
+- keep embedding fields nullable until semantic search is enabled
 
 Failure handling:
-- FTS write failure -> fail run (index integrity risk).
+- FTS write failure -> fail run (index integrity risk)
 
-### Stage 6: Retrieve Evidence Pack
+### Stage 6: Build Deterministic Evidence Layer
 
 Actions:
-- Query top candidates via FTS + reranking inputs.
-- Apply recency weighting and credibility weighting.
-- Enforce diversity constraints:
+- retrieve top candidates via FTS + reranking inputs
+- apply recency weighting and credibility weighting
+- enforce diversity constraints:
   - max 40% one publisher
   - at least 50% Tier 1/2
   - at most 15% Tier 4
-- Cap final pack at 30 chunks.
+- cap final evidence pack at 30 chunks
+- build citation store for all evidence candidates
+- load prior brief context for novelty comparisons
+
+Outputs:
+- `evidence_pack`
+- `citation_store`
+- `prior_brief_context`
 
 Failure handling:
-- Cannot satisfy diversity constraints -> degrade gracefully with abstain-ready path and explicit note.
+- cannot satisfy diversity constraints -> degrade gracefully with abstain-ready path and explicit note
 
-### Stage 7: Synthesize
+### Stage 7: Issue Planning (Model Layer)
 
 Actions:
-- Build structured output sections:
-  - prevailing
-  - counterarguments
-  - minority
-  - what to watch
-  - changed since yesterday (daily brief)
-- Keep output within section and word caps.
+- call provider-agnostic issue planner with bounded `evidence_pack` and optional `prior_brief_context`
+- require schema-valid JSON output only
+- identify 2-3 important issues when evidence supports them
+- assign support/opposition/minority/watch evidence groups per issue
+
+Outputs:
+- `issue_map.json`
 
 Failure handling:
-- Model/tool timeout -> one retry with same evidence pack.
-- Second failure -> output abstaining report.
+- timeout or invalid JSON -> retry once with same inputs
+- second failure -> brief-level abstain
 
-### Stage 8: Citation Validate
+### Stage 8: Claim Composition (Model Layer)
 
 Actions:
-- Verify every claim/bullet has >=1 citation mapping.
-- Verify paywall policy compliance (no fabricated quote spans for `metadata_only`).
-- Remove invalid bullets or replace with explicit "insufficient evidence".
+- call provider-agnostic claim composer with `issue_map`, `citation_store`, and `prior_brief_context`
+- require schema-valid JSON output only
+- produce structured claims for `prevailing`, `counter`, `minority`, and `watch`
+- include `why_it_matters`, `confidence`, and `novelty_vs_prior_brief`
+
+Outputs:
+- `claim_objects.json`
 
 Failure handling:
-- <=3 removals: deliver with `partial` status.
-- >3 removals or empty critical sections: retry once.
-- Retry failure: mark synthesis `abstained` and deliver minimal abstain output.
+- timeout or invalid JSON -> retry once with same inputs
+- second failure -> brief-level abstain
 
-### Stage 9: Alert Scoring + Policy Gate
+### Stage 9: Validation + Critic
 
 Actions:
-- Score candidates using `alert_scoring.md` formula.
-- Enforce cooldown and daily cap.
-- Bundle below-threshold but notable events into next daily brief.
+- run deterministic citation validation
+- run paywall-policy validation
+- run numeric/date/source-quality checks
+- verify issue consistency:
+  - claims under one issue share the same `issue_id`
+  - `prevailing`, `counter`, and `minority` address the same issue question
+- optionally run critic pass to detect shallow source-by-source paraphrase
 
 Failure handling:
-- If policy gate fails (cooldown/daily cap), suppress alert and log reason.
+- minor claim failures -> drop invalid claims and continue with partial issue output
+- critical issue failures -> retry claim composer once
+- second critical failure -> issue-level or brief-level abstain
 
 ### Stage 10: Deliver + Persist
 
 Actions:
-- Write daily HTML output locally.
-- Send email for daily brief and approved alerts.
-- Store run metrics, costs, and output lineage.
-- Persist a per-run `decision_record` artifact under `artifacts/decision_records/<YYYY-MM-DD>/<run_id>.json`.
-- Validate the `decision_record` schema before writing to disk.
+- render local HTML output from structured issues and claims
+- send email for daily brief and approved alerts
+- store run metrics, costs, and output lineage
+- persist:
+  - `issue_map`
+  - `claim_objects`
+  - validator report
+  - critic report
+  - final HTML artifact
+  - `decision_record` artifact under `artifacts/decision_records/<YYYY-MM-DD>/<run_id>.json`
+- validate the `decision_record` schema before writing to disk
 
 Failure handling:
-- Email send error -> keep local deliverable, queue retry in next run.
-- Local write error -> fail run and retain logs.
+- email send error -> keep local deliverable, queue retry in next run
+- local write error -> fail run and retain logs
 
 ## 4. Incremental Run Logic
 
-- Use `published_at` + `fetched_at` watermarks per source.
-- Re-ingest only unseen/updated docs since last successful watermark.
-- On partial run failure, persist source-level checkpoints already completed.
-- Never reprocess full corpus unless manually requested.
+- use `published_at` + `fetched_at` watermarks per source
+- re-ingest only unseen/updated docs since last successful watermark
+- on partial run failure, persist source-level checkpoints already completed
+- never reprocess full corpus unless manually requested
 
 ## 5. Retry Policy
 
-- Fetch/extract/source-level operations: continue on per-source errors.
-- Synthesis generation: max 1 retry.
-- Citation validation: max 1 synthesis retry when critical failures occur.
-- No infinite retries; all retries are deterministic and bounded.
+- fetch/extract/source-level operations: continue on per-source errors
+- issue planner: max 1 retry
+- claim composer: max 1 retry
+- validation-triggered composer retry: max 1 additional composer retry
+- no infinite retries; all retries are deterministic and bounded
 
-## 6. Observability Requirements
+## 6. Abstain Policy
+
+- **Issue-level abstain:** one issue can abstain if evidence is insufficient while other issues still deliver
+- **Brief-level abstain:** if no trustworthy issues remain after validation, deliver abstaining report
+- abstain output must explain why evidence was insufficient and list what evidence was available
+
+## 7. Observability Requirements
 
 Each run must persist:
-- `run_id`, run type, start/end times, status.
-- Docs fetched/ingested, chunks indexed.
-- Token and cost counters.
-- Budget window checks and exceed flags.
-- Error summary and stage of failure.
+- `run_id`, run type, start/end times, status
+- docs fetched/ingested, chunks indexed
+- evidence pack diversity stats
+- token and cost counters by model stage
+- budget window checks and exceed flags
+- validator/critic outcomes
+- error summary and stage of failure
 
-## 7. Acceptance Checks for This Pipeline Spec
+## 8. Acceptance Checks for This Pipeline Spec
 
-- Stages cover fetch -> extract -> normalize -> chunk -> index -> retrieve -> synthesize -> validate -> deliver.
-- Failure handling is explicit at stage and run levels.
-- Incremental run behavior is defined.
-- Hard limits and budget stop conditions are explicit.
+- stages cover fetch -> extract -> normalize -> chunk -> index -> evidence build -> issue planning -> claim composition -> validate -> deliver
+- failure handling is explicit at stage and run levels
+- incremental run behavior is defined
+- hard limits and budget stop conditions are explicit
+- daily brief architecture is issue-centered rather than one-query / one-bucket synthesis

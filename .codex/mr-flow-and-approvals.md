@@ -1,6 +1,8 @@
 # MR Flow And Approval Preferences
 
 ## User Preferences
+- Default workflow is always: `issue -> PR -> merge`.
+- This rule applies to design changes, planning docs, implementation work, and bug fixes.
 - Do not repeatedly ask for GitHub-related approvals when an approved command prefix already exists.
 - Prefer reusing saved approved prefixes for `gh`/GitHub operations.
 - Batch GitHub operations to minimize approval prompts.
@@ -8,18 +10,20 @@
 - If approval is required and self-approval is blocked, use admin merge when explicitly requested by user workflow.
 
 ## Standard MR Flow
-1. Identify latest/open MR tied to current branch.
-2. Check CI status and review state.
-3. Pull unresolved review threads/comments.
-4. Address unaddressed comments in code/docs/workflows.
-5. Resolve addressed threads.
-6. Re-request review and re-check CI.
-7. Iterate steps 3-6 until review threads are resolved and checks pass.
-8. Merge MR (prefer normal merge; use `--admin` only when required by policy/workflow).
-9. Verify merged state and report merge commit SHA.
+1. Confirm there is a tracking issue for the work; if not, create one before treating the task as in-flight.
+2. Identify the latest/open PR tied to the current branch; if none exists, create one.
+3. Check CI status and review state.
+4. Pull unresolved review threads/comments.
+5. Address unaddressed comments in code/docs/workflows.
+6. Resolve addressed threads.
+7. Re-request review and re-check CI.
+8. Iterate steps 4-7 until review threads are resolved and checks pass.
+9. Merge PR (prefer normal merge; use `--admin` only when required by policy/workflow).
+10. Verify merged state and report merge commit SHA.
 
 ## Operational Rules For Future Sessions
 - Read this file at the start of MR-related tasks.
+- Treat work without an issue or PR as not yet in the required delivery flow.
 - Assume user wants end-to-end completion (fix -> resolve -> review -> merge) unless user says otherwise.
 - Surface only hard blockers (policy limitations, failed CI, missing required reviewer approval).
 - Keep user updates brief and action-focused.

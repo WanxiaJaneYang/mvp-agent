@@ -1,6 +1,6 @@
-# Citation Contract — Evidence Grounding Rules
+# Citation Contract - Evidence Grounding Rules
 
-**Purpose:** Define how every claim in synthesis outputs must be backed by citations to stored evidence.
+**Purpose:** Define how every delivered issue, claim, and rendered output must be backed by citations to stored evidence.
 
 **Scope:** Applies to all AI-generated content: daily briefs, major event alerts, synthesis summaries.
 
@@ -12,7 +12,7 @@ Every citation references a stored document/chunk with the following structure:
 
 ```json
 {
-  "citation_id": "cite_<uuid>",
+  "id": "cite_<uuid>",
   "source_id": "fed_press_releases",
   "publisher": "Federal Reserve",
   "doc_id": "doc_<uuid>",
@@ -21,305 +21,300 @@ Every citation references a stored document/chunk with the following structure:
   "title": "Federal Reserve announces...",
   "published_at": "2026-02-10T14:00:00Z",
   "fetched_at": "2026-02-11T02:15:00Z",
-  "quote_text": "...actual quoted text snippet...",
-  "snippet_text": "...headline or RSS snippet..."
+  "quote_span": {
+    "start": 150,
+    "end": 320,
+    "text": "...actual quoted text snippet..."
+  },
+  "snippet_span": {
+    "text": "...headline or RSS snippet..."
+  }
 }
 ```
 
 **Required fields:**
-- `citation_id`: Unique citation identifier
-- `source_id`: Reference to source_registry.yaml entry
-- `publisher`: Publisher name (derived from sources table via source_id, stored for diversity checks)
-- `doc_id`: Document identifier in local store
-- `chunk_id`: Chunk identifier (if chunked retrieval used)
-- `url`: Canonical URL of source document
-- `title`: Document title
-- `published_at`: Original publication timestamp (ISO 8601)
-- `fetched_at`: When we fetched/stored it (ISO 8601)
+- `id`
+- `source_id`
+- `publisher`
+- `doc_id`
+- `url`
+- `title`
+- `published_at`
+- `fetched_at`
 
 **Optional fields:**
-- `quote_text`: Full-text excerpt stored in the runtime payload (only for `paywall_policy: full` sources)
-- `snippet_text`: Headline/snippet text from RSS/metadata (allowed for all sources, including `paywall_policy: metadata_only`)
+- `chunk_id`
+- `quote_span`
+- `snippet_span`
 
 **Paywall-sourced citations:**
-- If `source_registry.yaml` marks source as `paywall_policy: metadata_only`:
-  - Citation MUST set `quote_text` to `null` (no full-text extraction)
-  - Citation MAY include `snippet_text` (headline/RSS snippet explicitly labeled)
-  - System must NOT fabricate or extract paywalled full text
+- If `paywall_policy: metadata_only`:
+  - citation MUST NOT include `quote_span`
+  - citation MAY include `snippet_span`
+  - system must NOT fabricate or extract paywalled full text
 
 ---
 
-## 2. Compatibility with Claude API Structured Citations
+## 2. Structured Output Levels
 
-**When using Claude API with citations feature:**
+The system now has three grounding levels:
 
-Claude's API returns structured citation metadata that includes:
-- Citation ranges (sentence/passage references within the model's response)
-- Source document identifiers
-- Extracted text spans
+1. **Issue map**
+   - identifies the issue and the evidence sets associated with it
+2. **Claim objects**
+   - express the prevailing/counter/minority/watch arguments for one issue
+3. **Rendered output**
+   - HTML/email presentation of issue summaries, claims, and evidence
 
-**Integration approach:**
-
-1. **Store model-returned citation metadata as canonical evidence pointers:**
-   - Claude API citations map to our citation objects via `doc_id`/`chunk_id`
-   - The API's citation range is normalized into `quote_text` (if full-text) or `snippet_text` (if metadata-only) for the v1 runtime payload
-   - Offset/range metadata may be kept upstream, but validator/storage parity is defined by the flattened runtime fields above
-
-2. **Presentation layer vs storage layer:**
-   - The rendered `[1][2]` numbering in output is a presentation layer convenience
-   - Underlying store maintains structured citation metadata (JSON objects as defined in §1)
-   - Citation validator operates on stored metadata, not presentation markup
-
-3. **Validator compatibility:**
-   - Claude API citations must still pass our validation rules (§3, §3.1)
-   - API-returned citations without valid `source_id`/`url`/`published_at` are rejected
-   - Paywall policy still applies: API cannot cite full-text from `metadata_only` sources
-
-**Implementation note:** If not using Claude API citations, the system generates citation objects manually during retrieval/synthesis and stores them with the same schema.
+Citations must remain traceable through all three levels.
 
 ---
 
-## 3. Claim-Level Citation Binding (Bullets as Containers)
+## 3. Core Grounding Rule
 
-**Goal:** Keep the UX readable (bullets), while making citation granularity closer to academic sentence-level citation.
+**Absolute requirement:** every delivered claim span must have citation coverage.
 
-### 3.1 Definitions
+This means:
+- every `claim_text` must reference one or more valid citation IDs
+- every visible evidence item shown under a claim must reference one valid citation ID
+- renderer must not surface prose that cannot be mapped back to stored citations
 
-- **Bullet**: A list item shown to the user.
-- **Claim span**: The smallest unit that asserts a fact, inference, or prediction that should be supported by evidence.  
-  In practice, a claim span is usually **one sentence** inside a bullet.
+If a claim cannot be cited, it must not appear in the output.
 
-### 3.2 Rule: Every claim span must be covered by citations
+---
 
-**Absolute requirement:** Every claim span must have **≥ 1 citation**.
+## 4. Issue Planner Contract
 
-You can satisfy this in two compliant ways:
+The issue planner outputs structured JSON, not prose.
 
-**A) Sentence-level citations (preferred, most explicit):**
-```markdown
-- Inflation remained elevated in January. [1]
-  The central bank reiterated it needs “more confidence” before cutting rates. [2]
+Each issue must include evidence pointers similar to:
+
+```json
+{
+  "issue_id": "issue_growth_rates",
+  "issue_question": "Will softer growth change near-term Fed expectations?",
+  "thesis_hint": "Growth is cooling, but inflation persistence complicates any near-term policy pivot.",
+  "supporting_evidence_ids": ["chunk_1", "chunk_2"],
+  "opposing_evidence_ids": ["chunk_3"],
+  "minority_evidence_ids": ["chunk_4"],
+  "watch_evidence_ids": ["chunk_5"]
+}
 ```
 
-**B) Shared citation for a consecutive multi-sentence span (allowed when sources do not change):**  
-If two (or more) consecutive sentences in the same bullet are supported by the **same citation set**, you may place citations **once at the end of the span** to avoid noisy repetition. This matches common academic guidance that repeating the same citation every sentence can be unnecessary when attribution remains clear. citeturn0search0turn0search17
-
-```markdown
-- The report argues growth risks are rising while inflation is sticky.
-  It expects policy to remain restrictive for longer. [3]
-```
-
-**Not allowed:** A bullet containing multiple claim spans with **no clear citation coverage** for each span.
-
-### 3.3 Formatting constraints (so validation is deterministic)
-
-1. **Max 2 sentences per bullet** (recommended). If you need more, split into multiple bullets.
-2. **Citations must appear immediately after the sentence/span they support** (same line or the next line).
-3. If a bullet contains multiple claim spans supported by different sources, each claim span must carry its own citations (Option A).
-
-### 3.4 Applies to all synthesis sections
-
-Claim-level citation binding applies to:
-- **Prevailing view**
-- **Counterarguments**
-- **Minority view**
-- **What to watch / falsification indicators**
+**Validation rules:**
+- `issue_question` must be specific enough to anchor a debate
+- evidence IDs must resolve to known chunks/documents
+- supporting/opposing/minority/watch evidence sets must belong to the same issue context
 
 ---
 
+## 5. Claim Composer Contract
 
-## 3. Validator Behavior
+The claim composer outputs structured JSON objects instead of direct HTML.
 
-**Pre-output validation (mandatory):**
+Each claim must include fields similar to:
 
-**Claim-span parsing (mandatory):**
-- Split each bullet into claim spans using sentence boundaries (`.`, `?`, `!`) and hard line breaks.
-- Treat semicolon-separated clauses as separate claim spans **if** they express different facts and only one side has citations.
-- If a multi-sentence bullet uses a single citation group, the citations must appear at the end of the last sentence of that span (Rule 3.2B).
+```json
+{
+  "claim_id": "claim_growth_prevailing",
+  "issue_id": "issue_growth_rates",
+  "claim_kind": "prevailing",
+  "claim_text": "Most evidence suggests softer activity is increasing pressure for cuts later this year, but not enough to force an immediate pivot.",
+  "supporting_citation_ids": ["cite_101", "cite_102"],
+  "opposing_citation_ids": ["cite_201"],
+  "confidence": "medium",
+  "novelty_vs_prior_brief": "strengthened",
+  "why_it_matters": "If growth continues to soften without a matching drop in inflation, rate-sensitive assets may stay volatile."
+}
+```
 
-Before delivering any synthesis output, the system MUST run a citation validator that:
+**Validation rules:**
+- every claim has at least one supporting citation
+- `counter` and `minority` claims must still reference the same `issue_id`
+- `why_it_matters` and `novelty_vs_prior_brief` are also grounded outputs and may be removed if unsupported
 
-1. **Extracts all claim bullets** from Prevailing/Counter/Minority/Watch sections
-2. **Checks each bullet** has ≥1 citation ID
-3. **Verifies each citation ID** resolves to:
-   - A valid doc_id/chunk_id in the local evidence store
-   - A URL that matches the source_registry.yaml entry
-   - A published_at timestamp (not missing/null)
+---
+
+## 6. Claim-Span Citation Binding
+
+**Goal:** keep the UX readable while enforcing claim-level grounding closer to academic sentence-level citation.
+
+### 6.1 Definitions
+
+- **Claim object:** a structured argument associated with one issue and one claim kind
+- **Claim span:** the smallest sentence or clause that asserts a fact, inference, or prediction
+- **Evidence item:** a visible supporting item shown under a claim in rendered output
+
+### 6.2 Rule
+
+Every claim span must be covered by one of these patterns:
+
+**A) Sentence-level citation binding (preferred):**
+```markdown
+Prevailing: Growth indicators softened across recent releases. [1]
+Inflation commentary still argues against a rapid pivot. [2]
+```
+
+**B) Shared citation binding for a short consecutive span (allowed):**
+```markdown
+Prevailing: Growth indicators softened while inflation commentary stayed sticky, which supports a later-but-not-immediate cut path. [1][2]
+```
+
+**Not allowed:**
+- one claim object containing multiple unsupported assertions
+- a rendered evidence item without a citation
+- support/opposition statements that cannot be mapped to citations
+
+### 6.3 Formatting constraints
+
+- keep claim text concise enough that validation can map spans to citations deterministically
+- if support for separate sentences differs, each sentence must carry its own citations
+- visible evidence blocks should show source, date, and snippet/quote derived from the citation object
+
+---
+
+## 7. Validator Behavior
+
+Before delivering any synthesis output, the system MUST run a deterministic validator that:
+
+1. extracts all claim objects
+2. checks each claim has at least one valid supporting citation
+3. verifies each citation resolves to:
+   - a valid doc/chunk in local evidence store
+   - a URL that matches the source registry entry
+   - a non-null `published_at`
+4. verifies issue consistency:
+   - each claim references a valid `issue_id`
+   - `prevailing`, `counter`, and `minority` claims under one issue address the same issue question
+5. verifies rendered evidence blocks are backed by cited evidence
 
 **On validation failure:**
 
 | Failure Type | Action |
 |--------------|--------|
-| Bullet has 0 citations | **Remove bullet** OR replace with `[Insufficient evidence to support this claim]` |
-| Citation ID not found in store | **Remove citation** from bullet; if bullet has no remaining citations, apply above rule |
-| Citation missing required fields (url, published_at) | **Remove citation**; if bullet has no remaining citations, apply above rule |
-| Paywalled source cited with full-text quote | **Set `quote_text` to null**, keep metadata-only citation |
-
-**No exceptions:** If a claim cannot be cited, it must not appear in the output.
+| Claim has 0 supporting citations | Remove claim or replace with explicit insufficient-evidence language |
+| Citation ID not found in store | Remove citation; if no valid citations remain, drop claim |
+| Citation missing required fields | Remove citation; if no valid citations remain, drop claim |
+| Paywalled source cited with full-text quote | Strip `quote_span`, keep metadata-only citation |
+| Claim drift across one issue | Mark issue invalid and retry or abstain |
 
 **Validator output:**
-- Validation report JSON: `{ "total_bullets": N, "cited_bullets": M, "removed_bullets": K, "validation_passed": true/false }`
-- If `validation_passed: false`, synthesis must be retried or flagged for review
+
+```json
+{
+  "total_claims": 8,
+  "valid_claims": 7,
+  "removed_claims": 1,
+  "issue_failures": 0,
+  "validation_passed": true
+}
+```
 
 ---
 
-## 3.1. Citation Quality Checks
+## 8. Citation Quality Checks
 
-**Beyond basic presence, enforce quality constraints on citations:**
+### Numeric / Time Claims Rule
 
-### Numeric/Time Claims Rule
+If a claim contains numbers, percentages, or specific dates (except purely scheduled dates from official calendars), it must satisfy one of:
 
-If a bullet contains **numbers, percentages, or specific dates** (except purely scheduled dates from official calendars), it must satisfy ONE of:
+- at least one Tier 1-2 citation, or
+- at least two independent sources
 
-- **At least one Tier 1–2 citation** (credible source), OR
-- **At least two independent sources** (different `publisher` or `source_id`)
-
-**Examples:**
-
-✓ Valid:
-- "Q4 GDP grew 2.9%, slightly above expectations. [BEA] [Reuters]" — Tier 1 + Tier 2
-- "Oil prices rose 3% on supply concerns. [Bloomberg] [MarketWatch]" — Two independent Tier 2 sources
-
-✗ Invalid (fails quality check):
-- "Inflation is expected to reach 5.2% by Q3. [Zero Hedge only]" — Numeric claim with only Tier 4 source
-- "Markets fell 2% yesterday. [single Tier-3 source]" — Numeric claim needs corroboration
-
-**Validator action:** If numeric/time claim fails quality check, remove bullet or mark "[Insufficient credible evidence for this claim]".
-**v1 scope:** Enforce this rule when cited sources can be resolved to `credibility_tier` metadata from `source_registry`.
+If not, validator must remove or downgrade the claim.
 
 ### Policy Claims Rule
 
-If a bullet is about **central bank policy** or **official macro releases** (identified by tags: `policy_centralbank`, `macro_data`), AND a Tier 1 source is available in the evidence pack:
+If a claim is about central bank policy or official macro releases, and a Tier 1 source exists in the evidence pack:
 
-- **Require at least one Tier 1 citation**
+- require at least one Tier 1 citation
 
-**Examples:**
+If not, validator must remove or downgrade the claim.
 
-✓ Valid:
-- "The Fed held rates at 5.25-5.50%. [Fed Statement] [Reuters]" — Includes Tier 1 (Fed)
+### Novelty / Delta Rule
 
-✗ Invalid (fails quality check):
-- "The Fed held rates steady. [CNBC] [Bloomberg]" — Policy claim with no Tier 1 citation when Fed statement is available
+If `novelty_vs_prior_brief` claims a change such as `strengthened`, `weakened`, or `reversed`, the system must have both:
 
-**Validator action:** If policy claim lacks Tier 1 citation and Tier 1 source exists in evidence pack, remove bullet or mark "[Cite official source directly for policy claims]".
+- prior brief context
+- current citations supporting the new state
 
-**Implementation note:** Quality checks run after basic citation validation. In v1 the validator uses `source_registry` tags/tiers plus the emitted `citation_store` payload as its evidence-pack view.
-
----
-
-## 3.2. Retry Policy (Cost Safety)
-
-**To prevent runaway costs from repeated synthesis attempts, enforce deterministic retry behavior:**
-
-### Decision Tree
-
-After validation completes, count removed bullets and check section completeness:
-
-| Scenario | Action |
-|----------|--------|
-| **≤3 bullets removed** AND all sections non-empty | **Deliver with removals** + log warnings in metadata |
-| **>3 bullets removed** OR any section (Prevailing/Counter/Minority/Watch) becomes empty | **Retry synthesis once** with explicit instruction to cite more evidence |
-| **Second attempt still fails** (>3 removed or section empty) | **Deliver abstaining report** (see below) |
-
-### Abstaining Report Format
-
-If synthesis cannot be salvaged after one retry:
-
-```markdown
-# Daily Brief - [Date]
-
-## Synthesis Status: Insufficient Evidence
-
-We were unable to generate a complete daily brief for [date] due to insufficient citeable evidence in available sources.
-
-## Available Evidence Summary
-
-[1-3 bullets summarizing what evidence WAS available, with citations]
-
-## Why Insufficient
-
-- [Specific reason: e.g., "No Tier 1 sources published policy statements today"]
-- [e.g., "Only contradictory Tier 4 sources available for key narrative"]
-- [e.g., "Paywalled sources dominate; insufficient full-text access"]
-
-## References
-
-[List all sources that WERE retrieved but couldn't support synthesis]
-```
-
-### Retry Cost Guards
-
-- **Max retries:** 1 (total 2 synthesis attempts per daily brief)
-- **Attempt contract:** attempt 1 may return `retry`; attempt 2 is the terminal attempt and MUST set `retry_exhausted: true` if validation still returns `retry`
-- **Postprocess rule:** only convert a `retry` validation result into an abstaining output after the retry budget is exhausted
-- **Retry triggers logging:** Record retry reason, removed bullets count, evidence pack diversity stats
-- **Runtime reporting:** persist `validation_attempts`, `max_validation_attempts`, and `validation_retry_exhausted` beside the normal budget snapshot so retry work is visible without fabricating extra spend
-- **Abort after 2nd failure:** Do not loop indefinitely; deliver abstaining report
-
-**Rationale:** This prevents scenarios where poor evidence packs cause repeated expensive synthesis calls. Better to abstain explicitly than burn budget retrying.
+If not, downgrade `novelty_vs_prior_brief` to `unknown` or remove it.
 
 ---
 
-## 4. Evidence-Pack Definition
+## 9. Critic Pass
 
-**Purpose:** Define how retrieval builds a bounded, diverse set of evidence chunks for synthesis.
+An optional critic layer may evaluate claim quality after deterministic validation.
 
-### 4.1 Retrieval Constraints
+It must not invent or rewrite claims. It can only:
+- pass
+- warn
+- fail
 
-- **Max chunks per query:** 20–40 chunks (configurable, default 30)
-- **Chunk size:** 300–800 tokens (configurable, default 500 tokens with 100-token overlap)
-- **Recency window:** Prioritize last 7 days; include older if highly relevant (up to 30 days for context)
+Recommended critic checks:
+- is this just source-by-source paraphrase?
+- does the counter claim genuinely challenge the prevailing thesis?
+- is the minority claim materially distinct?
+- is `why_it_matters` specific rather than generic?
 
-### 4.2 Diversity Constraints
+Critic output should be structured:
 
-To avoid one-source dominance (per PROJECT_FACTS.md):
-
-1. **Publisher diversity:**
-   - No single publisher can dominate >40% of evidence pack
-   - Publisher is determined by the `publisher` field in citations (derived from sources table via `source_id`)
-   - If retrieval returns >40% from one publisher, down-sample and retrieve more from others
-
-2. **Credibility tier diversity:**
-   - Require ≥50% of evidence from Tier 1 or Tier 2 sources
-   - Tier 4 (monitor-only) sources cannot exceed 15% of evidence pack
-
-3. **Perspective diversity:**
-   - For balanced synthesis, evidence pack should include:
-     - Official/policy sources (Tier 1)
-     - Mainstream news/analysis (Tier 2)
-     - Alternative/contrarian views (Tier 3/4, if available)
-
-### 4.3 Credibility Weighting
-
-Retrieval scoring formula includes credibility tier:
-
-```
-retrieval_score = semantic_similarity * 0.5
-                  + recency_score * 0.3
-                  + credibility_score * 0.2
+```json
+{
+  "status": "warn",
+  "reason_codes": ["minority_not_distinct"],
+  "flagged_claim_ids": ["claim_growth_minority"]
+}
 ```
 
-**Credibility score mapping:**
-- Tier 1: 1.0
-- Tier 2: 0.8
-- Tier 3: 0.6
-- Tier 4: 0.3
+---
 
-This ensures official/primary sources are weighted higher in retrieval, but still allows minority views.
+## 10. Retry and Abstain Policy
 
-### 4.4 Evidence-Pack Metadata
+To prevent runaway costs from repeated synthesis attempts, enforce bounded retries:
 
-Each evidence pack generated for a synthesis run must store:
+- issue planner: max 1 retry
+- claim composer: max 1 retry
+- validation-triggered composer retry: max 1 retry
+
+If synthesis still fails:
+- allow issue-level abstain when one issue is not supportable
+- use brief-level abstain when no trustworthy issues remain
+
+**Abstain language examples:**
+- `[Insufficient evidence to assess this issue]`
+- `[Conflicting reports; unable to confirm a defensible prevailing view]`
+- `[No official statement found in available sources]`
+
+---
+
+## 11. Evidence-Pack Definition
+
+The evidence pack remains deterministic and bounded.
+
+### 11.1 Retrieval Constraints
+
+- max chunks per query/run: `30`
+- chunk size: 300-500 tokens (configurable)
+- recency window: prioritize last 7 days; include up to 30 days for context
+
+### 11.2 Diversity Constraints
+
+- no single publisher >40% of evidence pack
+- at least 50% of evidence from Tier 1 or Tier 2 sources
+- Tier 4 evidence <=15%
+- support issue debates with multiple perspectives when available
+
+### 11.3 Evidence-Pack Metadata
+
+Each evidence pack must store:
 
 ```json
 {
   "pack_id": "pack_<uuid>",
-  "query": "What is the Fed's current stance on rates?",
   "generated_at": "2026-02-11T08:00:00Z",
   "chunks": [
-    { "chunk_id": "chunk_<uuid>", "source_id": "fed_press_releases", "score": 0.92, "credibility_tier": 1 },
-    { "chunk_id": "chunk_<uuid>", "source_id": "wsj_markets", "score": 0.87, "credibility_tier": 2 },
-    ...
+    { "chunk_id": "chunk_<uuid>", "source_id": "fed_press_releases", "score": 0.92, "credibility_tier": 1 }
   ],
   "diversity_stats": {
     "unique_publishers": 8,
@@ -334,254 +329,65 @@ Each evidence pack generated for a synthesis run must store:
 
 ---
 
-## 5. Paywall Rule
+## 12. Paywall Rule
 
-**Policy (from PROJECT_FACTS.md & source_registry.yaml):**
-
-Sources marked `paywall_policy: metadata_only` in source_registry.yaml:
-- Store: title, URL, published timestamp, RSS snippet (if available)
-- Do NOT store or fabricate full-text content
-- Do NOT extract content behind login/paywall
-
-**Citation behavior:**
+Sources marked `paywall_policy: metadata_only`:
+- store title, URL, published timestamp, RSS snippet if available
+- do not store or fabricate full-text content
+- do not extract content behind login/paywall
 
 When citing a paywalled source:
+- allowed: metadata-backed title/snippet-based citation
+- not allowed: fabricated quote spans or implied full-text reading
 
-✓ **Allowed:**
-```markdown
-- Markets fell sharply on inflation data. [Financial Times, "Stocks tumble as CPI exceeds forecasts", Feb 10, 2026]
-```
-
-Citation object includes:
-```json
-{
-  "citation_id": "cite_123",
-  "source_id": "ft_markets",
-  "url": "https://www.ft.com/content/...",
-  "title": "Stocks tumble as CPI exceeds forecasts",
-  "published_at": "2026-02-10T10:30:00Z",
-  "fetched_at": "2026-02-11T02:00:00Z",
-  "quote_text": null,
-  "snippet_text": "Stocks tumble as CPI exceeds forecasts"
-}
-```
-
-✗ **Not allowed:**
-- Fabricating full-text quotes from paywalled articles
-- Claiming to have read full content when only metadata is available
-- Bypassing paywalls via scraping/archive services
-
-**User experience:**
-- Paywalled citations link out to source URL
-- User can verify claim by visiting source (if they have subscription)
-- System is transparent: "Source is paywalled; citation based on headline/snippet"
+Rendered output should make paywall status visible.
 
 ---
 
-## 6. Explicit Abstain Language & Uncertainty Markers
+## 13. Citation Presentation in Outputs
 
-**When to abstain:**
-
-If retrieval yields insufficient evidence to support a claim, the system MUST abstain rather than guess.
-
-**Abstain scenarios:**
-1. No relevant chunks retrieved for a query
-2. Only 1 low-credibility (Tier 4) source available
-3. Evidence is contradictory and no clear consensus
-4. Evidence is outdated (>30 days old for time-sensitive topics)
-
-**Abstain language (use explicitly):**
-
-Instead of unsupported claims, use:
-
-- `[Insufficient evidence to assess this claim]`
-- `[Data not yet available as of <date>]`
-- `[Conflicting reports; unable to confirm]`
-- `[No official statement found in available sources]`
-
-**Uncertainty markers (when evidence is weak but present):**
-
-- "According to limited available reports, ..." [cite Tier 3/4 sources]
-- "Some sources suggest ... [cite], but official confirmation is pending."
-- "Early indications from [source] show ... [cite], though this has not been widely reported."
-
-**Confidence levels (optional future enhancement):**
-
-Mark bullets with confidence scores based on:
-- Number of corroborating sources
-- Credibility tier of sources
-- Recency of evidence
-
-Example:
-- `[HIGH CONFIDENCE] The Fed held rates at 5.25-5.50%. [1][2][3]` (3 Tier-1 sources)
-- `[MEDIUM CONFIDENCE] Markets expect a rate cut in Q3. [4][5]` (2 Tier-2 sources)
-- `[LOW CONFIDENCE] Some analysts predict recession. [6]` (1 Tier-4 source)
-
----
-
-## 7. Citation Presentation in Outputs
-
-### 7.1 Inline Citations
-
-**Format:**
-```markdown
-## Prevailing View
-- The Federal Reserve held rates steady at 5.25-5.50%, citing persistent inflation. [1][2]
-- Q4 GDP grew 2.9%, slightly above expectations. [3]
-
-## Counterarguments
-- Some economists argue the Fed is over-tightening. [4][5]
-
-## Minority View
-- A few contrarian voices predict deflation by Q3. [6]
-
-## What to Watch
-- Next CPI release on March 12. [7]
-- FOMC meeting minutes due March 20. [8]
-```
-
-### 7.2 Citation Reference Section
-
-At the end of each synthesis output, include a **References** section:
+Renderer should present citations in a readable issue-centered format:
 
 ```markdown
-## References
+## Issue: Will softer growth change near-term Fed expectations?
 
-[1] Federal Reserve. "FOMC Statement - February 2026". Published Feb 10, 2026. https://www.federalreserve.gov/...
+Summary: Recent growth data softened, but inflation commentary still argues against an immediate pivot.
 
-[2] Reuters. "Fed holds rates steady, signals cautious approach". Published Feb 10, 2026. https://www.reuters.com/...
+### Prevailing
+Most evidence suggests softer activity raises pressure for cuts later this year, not immediately. [1][2]
 
-[3] U.S. Bureau of Economic Analysis. "GDP Fourth Quarter 2025 (Advance Estimate)". Published Jan 30, 2026. https://www.bea.gov/...
+Evidence
+- Federal Reserve, Mar 10, 2026: "...more confidence..." [1]
+- Reuters, Mar 10, 2026: "..." [2]
 
-[4] Financial Times. "Is the Fed over-tightening? Economists debate". Published Feb 9, 2026. https://www.ft.com/... [Paywall]
+### Counter
+Some analysts argue inflation persistence means rates can stay restrictive for longer. [3]
 
-[5] Brookings Institution. "Monetary Policy in an Uncertain Economy". Published Feb 8, 2026. https://www.brookings.edu/...
-
-[6] Zero Hedge. "Deflation warnings ignored by mainstream". Published Feb 11, 2026. https://www.zerohedge.com/... [Monitor-only source]
-
-[7] U.S. Bureau of Labor Statistics. "CPI Release Schedule". https://www.bls.gov/schedule/
-
-[8] Federal Reserve. "FOMC Calendar". https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+### Minority
+A smaller set of views expects growth weakness to force a faster policy turn. [4]
 ```
 
-**Reference format:**
-- `[N] Publisher. "Title". Published <date>. <URL>`
-- Add `[Paywall]` tag for paywalled sources
-- Add `[Monitor-only source]` tag for Tier-4 sources
-- Sort by citation number
+At the end of each output, include a references section with source title, publisher, date, URL, and paywall label when applicable.
 
 ---
 
-## 8. Storage Requirements
+## 14. Storage Mapping
 
-**The data model must include the following storage capabilities:**
+The system must preserve lineage from rendered output back to evidence:
 
-### Citations Table
+- `run_id` -> `issue_map`
+- `issue_id` -> claim objects
+- `claim_id` -> supporting/opposing citation IDs
+- rendered evidence items -> citation IDs
 
-Store all fields from §1 citation object:
-- Required: `citation_id`, `source_id`, `publisher`, `doc_id`, `chunk_id`, `url`, `title`, `published_at`, `fetched_at`
-- Optional: `quote_text` for full-text sources
-- Optional: `snippet_text` for metadata-only sources
-- Foreign keys to sources, documents, chunks tables
-- Indexes on: `source_id`, `doc_id`, `published_at`
-
-### Synthesis-Bullets Mapping
-
-Junction table or embedded structure mapping:
-- `synthesis_id` → list of bullets → list of citation IDs
-- Store section (`prevailing`, `counter`, `minority`, `watch`) + bullet index
-- Enable retrieval: "Which citations support bullet N in section X of synthesis Y?"
-
-### Evidence-Pack Store
-
-Store evidence pack metadata (§4.4):
-- `pack_id`, `query`, `generated_at`
-- List of chunks with: `chunk_id`, `source_id`, `score`, `credibility_tier`
-- Diversity stats: `unique_publishers`, `tier_1_pct`, `tier_2_pct`, `tier_3_pct`, `tier_4_pct`, `max_publisher_pct`
-
-**Full schema DDL lives in:** `artifacts/modelling/data_model.md` (see that file for SQLite CREATE TABLE statements).
+This enables validator audits, debugging, and decision-record persistence.
 
 ---
 
-## 9. Implementation Checklist
+## 15. Acceptance Summary
 
-Before marking this deliverable as complete, ensure:
-
-- [ ] Citation object schema implemented in data_model.md
-- [ ] Claim-level (sentence/span) citation binding enforced in synthesis prompts (Section 3)
-- [ ] Citation validator implemented and tested
-- [ ] Evidence-pack retrieval respects diversity + credibility constraints
-- [ ] Paywall sources handled correctly (metadata-only, no full-text)
-- [ ] Abstain language included in synthesis templates
-- [ ] Citation presentation format implemented in output renderer
-- [ ] Validator runs before every synthesis output delivery
-- [ ] Test cases include: missing citations, paywalled sources, insufficient evidence scenarios
-
----
-
-## 10. Example: Valid vs Invalid Outputs
-
-### ✓ Valid Output (passes validation)
-
-```markdown
-## Prevailing View
-- The Federal Reserve held rates at 5.25-5.50% in February, citing persistent inflation. [1][2]
-- Q4 GDP grew 2.9%, slightly above consensus. [3]
-
-## Counterarguments
-- Some economists warn the Fed risks over-tightening into a slowdown. [4][5]
-
-## Minority View
-- [Insufficient evidence to represent minority views on this topic]
-
-## What to Watch
-- Next CPI release on March 12. [6]
-
-## References
-[1] Federal Reserve. "FOMC Statement". Feb 10, 2026. https://...
-[2] Reuters. "Fed holds rates steady". Feb 10, 2026. https://...
-[3] BEA. "GDP Q4 2025 Advance Estimate". Jan 30, 2026. https://...
-[4] Financial Times. "Is the Fed over-tightening?". Feb 9, 2026. https://... [Paywall]
-[5] Brookings. "Monetary Policy Debate". Feb 8, 2026. https://...
-[6] BLS. "Economic Release Schedule". https://...
-```
-
-### ✗ Invalid Output (fails validation)
-
-```markdown
-## Prevailing View
-- The Federal Reserve held rates at 5.25-5.50% in February.
-  ❌ No citation
-
-- Markets are expecting a rate cut in Q3.
-  ❌ No citation (speculative claim)
-
-## Counterarguments
-- Some economists think inflation is actually falling faster than the Fed realizes. [99]
-  ❌ Citation [99] does not exist in evidence store
-
-## Minority View
-- According to insider sources, the Fed will cut rates in March.
-  ❌ No citation; "insider sources" is not a stored document
-
-## References
-[99] Anonymous. "Insider Fed leak". <no URL>
-  ❌ Invalid citation: no URL, no published_at, not in source_registry
-```
-
-**Validator action:** Reject output, strip uncited bullets, retry synthesis with explicit "cite everything" instruction.
-
----
-
-## 11. Summary
-
-This citation contract ensures:
-
-1. **No uncited claims** — Every bullet has ≥1 citation to stored evidence
-2. **Validator enforcement** — Pre-delivery checks reject outputs with missing/invalid citations
-3. **Evidence diversity** — Retrieval avoids one-source dominance, balances credibility tiers
-4. **Paywall compliance** — Metadata-only for paywalled sources; no fabrication
-5. **Explicit abstention** — "Insufficient evidence" over unsupported claims
-6. **Transparency** — Citations include URL, timestamp, publisher; user can verify
-
-**Next step:** Implement citation validator in `apps/agent/validators/citation_validator.py` and integrate into synthesis pipeline (see `pipeline.md`).
+1. No uncited delivered claims
+2. Issue planner and claim composer output schema-valid JSON
+3. Claims stay grounded in deterministic evidence
+4. Renderer never shows unsupported prose
+5. Explicit abstention replaces unsupported synthesis
