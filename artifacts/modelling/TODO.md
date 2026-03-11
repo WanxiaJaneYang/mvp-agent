@@ -1,6 +1,6 @@
 # Modelling TODO (Prophet-Inspired, Project-Scoped)
 
-Last updated: 2026-02-19
+Last updated: 2026-03-12
 
 ## Priority Queue
 
@@ -16,18 +16,24 @@ Last updated: 2026-02-19
 - [ ] P1: Add role-lane orchestration spec (research/risk/editorial/reviewer)
   - Acceptance: phase prompts, inputs/outputs, and failover behavior documented.
 
+- [ ] P1: Define issue planner contract and prompt interface
+  - Acceptance: issue map schema, provider interface, retry policy, and evaluation criteria documented.
+
+- [ ] P1: Define claim composer contract and prompt interface
+  - Acceptance: claim object schema, grounding rules, delta fields, and evaluation criteria documented.
+
 - [ ] P1: Extend validator gates for deterministic fail/abstain behavior
   - Acceptance: explicit gate matrix for citation, paywall, diversity, and budget constraints.
 
 - [ ] P2: Define fixed output templates (daily brief, event-risk brief, portfolio delta)
-  - Acceptance: template examples with required sections and max-length constraints.
+  - Acceptance: issue-centered template examples with required sections, visible evidence blocks, and max-length constraints.
 
 - [ ] P2: Define reliability metrics and weekly review report format
   - Acceptance: metric definitions, SQL/source mapping, and reporting cadence.
 
 ## Notes
 
-- Keep all work aligned with PRD v1.1 constraints: local-first, citation-grounded, no trading instructions.
+- Keep all work aligned with PRD v1.2 constraints: local-first, citation-grounded, issue-centered, no trading instructions.
 - Do not relax paywall, budget hard-stop, or evidence requirements.
 - Treat alert delivery as post-daily-brief scope until the daily-brief path is stable.
 - Use `docs/status-matrix.md` as the canonical modelled/coded/verified status view.
