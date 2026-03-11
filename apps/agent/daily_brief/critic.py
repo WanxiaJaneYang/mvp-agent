@@ -4,7 +4,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from apps.agent.daily_brief.model_interfaces import CriticInput, CriticProvider
-from apps.agent.pipeline.types import CriticReport
+from apps.agent.pipeline.types import CriticReport, CriticStatus
 
 PARAPHRASE_VERBS = (
     " according to ",
@@ -78,7 +78,7 @@ def review_brief_locally(
                 _append_reason(reason_codes, "empty_why_it_matters")
                 flagged_claim_ids.add(claim_id)
 
-    status = "pass"
+    status: CriticStatus = "pass"
     if reason_codes:
         status = "warn"
     if any(code in HARD_FAIL_REASON_CODES for code in reason_codes):
