@@ -118,6 +118,9 @@ Failure handling:
 
 Actions:
 - call provider-agnostic issue planner with bounded `evidence_pack` and optional `prior_brief_context`
+- resolve provider runtime before the model call:
+  - `openai` -> API-backed runtime with explicit API billing/quota
+  - `codex-oauth` -> local `codex exec` runtime using `codex login` credentials
 - require schema-valid JSON output only
 - identify 2-3 important issues when evidence supports them
 - assign support/opposition/minority/watch evidence groups per issue
@@ -127,12 +130,14 @@ Outputs:
 
 Failure handling:
 - timeout or invalid JSON -> retry once with same inputs
+- missing provider auth -> fail fast with provider-specific guidance
 - second failure -> brief-level abstain
 
 ### Stage 8: Claim Composition (Model Layer)
 
 Actions:
 - call provider-agnostic claim composer with `issue_map`, `citation_store`, and `prior_brief_context`
+- use the same resolved provider runtime family as Stage 7 for one run
 - require schema-valid JSON output only
 - produce structured claims for `prevailing`, `counter`, `minority`, and `watch`
 - include `why_it_matters`, `confidence`, and `novelty_vs_prior_brief`
@@ -142,6 +147,7 @@ Outputs:
 
 Failure handling:
 - timeout or invalid JSON -> retry once with same inputs
+- provider transport failure after issue planning -> fail the run or brief-level abstain with explicit provider error
 - second failure -> brief-level abstain
 
 ### Stage 9: Validation + Critic
@@ -192,6 +198,8 @@ Failure handling:
 - issue planner: max 1 retry
 - claim composer: max 1 retry
 - validation-triggered composer retry: max 1 additional composer retry
+- provider-auth failures: 0 retries
+- provider-misconfiguration failures: 0 retries
 - no infinite retries; all retries are deterministic and bounded
 
 ## 6. Abstain Policy
@@ -218,3 +226,4 @@ Each run must persist:
 - incremental run behavior is defined
 - hard limits and budget stop conditions are explicit
 - daily brief architecture is issue-centered rather than one-query / one-bucket synthesis
+- provider runtime can switch between API-key and Codex-OAuth transports without changing downstream contracts

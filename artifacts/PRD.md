@@ -32,7 +32,9 @@ The product goal is not to summarize sources one by one. It should identify the 
 - **Major event alerts:** notify on significant events with rate limiting.
 - **Cite everything:** every delivered claim must have valid evidence coverage.
 - **Local-first evidence layer:** runs on the user's machine; portfolio data stored locally.
-- **Model-assisted synthesis:** provider-agnostic interface with OpenAI as the first supported provider.
+- **Model-assisted synthesis:** provider-agnostic interface with two first-class runtime paths:
+  - OpenAI API via project-scoped API key
+  - Codex OAuth via local `codex login` / ChatGPT sign-in
 - **Lightweight UI:**
   - local daily analysis page (static HTML)
   - email delivery for daily brief and alerts
@@ -183,7 +185,25 @@ The claim composer must output JSON objects similar to:
 
 Free-form prose generation without structured JSON is out of scope for the model interface.
 
-### 6.7 Daily brief delivery
+### 6.7 Provider Runtime Modes
+The model layer must stay provider-agnostic above the transport/runtime boundary.
+
+Supported runtime modes:
+- `deterministic`
+  - no model calls; legacy local fallback for fixtures and abstain-safe paths
+- `openai`
+  - uses OpenAI API credentials and quota via the Responses API
+- `codex-oauth`
+  - uses the locally authenticated Codex CLI runtime backed by ChatGPT sign-in
+  - must not require `OPENAI_API_KEY`
+
+Provider invariants:
+- issue planner and claim composer still consume the same internal typed inputs
+- issue planner and claim composer still return the same schema-valid JSON
+- renderer, validator, and decision record layers must not care which provider runtime produced the JSON
+- provider switching must not weaken citation, paywall, or budget constraints
+
+### 6.8 Daily brief delivery
 - Generate once per day in user timezone.
 - Deliver via:
   - email
@@ -191,7 +211,7 @@ Free-form prose generation without structured JSON is out of scope for the model
 - Show exact evidence supporting each argument.
 - Show what changed since the prior brief through claim-level delta, not a renderer-only heuristic.
 
-### 6.8 Major event alerts
+### 6.9 Major event alerts
 Trigger categories (v1):
 - **Policy (Tier 1):** new central bank statement/minutes/speech/press release
 - **Macro releases (Tier 1):** CPI/jobs/GDP and other major official releases
@@ -205,7 +225,7 @@ Rate limiting:
 - enforce cooldown + daily cap
 - bundle minor items into next daily brief
 
-### 6.9 Portfolio input & relevance
+### 6.10 Portfolio input & relevance
 UI allows manual input:
 - tickers + weights (required)
 
@@ -231,11 +251,13 @@ Outputs:
 ### 7.3 Privacy & security
 - Portfolio stored locally.
 - API keys stored locally in environment variables / `.env` (never committed).
+- Codex OAuth credentials remain under the user's local Codex auth store and must not be copied into repo artifacts.
 
 ### 7.4 Maintainability
 - Source registry is config-driven.
 - Modular components: ingestion, extraction, indexing, evidence, issue planning, claim composition, validation, delivery.
 - Provider integrations must be replaceable without changing renderer or validation contracts.
+- CLI-backed providers must be bounded, deterministic at the transport layer, and safe to disable when auth is missing.
 
 ## 8. Content & UX Requirements
 - Calm, concise, evidence-based tone.
@@ -295,6 +317,7 @@ Outputs:
 - **Paywalls / crawling restrictions:** metadata/snippet + link-out; prefer RSS and official sources.
 - **Alert noise:** thresholds + rate limiting + bundling.
 - **Source quality drift:** credibility tiers and allowlist/blocklist.
+- **Provider/runtime drift:** keep a shared JSON contract above provider adapters and validate provider outputs before rendering.
 
 ## 12. Phased Delivery Plan
 

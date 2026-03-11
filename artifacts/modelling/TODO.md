@@ -4,6 +4,12 @@ Last updated: 2026-03-12
 
 ## Priority Queue
 
+- [ ] P0: Define Codex OAuth runtime adapter contract for daily brief providers
+  - Acceptance: auth discovery, command boundary, output parsing, and failure modes documented for `codex-oauth`.
+
+- [ ] P0: Define provider selection and registry contract for daily brief runner scripts
+  - Acceptance: one spec covers `deterministic`, `openai`, and `codex-oauth` selection plus provider-specific config validation.
+
 - [x] P0: Define `decision_record` artifact schema and storage location
   - Acceptance: markdown spec + JSON example + field-level validation rules.
 
