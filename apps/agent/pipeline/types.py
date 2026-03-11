@@ -26,6 +26,7 @@ DailyBriefClaimKind = Literal["prevailing", "counter", "minority", "watch"]
 DailyBriefNoveltyLabel = Literal["new", "continued", "reframed", "weakened", "strengthened", "reversed", "unknown"]
 CitationValidationStatus = Literal["ok", "partial", "retry"]
 FinalSynthesisStatus = Literal["ok", "partial", "abstained"]
+CriticStatus = Literal["pass", "warn", "fail"]
 
 
 DAILY_BRIEF_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = (
@@ -255,6 +256,12 @@ class FinalSynthesisResult(TypedDict):
     abstain_reason: str | None
 
 
+class CriticReport(TypedDict):
+    status: CriticStatus
+    reason_codes: list[str]
+    flagged_claim_ids: list[str]
+
+
 class DailyBriefSectionBulletRow(TypedDict):
     synthesis_id: str
     section: DailyBriefOutputSection
@@ -355,6 +362,7 @@ class DailyBriefSynthesisStageData:
     citation_store: dict[str, CitationStoreEntry]
     stage8_result: CitationValidationResult
     final_result: FinalSynthesisResult
+    critic_report: CriticReport | None
     citation_rows: list[CitationStoreEntry]
     synthesis_bullet_rows: list[DailyBriefSectionBulletRow]
     bullet_citation_rows: list[BulletCitationRow]

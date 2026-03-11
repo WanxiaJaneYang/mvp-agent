@@ -7,10 +7,12 @@ from typing import get_type_hints
 from apps.agent.daily_brief.model_interfaces import (
     ClaimComposerInput,
     ClaimComposerProvider,
+    CriticInput,
+    CriticProvider,
     IssuePlannerInput,
     IssuePlannerProvider,
 )
-from apps.agent.pipeline.types import IssueMap, StructuredClaim
+from apps.agent.pipeline.types import CriticReport, IssueMap, StructuredClaim
 
 
 class DailyBriefModelInterfaceTests(unittest.TestCase):
@@ -28,6 +30,13 @@ class DailyBriefModelInterfaceTests(unittest.TestCase):
         self.assertEqual(hints["brief_input"], ClaimComposerInput)
         self.assertEqual(hints["return"], list[StructuredClaim])
 
+    def test_critic_provider_is_task_specific(self) -> None:
+        signature = inspect.signature(CriticProvider.review_brief)
+        self.assertIn("brief_input", signature.parameters)
+        hints = get_type_hints(CriticProvider.review_brief)
+        self.assertEqual(hints["brief_input"], CriticInput)
+        self.assertEqual(hints["return"], CriticReport)
+
     def test_interface_inputs_use_structured_context(self) -> None:
         self.assertEqual(
             set(IssuePlannerInput.__annotations__),
@@ -39,6 +48,16 @@ class DailyBriefModelInterfaceTests(unittest.TestCase):
                 "run_id",
                 "generated_at_utc",
                 "issue_map",
+                "citation_store",
+                "prior_brief_context",
+            },
+        )
+        self.assertEqual(
+            set(CriticInput.__annotations__),
+            {
+                "run_id",
+                "generated_at_utc",
+                "synthesis",
                 "citation_store",
                 "prior_brief_context",
             },
