@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Callable, Mapping
 from typing import Any, cast
@@ -24,9 +25,9 @@ class OpenAIResponsesTextClient:
         self._client = client
         self._model = model
 
-    def create_json_response(self, request_payload: Mapping[str, Any]) -> str:
+    def create_json_response(self, request_payload: Mapping[str, Any]) -> str | list[dict[str, Any]]:
         system_message, input_messages = _split_messages(request_payload=request_payload)
-        text_format = _build_text_format(request_payload=request_payload)
+        text_format, array_wrapper_key = _build_text_format(request_payload=request_payload)
         response = self._client.responses.create(
             model=self._model,
             instructions=system_message,
@@ -36,7 +37,15 @@ class OpenAIResponsesTextClient:
         output_text = getattr(response, "output_text", None)
         if not isinstance(output_text, str) or not output_text.strip():
             raise ValueError("OpenAI response did not include output_text.")
-        return output_text
+        if array_wrapper_key is None:
+            return output_text
+        parsed_output = json.loads(output_text)
+        if not isinstance(parsed_output, Mapping):
+            raise ValueError("OpenAI response did not match wrapped schema.")
+        items = parsed_output.get(array_wrapper_key)
+        if not isinstance(items, list):
+            raise ValueError("OpenAI response did not include wrapped items.")
+        return [dict(item) for item in items if isinstance(item, Mapping)]
 
 
 def build_openai_daily_brief_providers(
@@ -115,7 +124,7 @@ def _split_messages(*, request_payload: Mapping[str, Any]) -> tuple[str | None, 
     return instructions, input_messages
 
 
-def _build_text_format(*, request_payload: Mapping[str, Any]) -> dict[str, Any]:
+def _build_text_format(*, request_payload: Mapping[str, Any]) -> tuple[dict[str, Any], str | None]:
     response_format = request_payload.get("response_format")
     if not isinstance(response_format, Mapping):
         raise ValueError("OpenAI request payload requires response_format.")
@@ -128,9 +137,26 @@ def _build_text_format(*, request_payload: Mapping[str, Any]) -> dict[str, Any]:
     schema = json_schema.get("schema")
     if not name or not isinstance(schema, Mapping):
         raise ValueError("OpenAI request payload requires a named schema.")
-    return {
+    wrapped_schema, array_wrapper_key = _wrap_array_schema(schema=dict(schema))
+    return ({
         "type": "json_schema",
         "name": name,
-        "schema": dict(schema),
+        "schema": wrapped_schema,
         "strict": bool(json_schema.get("strict", False)),
-    }
+    }, array_wrapper_key)
+
+
+def _wrap_array_schema(*, schema: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    if schema.get("type") != "array":
+        return schema, None
+    return (
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["items"],
+            "properties": {
+                "items": schema,
+            },
+        },
+        "items",
+    )

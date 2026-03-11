@@ -30,9 +30,11 @@ class OpenAIClaimComposerTests(unittest.TestCase):
         payload = composer.build_request_payload(brief_input=brief_input)
 
         self.assertEqual(payload["run_id"], "run_001")
-        self.assertEqual(payload["issue_map"][0]["issue_id"], "issue_oil")
-        self.assertEqual(payload["citation_store"]["cite_001"]["citation_id"], "cite_001")
-        self.assertEqual(payload["prior_brief_context"]["issue_count"], 1)
+        self.assertEqual(payload["input"]["issue_map"][0]["issue_id"], "issue_oil")
+        self.assertEqual(payload["input"]["citation_store"]["cite_001"]["citation_id"], "cite_001")
+        self.assertEqual(payload["input"]["prior_brief_context"]["issue_count"], 1)
+        self.assertEqual(payload["response_format"]["type"], "json_schema")
+        self.assertEqual(payload["messages"][0]["role"], "system")
 
     def test_composes_claims_from_schema_valid_json(self) -> None:
         composer = OpenAIClaimComposer(
@@ -117,7 +119,7 @@ class OpenAIClaimComposerTests(unittest.TestCase):
         )
 
         self.assertEqual(captured_payload["run_id"], "run_001")
-        self.assertEqual(captured_payload["prior_brief_context"]["issue_count"], 1)
+        self.assertEqual(captured_payload["input"]["prior_brief_context"]["issue_count"], 1)
         self.assertEqual(result[0]["claim_id"], "claim_oil_prevailing")
 
     def test_rejects_malformed_claim_output(self) -> None:

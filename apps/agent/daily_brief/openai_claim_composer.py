@@ -18,6 +18,36 @@ VALID_NOVELTY_LABELS = {
     "unknown",
 }
 REQUIRED_STRUCTURED_CLAIM_FIELDS = frozenset(StructuredClaim.__annotations__)
+REQUEST_TASK = "daily_brief_claim_composer"
+CLAIM_COMPOSER_SYSTEM_PROMPT = (
+    "You are composing issue-centered daily brief claims from a bounded evidence set. "
+    "Use only the supplied issue map, citation store, and prior context. "
+    "Return strict JSON matching the structured-claim schema."
+)
+STRUCTURED_CLAIMS_JSON_SCHEMA: dict[str, Any] = {
+    "name": "structured_claims_list",
+    "strict": True,
+    "schema": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": sorted(REQUIRED_STRUCTURED_CLAIM_FIELDS),
+            "properties": {
+                "claim_id": {"type": "string"},
+                "issue_id": {"type": "string"},
+                "claim_kind": {"type": "string", "enum": sorted(VALID_CLAIM_KINDS)},
+                "claim_text": {"type": "string"},
+                "supporting_citation_ids": {"type": "array", "items": {"type": "string"}},
+                "opposing_citation_ids": {"type": "array", "items": {"type": "string"}},
+                "confidence": {"type": "string"},
+                "novelty_vs_prior_brief": {"type": "string", "enum": sorted(VALID_NOVELTY_LABELS)},
+                "why_it_matters": {"type": "string"},
+            },
+        },
+    },
+}
 
 
 class OpenAIClaimComposer(ClaimComposerProvider):
@@ -26,18 +56,32 @@ class OpenAIClaimComposer(ClaimComposerProvider):
 
     def build_request_payload(self, *, brief_input: ClaimComposerInput) -> dict[str, Any]:
         return {
+            "task": REQUEST_TASK,
             "run_id": str(brief_input["run_id"]),
             "generated_at_utc": str(brief_input["generated_at_utc"]),
-            "issue_map": [dict(issue) for issue in brief_input["issue_map"]],
-            "citation_store": {
-                str(citation_id): dict(citation_payload)
-                for citation_id, citation_payload in brief_input["citation_store"].items()
+            "response_format": {"type": "json_schema", "json_schema": STRUCTURED_CLAIMS_JSON_SCHEMA},
+            "messages": [
+                {"role": "system", "content": CLAIM_COMPOSER_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        "Compose structured prevailing, counter, minority, and watch claims "
+                        "for each issue. Return only strict JSON matching the schema."
+                    ),
+                },
+            ],
+            "input": {
+                "issue_map": [dict(issue) for issue in brief_input["issue_map"]],
+                "citation_store": {
+                    str(citation_id): dict(citation_payload)
+                    for citation_id, citation_payload in brief_input["citation_store"].items()
+                },
+                "prior_brief_context": (
+                    None
+                    if brief_input["prior_brief_context"] is None
+                    else dict(brief_input["prior_brief_context"])
+                ),
             },
-            "prior_brief_context": (
-                None
-                if brief_input["prior_brief_context"] is None
-                else dict(brief_input["prior_brief_context"])
-            ),
         }
 
     def parse_response_payload(self, *, payload: str | list[dict[str, Any]]) -> list[StructuredClaim]:
