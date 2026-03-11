@@ -28,6 +28,12 @@ Use `explore -> plan -> code -> verify -> commit` for implementation tasks.
 Use `issue -> PR -> merge` as the default delivery path for all finalized work.
 This applies to design changes, planning documents, implementation work, and bug fixes.
 
+For redesign-heavy work, use the staged delivery chain:
+`redesign issue -> redesign PR -> merge -> planning issue/PR -> merge -> child issues -> implementation PRs -> merge`.
+
+When a redesign expands into multiple execution tracks, do not jump straight from redesign into local implementation.
+First land planning, then split the work into child issues, then execute implementation through an agent team aligned to those child issues.
+
 ### Operating standards
 1. Inspect repository state first (`git status`, current branch, pending local changes).
 2. Keep changes minimal and aligned with existing architecture and conventions.
@@ -35,7 +41,9 @@ This applies to design changes, planning documents, implementation work, and bug
 4. Update docs when behavior, commands, or workflow changes.
 5. Summarize what changed, what was validated, and any residual risk.
 6. When a step is finalized, make sure it is tracked through an issue first, then committed into a PR (or the active PR), and merged instead of leaving completed local-only work unpushed.
-7. For independent tasks that are unlikely to conflict, use separate branches and separate MRs instead of combining them in one MR.
+7. After redesign is merged, create a planning step before implementation starts; if the plan yields multiple workstreams, create child issues before coding.
+8. For independent tasks that are unlikely to conflict, use separate branches and separate MRs instead of combining them in one MR.
+9. For multi-stream implementation, prefer an agent team working against child issues instead of one undifferentiated branch of work.
 
 ### Repo-specific non-negotiables
 1. No uncited factual claims in generated analysis outputs.
