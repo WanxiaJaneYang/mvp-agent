@@ -9,11 +9,19 @@ from pathlib import Path
 from smtplib import SMTP
 from typing import Any, cast
 
+from apps.agent.daily_brief.model_interfaces import (
+    ClaimComposerInput,
+    ClaimComposerProvider,
+    IssuePlannerInput,
+    IssuePlannerProvider,
+)
+from apps.agent.daily_brief.prior_brief_context import build_prior_brief_context
 from apps.agent.daily_brief.synthesis import (
     SynthesisRetryPlan,
     build_changed_section,
     build_citation_store,
     build_synthesis,
+    build_synthesis_from_structured_claims,
 )
 from apps.agent.delivery.email_sender import EmailDeliveryConfig, send_daily_brief_email
 from apps.agent.delivery.html_report import render_daily_brief_html
@@ -34,6 +42,7 @@ from apps.agent.pipeline.stage10_decision_record import build_and_persist_decisi
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_OUTPUT_SECTIONS,
     BulletCitationRow,
+    CitationStoreEntry,
     CitationValidationResult,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
@@ -43,12 +52,14 @@ from apps.agent.pipeline.types import (
     DailyBriefSynthesisStageData,
     EvidencePackItem,
     FtsRow,
+    IssueMap,
     RunStatus,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
     SourceRegistryEntry,
     SourceRow,
     StageResult,
+    StructuredClaim,
 )
 from apps.agent.portfolio.input_store import load_portfolio_positions
 from apps.agent.portfolio.relevance import build_portfolio_relevance_flags
@@ -129,6 +140,8 @@ def run_fixture_daily_brief(
     delivery_schedule: DailyBriefSchedule | None = None,
     email_config: EmailDeliveryConfig | None = None,
     smtp_class: Any = SMTP,
+    issue_planner: IssuePlannerProvider | None = None,
+    claim_composer: ClaimComposerProvider | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -145,6 +158,8 @@ def run_fixture_daily_brief(
                 delivery_schedule=delivery_schedule,
                 email_config=email_config,
                 smtp_class=smtp_class,
+                issue_planner=issue_planner,
+                claim_composer=claim_composer,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -199,6 +214,8 @@ def run_daily_brief(
     delivery_schedule: DailyBriefSchedule | None = None,
     email_config: EmailDeliveryConfig | None = None,
     smtp_class: Any = SMTP,
+    issue_planner: IssuePlannerProvider | None = None,
+    claim_composer: ClaimComposerProvider | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -216,6 +233,8 @@ def run_daily_brief(
                 delivery_schedule=delivery_schedule,
                 email_config=email_config,
                 smtp_class=smtp_class,
+                issue_planner=issue_planner,
+                claim_composer=claim_composer,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -272,6 +291,8 @@ def _execute_daily_brief_slice(
     delivery_schedule: DailyBriefSchedule | None = None,
     email_config: EmailDeliveryConfig | None = None,
     smtp_class: Any = SMTP,
+    issue_planner: IssuePlannerProvider | None = None,
+    claim_composer: ClaimComposerProvider | None = None,
 ) -> dict[str, Any]:
     report_date = generated_at_utc[:10]
     schedule = delivery_schedule or DailyBriefSchedule()
@@ -297,7 +318,10 @@ def _execute_daily_brief_slice(
         stage_data=corpus_data,
         registry=input_data.registry,
         run_id=run_id,
+        generated_at_utc=generated_at_utc,
         previous_synthesis=_load_previous_synthesis(base_dir=base_dir, report_date=report_date),
+        issue_planner=issue_planner,
+        claim_composer=claim_composer,
     )
     portfolio_positions = load_portfolio_positions(base_dir=base_dir)
     portfolio_relevance_flags = build_portfolio_relevance_flags(
@@ -353,6 +377,8 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "chunks.json", corpus_data.chunks)
     _write_json(artifact_dir / "fts_rows.json", corpus_data.fts_rows)
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
+    _write_json(artifact_dir / "issue_map.json", synthesis_data.issue_map)
+    _write_json(artifact_dir / "claim_objects.json", synthesis_data.structured_claims)
     _write_json(artifact_dir / "citations.json", synthesis_data.citation_rows)
     _write_json(artifact_dir / "synthesis.json", synthesis_data.final_result["synthesis"])
     _write_json(artifact_dir / "synthesis_bullets.json", synthesis_data.synthesis_bullet_rows)
@@ -371,6 +397,8 @@ def _execute_daily_brief_slice(
             "run_id": run_id,
             "report_date": report_date,
             "query_text": synthesis_data.query_text,
+            "issue_count": len(synthesis_data.issue_map),
+            "claim_count": len(synthesis_data.structured_claims),
             "docs_fetched": context.counters.docs_fetched,
             "docs_ingested": context.counters.docs_ingested,
             "chunks_indexed": context.counters.chunks_indexed,
@@ -501,8 +529,15 @@ def build_daily_brief_synthesis(
     stage_data: DailyBriefCorpusStageData,
     registry: Mapping[str, SourceRegistryEntry],
     run_id: str,
+    generated_at_utc: str | None = None,
     previous_synthesis: Mapping[str, Any] | None = None,
+    issue_planner: IssuePlannerProvider | None = None,
+    claim_composer: ClaimComposerProvider | None = None,
 ) -> DailyBriefSynthesisStageData:
+    if (issue_planner is None) != (claim_composer is None):
+        raise ValueError("Daily brief synthesis requires both issue_planner and claim_composer together.")
+
+    synthesis_generated_at_utc = generated_at_utc or _utc_now_iso()
     query_text = build_daily_brief_query(documents=stage_data.documents)
     evidence_pack_report = build_evidence_pack_report(
         fts_rows=stage_data.fts_rows,
@@ -522,6 +557,22 @@ def build_daily_brief_synthesis(
         documents_by_id=documents_by_id,
         chunks_by_id=chunks_by_id,
     )
+    prior_brief_context = build_prior_brief_context(
+        previous_synthesis=previous_synthesis,
+        previous_generated_at_utc=None,
+    )
+    use_structured_orchestration = issue_planner is not None and claim_composer is not None
+    issue_map: list[IssueMap] = []
+    structured_claims: list[StructuredClaim] = []
+    if use_structured_orchestration:
+        issue_map = _build_issue_map(
+            query_text=query_text,
+            evidence_pack_items=evidence_pack_items,
+            issue_planner=issue_planner,
+            prior_brief_context=prior_brief_context,
+            run_id=run_id,
+            generated_at_utc=synthesis_generated_at_utc,
+        )
     validation_registry = _build_validation_registry(
         registry=registry,
         documents=stage_data.documents,
@@ -530,12 +581,25 @@ def build_daily_brief_synthesis(
     stage8_result: CitationValidationResult | None = None
     retry_plan: SynthesisRetryPlan | None = None
     for validation_attempt in range(1, MAX_VALIDATION_ATTEMPTS + 1):
-        synthesis = build_synthesis(
-            evidence_items=evidence_pack_items,
-            documents_by_id=documents_by_id,
-            citation_store=citation_store,
-            retry_plan=retry_plan,
-        )
+        if use_structured_orchestration:
+            structured_claims = _build_structured_claims(
+                issue_map=issue_map,
+                citation_store=citation_store,
+                evidence_pack_items=evidence_pack_items,
+                documents_by_id=documents_by_id,
+                claim_composer=claim_composer,
+                prior_brief_context=prior_brief_context,
+                run_id=run_id,
+                generated_at_utc=synthesis_generated_at_utc,
+            )
+            synthesis = build_synthesis_from_structured_claims(structured_claims=structured_claims)
+        else:
+            synthesis = build_synthesis(
+                evidence_items=evidence_pack_items,
+                documents_by_id=documents_by_id,
+                citation_store=citation_store,
+                retry_plan=retry_plan,
+            )
         current_result = run_stage8_citation_validation(
             synthesis,
             citation_store,
@@ -575,11 +639,26 @@ def build_daily_brief_synthesis(
             **final_result,
             "synthesis": cast(DailyBriefSynthesis, final_synthesis),
         }
+    if not use_structured_orchestration:
+        issue_map = _build_issue_map(
+            query_text=query_text,
+            evidence_pack_items=evidence_pack_items,
+            issue_planner=None,
+            prior_brief_context=prior_brief_context,
+            run_id=run_id,
+            generated_at_utc=synthesis_generated_at_utc,
+        )
+        structured_claims = _build_structured_claims_from_synthesis(
+            issue_map=issue_map,
+            synthesis=final_result["synthesis"],
+        )
     synthesis_id = build_synthesis_id(run_id=run_id)
     return DailyBriefSynthesisStageData(
         query_text=query_text,
         evidence_pack_items=evidence_pack_items,
         evidence_pack_report=evidence_pack_report,
+        issue_map=issue_map,
+        structured_claims=structured_claims,
         citation_store=stage8_result["citation_store"],
         stage8_result=stage8_result,
         final_result=final_result,
@@ -599,7 +678,7 @@ def _build_retry_plan(
     *,
     synthesis: DailyBriefSynthesis,
     validation_result: CitationValidationResult,
-    citation_store: Mapping[str, Mapping[str, Any]],
+    citation_store: Mapping[str, CitationStoreEntry],
 ) -> SynthesisRetryPlan:
     target_sections = tuple(
         section
@@ -651,11 +730,132 @@ def _build_retry_plan(
     )
 
 
+def _build_issue_map(
+    *,
+    query_text: str,
+    evidence_pack_items: list[EvidencePackItem],
+    issue_planner: IssuePlannerProvider | None,
+    prior_brief_context: dict[str, Any] | None,
+    run_id: str,
+    generated_at_utc: str,
+) -> list[IssueMap]:
+    if issue_planner is not None:
+        return issue_planner.plan_issues(
+            brief_input=IssuePlannerInput(
+                run_id=run_id,
+                generated_at_utc=generated_at_utc,
+                evidence_pack=[dict(item) for item in evidence_pack_items],
+                prior_brief_context=prior_brief_context,
+            )
+        )
+
+    fallback_topic = query_text or "today's dominant narrative"
+    issue_question = (
+        f"What is the latest debate around {query_text}?"
+        if query_text
+        else "What is the latest market debate?"
+    )
+    chunk_ids = [str(item["chunk_id"]) for item in evidence_pack_items]
+    return [
+        IssueMap(
+            issue_id="issue_001",
+            issue_question=issue_question,
+            thesis_hint=f"The latest evidence pack centers on {fallback_topic}.",
+            supporting_evidence_ids=chunk_ids[:2],
+            opposing_evidence_ids=chunk_ids[2:3],
+            minority_evidence_ids=chunk_ids[3:4],
+            watch_evidence_ids=chunk_ids[:1],
+        )
+    ]
+
+
+def _build_structured_claims(
+    *,
+    issue_map: list[IssueMap],
+    citation_store: Mapping[str, CitationStoreEntry],
+    evidence_pack_items: list[EvidencePackItem],
+    documents_by_id: Mapping[str, RuntimeDocumentRecord],
+    claim_composer: ClaimComposerProvider | None,
+    prior_brief_context: dict[str, Any] | None,
+    run_id: str,
+    generated_at_utc: str,
+) -> list[StructuredClaim]:
+    if claim_composer is not None:
+        return claim_composer.compose_claims(
+            brief_input=ClaimComposerInput(
+                run_id=run_id,
+                generated_at_utc=generated_at_utc,
+                issue_map=issue_map,
+                citation_store={key: dict(value) for key, value in citation_store.items()},
+                prior_brief_context=prior_brief_context,
+            )
+        )
+
+    legacy_synthesis = build_synthesis(
+        evidence_items=evidence_pack_items,
+        documents_by_id=documents_by_id,
+        citation_store=citation_store,
+    )
+    issue_id = issue_map[0]["issue_id"] if issue_map else "issue_001"
+    structured_claims: list[StructuredClaim] = []
+    for claim_kind in ("prevailing", "counter", "minority", "watch"):
+        bullets = legacy_synthesis.get(claim_kind, [])
+        if not isinstance(bullets, list):
+            continue
+        for index, bullet in enumerate(bullets, start=1):
+            if not isinstance(bullet, Mapping):
+                continue
+            structured_claims.append(
+                StructuredClaim(
+                    claim_id=f"{issue_id}_{claim_kind}_{index:03d}",
+                    issue_id=issue_id,
+                    claim_kind=claim_kind,
+                    claim_text=str(bullet.get("text", "")),
+                    supporting_citation_ids=[str(citation_id) for citation_id in bullet.get("citation_ids", [])],
+                    opposing_citation_ids=[],
+                    confidence=str(bullet.get("confidence_label", "medium")),
+                    novelty_vs_prior_brief="unknown",
+                    why_it_matters=f"This affects the current {claim_kind} case for the issue.",
+                )
+            )
+    return structured_claims
+
+
+def _build_structured_claims_from_synthesis(
+    *,
+    issue_map: list[IssueMap],
+    synthesis: DailyBriefSynthesis,
+) -> list[StructuredClaim]:
+    issue_id = issue_map[0]["issue_id"] if issue_map else "issue_001"
+    structured_claims: list[StructuredClaim] = []
+    for claim_kind in ("prevailing", "counter", "minority", "watch"):
+        bullets = synthesis.get(claim_kind, [])
+        if not isinstance(bullets, list):
+            continue
+        for index, bullet in enumerate(bullets, start=1):
+            if not isinstance(bullet, Mapping):
+                continue
+            structured_claims.append(
+                StructuredClaim(
+                    claim_id=f"{issue_id}_{claim_kind}_{index:03d}",
+                    issue_id=issue_id,
+                    claim_kind=claim_kind,
+                    claim_text=str(bullet.get("text", "")),
+                    supporting_citation_ids=[str(citation_id) for citation_id in bullet.get("citation_ids", [])],
+                    opposing_citation_ids=[],
+                    confidence=str(bullet.get("confidence_label", "medium")),
+                    novelty_vs_prior_brief="unknown",
+                    why_it_matters=f"This affects the current {claim_kind} case for the issue.",
+                )
+            )
+    return structured_claims
+
+
 def _chunk_ids_for_section(
     *,
     synthesis: Mapping[str, Any],
     section: str,
-    citation_store: Mapping[str, Mapping[str, Any]],
+    citation_store: Mapping[str, CitationStoreEntry],
 ) -> list[str]:
     bullets = synthesis.get(section, [])
     if not isinstance(bullets, list):

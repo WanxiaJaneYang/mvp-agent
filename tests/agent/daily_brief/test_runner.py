@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import get_args, get_type_hints
 from unittest.mock import patch
 
+from apps.agent.daily_brief.model_interfaces import ClaimComposerProvider, IssuePlannerProvider
 from apps.agent.daily_brief.runner import (
     build_daily_brief_corpus,
     build_daily_brief_query,
@@ -31,6 +32,7 @@ from apps.agent.pipeline.types import (
     EvidencePackItem,
     FinalSynthesisResult,
     FtsRow,
+    IssueMap,
     PlannedFetchItem,
     RunContext,
     RunStatus,
@@ -39,6 +41,7 @@ from apps.agent.pipeline.types import (
     RunType,
     SourceRegistryEntry,
     SourceRow,
+    StructuredClaim,
 )
 from apps.agent.portfolio.input_store import PortfolioPosition, replace_portfolio_positions
 from apps.agent.runtime.budget_guard import BudgetCaps
@@ -1116,6 +1119,271 @@ class DailyBriefRunnerTests(unittest.TestCase):
             DailyBriefRunnerTests._FakeSMTP.last_instance.sent_messages[0]["Subject"],
             "Daily Brief: 2026-03-11",
         )
+
+    def test_build_daily_brief_synthesis_calls_issue_planner_before_claim_composer(self):
+        call_order: list[str] = []
+        test_case = self
+
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                call_order.append("planner")
+                test_case.assertEqual(brief_input["generated_at_utc"], "2026-03-10T16:00:00Z")
+                return [
+                    IssueMap(
+                        issue_id="issue_001",
+                        issue_question="Will softer growth change near-term Fed expectations?",
+                        thesis_hint="Growth is cooling, but inflation remains sticky.",
+                        supporting_evidence_ids=["doc_prevailing_chunk_000"],
+                        opposing_evidence_ids=["doc_counter_retry_chunk_000"],
+                        minority_evidence_ids=["doc_minority_chunk_000"],
+                        watch_evidence_ids=["doc_watch_chunk_000"],
+                    )
+                ]
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                call_order.append("composer")
+                test_case.assertEqual(brief_input["issue_map"][0]["issue_id"], "issue_001")
+                test_case.assertEqual(brief_input["generated_at_utc"], "2026-03-10T16:00:00Z")
+                return [
+                    StructuredClaim(
+                        claim_id="claim_prevailing",
+                        issue_id="issue_001",
+                        claim_kind="prevailing",
+                        claim_text="Softer growth is raising later-cut expectations.",
+                        supporting_citation_ids=["cite_003"],
+                        opposing_citation_ids=["cite_005"],
+                        confidence="medium",
+                        novelty_vs_prior_brief="new",
+                        why_it_matters="Rate-sensitive assets remain exposed to data surprises.",
+                    ),
+                    StructuredClaim(
+                        claim_id="claim_counter",
+                        issue_id="issue_001",
+                        claim_kind="counter",
+                        claim_text="Sticky inflation still argues against a quick pivot.",
+                        supporting_citation_ids=["cite_005"],
+                        opposing_citation_ids=["cite_003"],
+                        confidence="medium",
+                        novelty_vs_prior_brief="new",
+                        why_it_matters="Policy may stay restrictive longer than bulls expect.",
+                    ),
+                    StructuredClaim(
+                        claim_id="claim_minority",
+                        issue_id="issue_001",
+                        claim_kind="minority",
+                        claim_text="A smaller camp expects a sharper growth slowdown.",
+                        supporting_citation_ids=["cite_002"],
+                        opposing_citation_ids=[],
+                        confidence="low",
+                        novelty_vs_prior_brief="new",
+                        why_it_matters="Downside tail risk is still present.",
+                    ),
+                    StructuredClaim(
+                        claim_id="claim_watch",
+                        issue_id="issue_001",
+                        claim_kind="watch",
+                        claim_text="The next CPI release is the key falsification point.",
+                        supporting_citation_ids=["cite_001"],
+                        opposing_citation_ids=[],
+                        confidence="high",
+                        novelty_vs_prior_brief="new",
+                        why_it_matters="The next inflation print can reprice the whole debate.",
+                    ),
+                ]
+
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "bls_preview",
+                    "publisher": "BLS Preview Desk",
+                    "canonical_url": "https://example.test/watch",
+                    "title": "Watch Friday CPI for shelter inflation",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "analysis",
+                    "published_at": "2026-03-10T16:00:00Z",
+                    "fetched_at": "2026-03-10T16:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Markets are watching Friday CPI for shelter inflation surprises.",
+                    "body_text": "Watch Friday CPI for shelter inflation surprises.",
+                    "content_hash": "hash_watch",
+                    "status": "active",
+                    "created_at": "2026-03-10T16:05:00Z",
+                    "updated_at": "2026-03-10T16:05:00Z",
+                    "doc_id": "doc_watch",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_issue_flow",
+                },
+                {
+                    "source_id": "market_commentary",
+                    "publisher": "Market Commentary",
+                    "canonical_url": "https://example.test/minority",
+                    "title": "Minority view still expects a hard landing",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "analysis",
+                    "published_at": "2026-03-10T15:30:00Z",
+                    "fetched_at": "2026-03-10T15:35:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "A minority of investors still expects a hard landing.",
+                    "body_text": "A minority of investors still expects a hard landing.",
+                    "content_hash": "hash_minority",
+                    "status": "active",
+                    "created_at": "2026-03-10T15:35:00Z",
+                    "updated_at": "2026-03-10T15:35:00Z",
+                    "doc_id": "doc_minority",
+                    "credibility_tier": 3,
+                    "ingestion_run_id": "run_issue_flow",
+                },
+                {
+                    "source_id": "fed_press_releases",
+                    "publisher": "Federal Reserve",
+                    "canonical_url": "https://example.test/prevailing",
+                    "title": "Fed keeps policy steady",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "statement",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "fetched_at": "2026-03-10T14:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "body_text": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "content_hash": "hash_prevailing",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:05:00Z",
+                    "updated_at": "2026-03-10T14:05:00Z",
+                    "doc_id": "doc_prevailing",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_issue_flow",
+                },
+                {
+                    "source_id": "wsj_markets",
+                    "publisher": "Wall Street Journal",
+                    "canonical_url": "https://example.test/counter-retry",
+                    "title": "Investors question the soft-landing narrative",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T14:20:00Z",
+                    "fetched_at": "2026-03-10T14:25:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Investors question the soft-landing narrative as growth data weakens.",
+                    "body_text": "Investors question the soft-landing narrative as growth data weakens.",
+                    "content_hash": "hash_counter_retry",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:25:00Z",
+                    "updated_at": "2026-03-10T14:25:00Z",
+                    "doc_id": "doc_counter_retry",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_issue_flow",
+                },
+            ],
+            chunks=[
+                {"chunk_id": "doc_watch_chunk_000", "doc_id": "doc_watch", "chunk_index": 0, "text": "Watch Friday CPI for shelter inflation surprises.", "token_count": 6, "char_start": 0, "char_end": 43, "created_at": "2026-03-10T16:05:00Z"},
+                {"chunk_id": "doc_minority_chunk_000", "doc_id": "doc_minority", "chunk_index": 0, "text": "A minority of investors still expects a hard landing.", "token_count": 9, "char_start": 0, "char_end": 55, "created_at": "2026-03-10T15:35:00Z"},
+                {"chunk_id": "doc_prevailing_chunk_000", "doc_id": "doc_prevailing", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},
+                {"chunk_id": "doc_counter_retry_chunk_000", "doc_id": "doc_counter_retry", "chunk_index": 0, "text": "Investors question the soft-landing narrative as growth data weakens.", "token_count": 9, "char_start": 0, "char_end": 68, "created_at": "2026-03-10T14:25:00Z"},
+            ],
+            fts_rows=[
+                {"text": "Watch Friday CPI for shelter inflation surprises.", "doc_id": "doc_watch", "chunk_id": "doc_watch_chunk_000", "publisher": "BLS Preview Desk", "source_id": "bls_preview", "published_at": "2026-03-10T16:00:00Z", "credibility_tier": 1},
+                {"text": "A minority of investors still expects a hard landing.", "doc_id": "doc_minority", "chunk_id": "doc_minority_chunk_000", "publisher": "Market Commentary", "source_id": "market_commentary", "published_at": "2026-03-10T15:30:00Z", "credibility_tier": 3},
+                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_prevailing", "chunk_id": "doc_prevailing_chunk_000", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
+                {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_counter_retry", "chunk_id": "doc_counter_retry_chunk_000", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
+            ],
+        )
+        registry = {
+            "bls_preview": {"id": "bls_preview", "name": "BLS Preview Desk", "url": "https://example.test/watch", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["macro_data"]},
+            "market_commentary": {"id": "market_commentary", "name": "Market Commentary", "url": "https://example.test/minority", "type": "rss", "credibility_tier": 3, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/prevailing", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},
+            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/counter-retry", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_evidence_pack_report") as evidence_pack_report_mock:
+            evidence_pack_report_mock.return_value = {
+                "items": [
+                    {"chunk_id": "doc_watch_chunk_000", "source_id": "bls_preview", "publisher": "BLS Preview Desk", "credibility_tier": 1, "retrieval_score": 0.95, "semantic_score": 0.95, "recency_score": 0.90, "credibility_score": 1.0, "rank_in_pack": 1},
+                    {"chunk_id": "doc_minority_chunk_000", "source_id": "market_commentary", "publisher": "Market Commentary", "credibility_tier": 3, "retrieval_score": 0.90, "semantic_score": 0.90, "recency_score": 0.80, "credibility_score": 0.6, "rank_in_pack": 2},
+                    {"chunk_id": "doc_prevailing_chunk_000", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.88, "semantic_score": 0.88, "recency_score": 0.70, "credibility_score": 1.0, "rank_in_pack": 3},
+                    {"chunk_id": "doc_counter_retry_chunk_000", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.84, "semantic_score": 0.84, "recency_score": 0.66, "credibility_score": 0.8, "rank_in_pack": 4},
+                ],
+                "diversity_stats": {"unique_publishers": 4},
+                "diversity_check": "pass",
+                "notes": [],
+            }
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=stage_data,
+                registry=registry,
+                run_id="run_issue_flow",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                issue_planner=_Planner(),
+                claim_composer=_Composer(),
+            )
+
+        self.assertEqual(call_order[:2], ["planner", "composer"])
+        self.assertGreaterEqual(call_order.count("composer"), 1)
+        self.assertEqual(synthesis.issue_map[0]["issue_id"], "issue_001")
+        self.assertEqual(synthesis.structured_claims[0]["claim_id"], "claim_prevailing")
+        self.assertEqual(synthesis.structured_claims[0]["supporting_citation_ids"], ["cite_003"])
+
+    def test_build_daily_brief_synthesis_rejects_partial_provider_injection(self):
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[],
+            chunks=[],
+            fts_rows=[],
+        )
+
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                return []
+
+        with self.assertRaises(ValueError):
+            build_daily_brief_synthesis(
+                stage_data=stage_data,
+                registry={},
+                run_id="run_partial_provider",
+                issue_planner=_Planner(),
+            )
+
+    def test_run_fixture_daily_brief_forwards_providers_to_execute_slice(self):
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                return []
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                return []
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("apps.agent.daily_brief.runner._execute_daily_brief_slice") as execute_mock:
+                execute_mock.return_value = {
+                    "status": "ok",
+                    "html_path": str(Path(temp_dir) / "brief.html"),
+                    "decision_record_path": str(Path(temp_dir) / "decision_record.json"),
+                    "artifact_dir": str(Path(temp_dir) / "artifacts"),
+                    "query_text": "inflation growth",
+                    "abstain_reason": None,
+                    "scheduled_for_local_date": "2026-03-11",
+                    "next_scheduled_run_at_utc": "2026-03-12T00:00:00Z",
+                    "email_delivery": None,
+                }
+
+                run_fixture_daily_brief(
+                    base_dir=Path(temp_dir),
+                    generated_at_utc="2026-03-10T16:00:00Z",
+                    issue_planner=_Planner(),
+                    claim_composer=_Composer(),
+                )
+
+        self.assertIsInstance(execute_mock.call_args.kwargs["issue_planner"], _Planner)
+        self.assertIsInstance(execute_mock.call_args.kwargs["claim_composer"], _Composer)
 
 
 if __name__ == "__main__":
