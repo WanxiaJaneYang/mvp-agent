@@ -124,6 +124,23 @@ set OPENAI_API_KEY=...
 python scripts/run_daily_brief_fixture.py --provider openai --openai-model gpt-4o-mini
 ```
 
+Run the fixture slice with subscription-backed Codex OAuth synthesis:
+
+```bash
+codex login status
+python scripts/run_daily_brief_fixture.py --provider codex-oauth
+```
+
+Provider-backed demo modes:
+- `openai`
+  - uses `OPENAI_API_KEY` and OpenAI API billing/quota
+- `codex-oauth`
+  - uses the local `codex login` session
+  - does not require `OPENAI_API_KEY`
+  - can return `ok` or a validator-driven `abstained` result depending on model output quality
+
+The current provider-agnostic seam is covered in `tests/agent/daily_brief/test_runner.py` for both `run_fixture_daily_brief(...)` and `run_daily_brief(...)`.
+
 Run the fixture slice with the modeled Asia/Singapore schedule and email delivery:
 
 ```bash
