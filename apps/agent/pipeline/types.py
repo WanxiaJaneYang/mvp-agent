@@ -22,6 +22,8 @@ class RunStatus(str, Enum):
 
 
 DailyBriefOutputSection = Literal["prevailing", "counter", "minority", "watch", "changed"]
+DailyBriefClaimKind = Literal["prevailing", "counter", "minority", "watch"]
+DailyBriefNoveltyLabel = Literal["new", "continued", "reframed", "weakened", "strengthened", "reversed", "unknown"]
 CitationValidationStatus = Literal["ok", "partial", "retry"]
 FinalSynthesisStatus = Literal["ok", "partial", "abstained"]
 
@@ -165,6 +167,43 @@ class DailyBriefBullet(TypedDict, total=False):
 class DailyBriefMeta(TypedDict):
     status: str
     reason: str
+
+
+class IssueMap(TypedDict):
+    issue_id: str
+    issue_question: str
+    thesis_hint: str
+    supporting_evidence_ids: list[str]
+    opposing_evidence_ids: list[str]
+    minority_evidence_ids: list[str]
+    watch_evidence_ids: list[str]
+
+
+class StructuredClaim(TypedDict):
+    claim_id: str
+    issue_id: str
+    claim_kind: DailyBriefClaimKind
+    claim_text: str
+    supporting_citation_ids: list[str]
+    opposing_citation_ids: list[str]
+    confidence: str
+    novelty_vs_prior_brief: DailyBriefNoveltyLabel
+    why_it_matters: str
+
+
+class DailyBriefIssue(TypedDict):
+    issue_id: str
+    issue_question: str
+    summary: str
+    prevailing: list[StructuredClaim]
+    counter: list[StructuredClaim]
+    minority: list[StructuredClaim]
+    watch: list[StructuredClaim]
+
+
+class DailyBriefSynthesisV2(TypedDict):
+    issues: list[DailyBriefIssue]
+    meta: DailyBriefMeta
 
 
 class DailyBriefSynthesis(TypedDict, total=False):

@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+import inspect
+import unittest
+from typing import get_type_hints
+
+from apps.agent.daily_brief.model_interfaces import (
+    ClaimComposerInput,
+    ClaimComposerProvider,
+    IssuePlannerInput,
+    IssuePlannerProvider,
+)
+from apps.agent.pipeline.types import IssueMap, StructuredClaim
+
+
+class DailyBriefModelInterfaceTests(unittest.TestCase):
+    def test_issue_planner_provider_is_task_specific(self) -> None:
+        signature = inspect.signature(IssuePlannerProvider.plan_issues)
+        self.assertIn("brief_input", signature.parameters)
+        hints = get_type_hints(IssuePlannerProvider.plan_issues)
+        self.assertEqual(hints["brief_input"], IssuePlannerInput)
+        self.assertEqual(hints["return"], list[IssueMap])
+
+    def test_claim_composer_provider_is_task_specific(self) -> None:
+        signature = inspect.signature(ClaimComposerProvider.compose_claims)
+        self.assertIn("brief_input", signature.parameters)
+        hints = get_type_hints(ClaimComposerProvider.compose_claims)
+        self.assertEqual(hints["brief_input"], ClaimComposerInput)
+        self.assertEqual(hints["return"], list[StructuredClaim])
+
+    def test_interface_inputs_use_structured_context(self) -> None:
+        self.assertEqual(
+            set(IssuePlannerInput.__annotations__),
+            {"run_id", "generated_at_utc", "evidence_pack", "prior_brief_context"},
+        )
+        self.assertEqual(
+            set(ClaimComposerInput.__annotations__),
+            {
+                "run_id",
+                "generated_at_utc",
+                "issue_map",
+                "citation_store",
+                "prior_brief_context",
+            },
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
