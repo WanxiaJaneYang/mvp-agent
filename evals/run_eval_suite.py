@@ -9,9 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
-from apps.agent.retrieval.evidence_pack import build_evidence_pack
-from apps.agent.synthesis.postprocess import CORE_SECTIONS, finalize_validation_outcome
+from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation  # noqa: E402
+from apps.agent.retrieval.evidence_pack import build_evidence_pack  # noqa: E402
+from apps.agent.synthesis.postprocess import CORE_SECTIONS, finalize_validation_outcome  # noqa: E402
 
 
 def _load_cases(golden_dir: Path) -> List[Dict[str, Any]]:
@@ -71,12 +71,23 @@ def _run_postprocess_case(case: Dict[str, Any]) -> List[str]:
 
     expected_core_text = case["expected"].get("core_section_text")
     if expected_core_text is not None:
+        synthesis_view = _core_section_view(result["synthesis"])
         for section in CORE_SECTIONS:
-            section_text = result["synthesis"][section][0]["text"]
+            section_bullets = synthesis_view.get(section, [])
+            section_text = section_bullets[0]["text"]
             if section_text != expected_core_text:
                 errors.append(f"expected {section}[0].text={expected_core_text}, got {section_text}")
 
     return errors
+
+
+def _core_section_view(synthesis: Dict[str, Any]) -> Dict[str, Any]:
+    issues = synthesis.get("issues")
+    if isinstance(issues, list) and issues:
+        first_issue = issues[0]
+        if isinstance(first_issue, dict):
+            return first_issue
+    return synthesis
 
 
 def _run_case(case: Dict[str, Any]) -> List[str]:
