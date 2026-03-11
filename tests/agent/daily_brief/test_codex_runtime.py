@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from apps.agent.daily_brief.codex_runtime import (
@@ -55,13 +57,13 @@ class CodexRuntimeTests(unittest.TestCase):
         def _runner(command, **kwargs):
             captured["command"] = command
             captured["kwargs"] = kwargs
+            schema_path = Path(command[3])
+            output_path = Path(command[5])
+            captured["schema"] = json.loads(schema_path.read_text(encoding="utf-8"))
+            output_path.write_text('{"result":[{"issue_id":"issue_001"}]}', encoding="utf-8")
             return SimpleNamespace(
                 returncode=0,
-                stdout=(
-                    '{"type":"thread.started","thread_id":"thread_001"}\n'
-                    '{"type":"item.completed","item":{"id":"item_001","type":"agent_message","text":"[{\\"issue_id\\":\\"issue_001\\"}]"}}\n'
-                    '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}\n'
-                ),
+                stdout="planner completed",
                 stderr="",
             )
 
@@ -96,14 +98,79 @@ class CodexRuntimeTests(unittest.TestCase):
 
         self.assertEqual(payload, '[{"issue_id":"issue_001"}]')
         self.assertEqual(
-            captured["command"][:4],
-            [r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd", "exec", "--json", "-"],
+            captured["command"][:7],
+            [
+                r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd",
+                "exec",
+                "--output-schema",
+                captured["command"][3],
+                "--output-last-message",
+                captured["command"][5],
+                "-",
+            ],
         )
         self.assertIn("daily_brief_issue_planner", captured["kwargs"]["input"])
-        self.assertIn("json_schema", captured["kwargs"]["input"])
+        self.assertNotIn("json_schema", captured["kwargs"]["input"])
+        self.assertEqual(
+            captured["schema"],
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["result"],
+                "properties": {"result": {"type": "array"}},
+            },
+        )
         self.assertEqual(captured["kwargs"]["timeout"], 12.5)
         self.assertTrue(captured["kwargs"]["text"])
         self.assertTrue(captured["kwargs"]["capture_output"])
+
+    def test_codex_exec_runtime_rejects_missing_output_file(self) -> None:
+        runtime = CodexExecJsonClient(
+            runner=lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="planner completed", stderr=""),
+            which_resolver=lambda _name: r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd",
+        )
+
+        with self.assertRaisesRegex(ValueError, "Codex exec did not return output."):
+            runtime.create_json_response(
+                {
+                    "task": "daily_brief_issue_planner",
+                    "response_format": {
+                        "type": "json_schema",
+                        "json_schema": {"name": "issue_map_list", "schema": {"type": "array"}},
+                    },
+                    "messages": [{"role": "user", "content": "Plan issues."}],
+                    "input": {"evidence_pack": []},
+                }
+            )
+
+    def test_codex_exec_runtime_uses_extended_default_timeout(self) -> None:
+        captured: dict[str, object] = {}
+
+        def _runner(command, **kwargs):
+            captured["command"] = command
+            captured["timeout"] = kwargs["timeout"]
+            Path(command[5]).write_text('{"result":[{"issue_id":"issue_001"}]}', encoding="utf-8")
+            return SimpleNamespace(returncode=0, stdout="planner completed", stderr="")
+
+        runtime = CodexExecJsonClient(
+            runner=_runner,
+            which_resolver=lambda _name: r"C:\Users\Lenovo\AppData\Roaming\npm\codex.cmd",
+        )
+
+        payload = runtime.create_json_response(
+            {
+                "task": "daily_brief_issue_planner",
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "issue_map_list", "schema": {"type": "array"}},
+                },
+                "messages": [{"role": "user", "content": "Plan issues."}],
+                "input": {"evidence_pack": []},
+            }
+        )
+
+        self.assertEqual(payload, '[{"issue_id":"issue_001"}]')
+        self.assertEqual(captured["timeout"], 300.0)
 
     def test_codex_exec_runtime_raises_provider_specific_error_on_file_not_found(self) -> None:
         runtime = CodexExecJsonClient(

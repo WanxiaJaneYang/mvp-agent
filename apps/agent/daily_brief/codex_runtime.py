@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Callable, Mapping
-from json import JSONDecodeError
 from pathlib import Path
 from typing import Any, cast
 
@@ -15,6 +15,8 @@ from apps.agent.daily_brief.openai_issue_planner import OpenAIIssuePlanner
 CODEX_EXECUTABLE = "codex"
 CODEX_CLI_REQUIRED_MESSAGE = "Codex runtime requires the `codex` CLI to be installed."
 CODEX_LOGIN_REQUIRED_MESSAGE = "Codex runtime requires an active `codex login` session."
+CODEX_OUTPUT_WRAPPER_KEY = "result"
+DEFAULT_CODEX_TIMEOUT_SECONDS = 300.0
 
 CodexRunner = Callable[..., subprocess.CompletedProcess[str] | Any]
 WhichResolver = Callable[[str], str | None]
@@ -27,7 +29,7 @@ class CodexExecJsonClient:
         runner: CodexRunner | None = None,
         executable: str = CODEX_EXECUTABLE,
         which_resolver: WhichResolver | None = None,
-        timeout_seconds: float = 60.0,
+        timeout_seconds: float = DEFAULT_CODEX_TIMEOUT_SECONDS,
     ) -> None:
         self._runner = runner or subprocess.run
         self._executable = executable
@@ -36,29 +38,39 @@ class CodexExecJsonClient:
 
     def create_json_response(self, request_payload: Mapping[str, Any]) -> str:
         prompt = _build_exec_prompt(request_payload=request_payload)
+        output_schema, output_wrapper_key = _build_output_schema(request_payload=request_payload)
         resolved_executable = resolve_codex_executable(
             executable=self._executable,
             which_resolver=self._which_resolver,
         )
-        try:
-            completed = self._runner(
-                [resolved_executable, "exec", "--json", "-"],
-                capture_output=True,
-                text=True,
-                input=prompt,
-                timeout=self._timeout_seconds,
-                check=False,
-            )
-        except FileNotFoundError as exc:
-            raise ValueError(CODEX_CLI_REQUIRED_MESSAGE) from exc
-        if int(getattr(completed, "returncode", 1)) != 0:
-            error_text = str(getattr(completed, "stderr", "") or getattr(completed, "stdout", "")).strip()
-            raise ValueError(error_text or "Codex exec failed.")
-
-        stdout = str(getattr(completed, "stdout", "")).strip()
-        if not stdout:
-            raise ValueError("Codex exec did not return output.")
-        return _extract_last_message(stdout)
+        with tempfile.TemporaryDirectory(prefix="codex-runtime-") as temp_dir:
+            temp_dir_path = Path(temp_dir)
+            schema_path = temp_dir_path / "output-schema.json"
+            output_path = temp_dir_path / "output-last-message.json"
+            _write_json_file(path=schema_path, payload=output_schema)
+            try:
+                completed = self._runner(
+                    [
+                        resolved_executable,
+                        "exec",
+                        "--output-schema",
+                        str(schema_path),
+                        "--output-last-message",
+                        str(output_path),
+                        "-",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    input=prompt,
+                    timeout=self._timeout_seconds,
+                    check=False,
+                )
+            except FileNotFoundError as exc:
+                raise ValueError(CODEX_CLI_REQUIRED_MESSAGE) from exc
+            if int(getattr(completed, "returncode", 1)) != 0:
+                error_text = str(getattr(completed, "stderr", "") or getattr(completed, "stdout", "")).strip()
+                raise ValueError(error_text or "Codex exec failed.")
+            return _read_output_payload(output_path=output_path, output_wrapper_key=output_wrapper_key)
 
 
 def build_codex_daily_brief_providers(
@@ -68,7 +80,7 @@ def build_codex_daily_brief_providers(
     login_checker: Callable[[], bool] | None = None,
     executable: str = CODEX_EXECUTABLE,
     which_resolver: WhichResolver | None = None,
-    timeout_seconds: float = 60.0,
+    timeout_seconds: float = DEFAULT_CODEX_TIMEOUT_SECONDS,
 ) -> tuple[IssuePlannerProvider, ClaimComposerProvider]:
     resolved_runner = codex_runner or subprocess.run
     resolved_which_resolver = which_resolver or shutil.which
@@ -152,60 +164,63 @@ def _codex_login_available(*, runner: CodexRunner, executable: str, which_resolv
 
 def _build_exec_prompt(*, request_payload: Mapping[str, Any]) -> str:
     messages = request_payload.get("messages")
-    response_format = request_payload.get("response_format")
     if not isinstance(messages, list) or not messages:
         raise ValueError("Codex runtime requires at least one message.")
-    if not isinstance(response_format, Mapping):
-        raise ValueError("Codex runtime requires response_format.")
 
     prompt_payload = {
         "task": request_payload.get("task"),
         "messages": [dict(message) for message in messages if isinstance(message, Mapping)],
-        "response_format": dict(response_format),
         "input": dict(request_payload.get("input", {})) if isinstance(request_payload.get("input"), Mapping) else {},
     }
     return (
-        "Return only valid JSON that matches the provided response_format. "
+        "Return only valid JSON that matches the attached output schema. "
         "Do not wrap the answer in markdown or commentary.\n\n"
         f"{json.dumps(prompt_payload, indent=2, sort_keys=True)}"
     )
 
 
-def _extract_last_message(stdout: str) -> str:
-    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
-    if len(lines) > 1:
-        for line in reversed(lines):
-            try:
-                parsed_line = json.loads(line)
-            except JSONDecodeError:
-                continue
-            if isinstance(parsed_line, Mapping) and parsed_line.get("type") == "item.completed":
-                item = parsed_line.get("item")
-                if isinstance(item, Mapping) and item.get("type") == "agent_message":
-                    text = item.get("text")
-                    if isinstance(text, str) and text.strip():
-                        return text.strip()
+def _build_output_schema(*, request_payload: Mapping[str, Any]) -> tuple[dict[str, Any], str | None]:
+    response_format = request_payload.get("response_format")
+    if not isinstance(response_format, Mapping):
+        raise ValueError("Codex runtime requires response_format.")
+    if response_format.get("type") != "json_schema":
+        raise ValueError("Codex runtime requires a json_schema response_format.")
 
-    try:
-        parsed = json.loads(stdout)
-    except JSONDecodeError:
-        return stdout.strip()
+    json_schema = response_format.get("json_schema")
+    if not isinstance(json_schema, Mapping):
+        raise ValueError("Codex runtime requires response_format.json_schema.")
 
-    if isinstance(parsed, Mapping):
-        for key in ("output_text", "last_message", "content", "message"):
-            value = parsed.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        return stdout.strip()
+    schema = json_schema.get("schema")
+    if not isinstance(schema, Mapping):
+        raise ValueError("Codex runtime requires response_format.json_schema.schema.")
+    schema_dict = dict(schema)
+    if schema_dict.get("type") == "object":
+        return schema_dict, None
+    return (
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [CODEX_OUTPUT_WRAPPER_KEY],
+            "properties": {CODEX_OUTPUT_WRAPPER_KEY: schema_dict},
+        },
+        CODEX_OUTPUT_WRAPPER_KEY,
+    )
 
-    if isinstance(parsed, list):
-        for item in reversed(parsed):
-            if not isinstance(item, Mapping):
-                continue
-            for key in ("output_text", "last_message", "content", "message"):
-                value = item.get(key)
-                if isinstance(value, str) and value.strip():
-                    return value.strip()
-        return stdout.strip()
 
-    return stdout.strip()
+def _write_json_file(*, path: Path, payload: Mapping[str, Any]) -> None:
+    path.write_text(json.dumps(dict(payload), indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _read_output_payload(*, output_path: Path, output_wrapper_key: str | None) -> str:
+    if not output_path.exists():
+        raise ValueError("Codex exec did not return output.")
+    payload = output_path.read_text(encoding="utf-8").strip()
+    if not payload:
+        raise ValueError("Codex exec did not return output.")
+    if output_wrapper_key is None:
+        return payload
+
+    parsed_payload = json.loads(payload)
+    if not isinstance(parsed_payload, Mapping) or output_wrapper_key not in parsed_payload:
+        raise ValueError("Codex exec did not return output.")
+    return json.dumps(parsed_payload[output_wrapper_key], separators=(",", ":"))
