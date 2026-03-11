@@ -4,6 +4,63 @@ from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 
 
 class Stage8ValidationTests(unittest.TestCase):
+    def test_stage8_retries_when_issue_centered_synthesis_has_no_issues(self):
+        result = run_stage8_citation_validation({"issues": []}, {})
+
+        self.assertEqual(result["status"], "retry")
+        self.assertIn("issues", result["report"]["empty_core_sections"])
+
+    def test_stage8_accepts_issue_centered_synthesis(self):
+        synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will oil prices keep rising?",
+                    "summary": "The market is split over near-term supply pressure.",
+                    "prevailing": [{"text": "Supply risks support more upside.", "citation_ids": ["c1"]}],
+                    "counter": [{"text": "Demand may soften soon.", "citation_ids": ["c2"]}],
+                    "minority": [{"text": "Long-term upside may outlast the short-term move.", "citation_ids": ["c3"]}],
+                    "watch": [{"text": "Watch inventory data.", "citation_ids": ["c4"]}],
+                }
+            ]
+        }
+        store = {
+            "c1": {"id": "c1", "url": "u1", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+        }
+
+        result = run_stage8_citation_validation(synthesis, store)
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["synthesis"]["issues"][0]["issue_id"], "issue_001")
+        self.assertEqual(result["report"]["removed_bullets"], 0)
+
+    def test_stage8_retries_when_issue_centered_synthesis_loses_core_section(self):
+        synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will oil prices keep rising?",
+                    "summary": "The market is split over near-term supply pressure.",
+                    "prevailing": [{"text": "Supply risks support more upside.", "citation_ids": []}],
+                    "counter": [{"text": "Demand may soften soon.", "citation_ids": ["c2"]}],
+                    "minority": [{"text": "Long-term upside may outlast the short-term move.", "citation_ids": ["c3"]}],
+                    "watch": [{"text": "Watch inventory data.", "citation_ids": ["c4"]}],
+                }
+            ]
+        }
+        store = {
+            "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+            "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z", "paywall_policy": "full"},
+        }
+
+        result = run_stage8_citation_validation(synthesis, store, replace_with_placeholder=False)
+
+        self.assertEqual(result["status"], "retry")
+        self.assertIn("issue_001.prevailing", result["report"]["empty_core_sections"])
     def test_stage8_sets_ok_status_when_no_removals(self):
         synthesis = {
             "prevailing": [{"text": "Good", "citation_ids": ["c1"]}],

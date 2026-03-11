@@ -8,6 +8,58 @@ from apps.agent.pipeline.stage10_decision_record import build_and_persist_decisi
 
 
 class Stage10DecisionRecordTests(unittest.TestCase):
+    def test_issue_centered_synthesis_preserves_issue_context_in_claims(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "daily" / "2026-02-19" / "brief.html"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("<html>brief</html>", encoding="utf-8")
+
+            result = build_and_persist_decision_record(
+                base_dir=Path(tmpdir),
+                run_id="run_issue_shape",
+                run_type="daily_brief",
+                stage8_status="ok",
+                synthesis={
+                    "issues": [
+                        {
+                            "issue_id": "issue_001",
+                            "issue_question": "Will oil prices keep rising?",
+                            "title": "Will oil prices keep rising?",
+                            "summary": "Supply and demand evidence point in different directions.",
+                            "prevailing": [{"text": "Supply risks support near-term upside.", "citation_ids": ["c1"]}],
+                            "counter": [{"text": "Demand softness could steady prices soon.", "citation_ids": ["c2"]}],
+                            "minority": [],
+                            "watch": [],
+                        }
+                    ]
+                },
+                removed_bullets=0,
+                budget_snapshot={
+                    "hourly_spend_usd": 0.03,
+                    "hourly_cap_usd": 0.10,
+                    "daily_spend_usd": 0.8,
+                    "daily_cap_usd": 3.0,
+                    "monthly_spend_usd": 12.4,
+                    "monthly_cap_usd": 100.0,
+                    "allowed": True,
+                },
+                guardrail_checks={
+                    "citation_check": "pass",
+                    "paywall_check": "pass",
+                    "diversity_check": "pass",
+                    "budget_check": "pass",
+                    "notes": [],
+                },
+                output_path=output_path,
+                generated_at_utc="2026-02-19T08:00:00Z",
+            )
+
+            claims = result["decision_record"]["claims"]
+            self.assertEqual([claim["section"] for claim in claims], ["prevailing", "counter"])
+            self.assertEqual(claims[0]["issue_id"], "issue_001")
+            self.assertEqual(claims[0]["issue_title"], "Will oil prices keep rising?")
+            self.assertEqual(claims[0]["citation_ids"], ["c1"])
+            self.assertEqual(validate_decision_record(result["decision_record"]), [])
     def test_persists_decision_record_to_date_partitioned_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "daily" / "2026-02-19" / "brief.html"

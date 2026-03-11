@@ -332,16 +332,99 @@ def validate_synthesis(
     total_bullets = 0
     cited_bullets = 0
     removed_bullets = 0
+    empty_core_sections: List[str] = []
 
-    for section, raw_bullets in synthesis.items():
-        if section not in CORE_SECTIONS:
-            normalized_synthesis[section] = deepcopy(raw_bullets)
-            continue
+    issue_items = synthesis.get("issues")
+    if isinstance(issue_items, list):
+        normalized_synthesis = {
+            key: deepcopy(value)
+            for key, value in synthesis.items()
+            if key != "issues"
+        }
+        normalized_issues: List[Dict[str, Any]] = []
+        for index, raw_issue in enumerate(issue_items, start=1):
+            issue = dict(raw_issue) if isinstance(raw_issue, Mapping) else {"value": deepcopy(raw_issue)}
+            issue_id = str(issue.get("issue_id") or f"issue_{index:03d}")
+            (
+                normalized_sections,
+                issue_total,
+                issue_cited,
+                issue_removed,
+                issue_empty_sections,
+            ) = _validate_core_sections(
+                issue,
+                sanitized_store=sanitized_store,
+                source_registry=source_registry,
+                available_source_ids=available_source_ids,
+                replace_with_placeholder=replace_with_placeholder,
+                section_prefix=f"{issue_id}.",
+            )
+            issue.update(normalized_sections)
+            normalized_issues.append(issue)
+            total_bullets += issue_total
+            cited_bullets += issue_cited
+            removed_bullets += issue_removed
+            empty_core_sections.extend(issue_empty_sections)
+        normalized_synthesis["issues"] = normalized_issues
+        if not normalized_issues:
+            empty_core_sections.append("issues")
+    else:
+        for section, raw_value in synthesis.items():
+            if section not in CORE_SECTIONS:
+                normalized_synthesis[section] = deepcopy(raw_value)
+        (
+            normalized_sections,
+            total_bullets,
+            cited_bullets,
+            removed_bullets,
+            empty_core_sections,
+        ) = _validate_core_sections(
+            synthesis,
+            sanitized_store=sanitized_store,
+            source_registry=source_registry,
+            available_source_ids=available_source_ids,
+            replace_with_placeholder=replace_with_placeholder,
+        )
+        normalized_synthesis.update(normalized_sections)
 
+    should_retry = removed_bullets > max_removed_without_retry or bool(empty_core_sections)
+    validation_passed = not should_retry
+
+    return ValidationReport(
+        total_bullets=total_bullets,
+        cited_bullets=cited_bullets,
+        removed_bullets=removed_bullets,
+        validation_passed=validation_passed,
+        should_retry=should_retry,
+        empty_core_sections=empty_core_sections,
+        synthesis=deepcopy(normalized_synthesis),
+        citation_store=deepcopy(sanitized_store),
+    )
+
+
+def _validate_core_sections(
+    sections: Mapping[str, Any],
+    *,
+    sanitized_store: Mapping[str, Mapping[str, Any]],
+    source_registry: Mapping[str, Mapping[str, Any]] | None,
+    available_source_ids: Collection[str] | None,
+    replace_with_placeholder: bool,
+    section_prefix: str = "",
+) -> tuple[Dict[str, List[Dict[str, Any]]], int, int, int, List[str]]:
+    normalized_sections: Dict[str, List[Dict[str, Any]]] = {}
+    total_bullets = 0
+    cited_bullets = 0
+    removed_bullets = 0
+
+    for section in CORE_SECTIONS:
+        raw_bullets = sections.get(section, [])
         section_out: List[Dict[str, Any]] = []
+
+        if not isinstance(raw_bullets, list):
+            raw_bullets = []
+
         for raw_bullet in raw_bullets:
             bullet = _normalize_bullet(raw_bullet)
-
             total_bullets += 1
 
             valid_ids: List[str] = []
@@ -382,30 +465,16 @@ def validate_synthesis(
             cited_bullets += 1
             section_out.append(bullet)
 
-        normalized_synthesis[section] = section_out
-
-    # Ensure core sections exist in normalized output even if absent in input.
-    for section in CORE_SECTIONS:
-        normalized_synthesis.setdefault(section, [])
+        normalized_sections[section] = section_out
 
     empty_core_sections: List[str] = []
     for section in CORE_SECTIONS:
-        section_bullets = normalized_synthesis.get(section, [])
+        section_bullets = normalized_sections[section]
+        qualified_name = f"{section_prefix}{section}"
         if len(section_bullets) == 0:
-            empty_core_sections.append(section)
+            empty_core_sections.append(qualified_name)
             continue
-        if all(isinstance(b, Mapping) and _is_placeholder_bullet(b) for b in section_bullets):
-            empty_core_sections.append(section)
-    should_retry = removed_bullets > max_removed_without_retry or bool(empty_core_sections)
-    validation_passed = not should_retry
+        if all(isinstance(bullet, Mapping) and _is_placeholder_bullet(bullet) for bullet in section_bullets):
+            empty_core_sections.append(qualified_name)
 
-    return ValidationReport(
-        total_bullets=total_bullets,
-        cited_bullets=cited_bullets,
-        removed_bullets=removed_bullets,
-        validation_passed=validation_passed,
-        should_retry=should_retry,
-        empty_core_sections=empty_core_sections,
-        synthesis=deepcopy(normalized_synthesis),
-        citation_store=deepcopy(sanitized_store),
-    )
+    return normalized_sections, total_bullets, cited_bullets, removed_bullets, empty_core_sections

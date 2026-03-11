@@ -111,12 +111,29 @@ def _build_corpus_text(
             value = document.get(field)
             if value:
                 text_parts.append(str(value))
-    for bullets in synthesis.values():
-        if not isinstance(bullets, list):
-            continue
-        for bullet in bullets:
-            if isinstance(bullet, Mapping) and bullet.get("text"):
-                text_parts.append(str(bullet["text"]))
+    issues = synthesis.get("issues")
+    if isinstance(issues, list):
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            for field in ("title", "issue_question", "summary"):
+                value = issue.get(field)
+                if value:
+                    text_parts.append(str(value))
+            for section in ("prevailing", "counter", "minority", "watch"):
+                bullets = issue.get(section, [])
+                if not isinstance(bullets, list):
+                    continue
+                for bullet in bullets:
+                    if isinstance(bullet, Mapping) and bullet.get("text"):
+                        text_parts.append(str(bullet["text"]))
+    else:
+        for bullets in synthesis.values():
+            if not isinstance(bullets, list):
+                continue
+            for bullet in bullets:
+                if isinstance(bullet, Mapping) and bullet.get("text"):
+                    text_parts.append(str(bullet["text"]))
     return " ".join(text_parts).lower()
 
 

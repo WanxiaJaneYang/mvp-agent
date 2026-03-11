@@ -7,13 +7,13 @@ from apps.agent.pipeline.types import (
     CitationValidationReport,
     CitationValidationResult,
     CitationValidationStatus,
-    DailyBriefSynthesis,
+    ValidatedDailyBriefSynthesis,
 )
 from apps.agent.validators.citation_validator import validate_synthesis
 
 
 def run_stage8_citation_validation(
-    synthesis: DailyBriefSynthesis,
+    synthesis: ValidatedDailyBriefSynthesis,
     citation_store: Mapping[str, CitationStoreEntry],
     *,
     source_registry: Mapping[str, Mapping[str, Any]] | None = None,
@@ -40,7 +40,7 @@ def run_stage8_citation_validation(
 
     return {
         "status": status,
-        "synthesis": cast(DailyBriefSynthesis, report.synthesis),
+        "synthesis": cast(ValidatedDailyBriefSynthesis, report.synthesis),
         "citation_store": cast(dict[str, CitationStoreEntry], report.citation_store),
         "report": cast(CitationValidationReport, report.to_dict()),
         "validation_attempts": 1,

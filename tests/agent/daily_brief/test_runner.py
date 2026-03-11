@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import get_args, get_type_hints
 from unittest.mock import patch
 
-from apps.agent.daily_brief.model_interfaces import ClaimComposerProvider, IssuePlannerProvider
+from apps.agent.daily_brief.model_interfaces import (
+    ClaimComposerProvider,
+    CriticProvider,
+    IssuePlannerProvider,
+)
 from apps.agent.daily_brief.runner import (
     build_daily_brief_corpus,
     build_daily_brief_query,
@@ -233,8 +237,11 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(synthesis.stage8_result["status"], "ok")
         self.assertEqual(synthesis.stage8_result["validation_attempts"], 2)
         self.assertFalse(synthesis.stage8_result["retry_exhausted"])
-        self.assertEqual(synthesis.final_result["synthesis"]["counter"][0]["citation_ids"], ["cite_005"])
-        self.assertNotIn("meta", synthesis.final_result["synthesis"])
+        self.assertEqual(
+            synthesis.final_result["synthesis"]["issues"][0]["counter"][0]["citation_ids"],
+            ["cite_005"],
+        )
+        self.assertEqual(synthesis.final_result["synthesis"]["meta"]["status"], "validated")
 
     def test_build_daily_brief_synthesis_retries_once_before_returning_validated_output(self):
         stage_inputs = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
@@ -490,8 +497,11 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertGreater(len(synthesis.evidence_pack_items), 0)
         self.assertIn(synthesis.final_result["status"], {"ok", "abstained"})
         self.assertGreater(len(synthesis.synthesis_bullet_rows), 0)
-        self.assertIsInstance(synthesis.final_result["synthesis"]["prevailing"][0], dict)
-        self.assertIn("citation_ids", synthesis.final_result["synthesis"]["prevailing"][0])
+        self.assertIsInstance(synthesis.final_result["synthesis"]["issues"][0]["prevailing"][0], dict)
+        self.assertIn(
+            "citation_ids",
+            synthesis.final_result["synthesis"]["issues"][0]["prevailing"][0],
+        )
 
     def test_load_active_fixture_payloads_filters_to_runtime_subset(self):
         fixture_payloads = {
@@ -613,7 +623,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
             self.assertEqual(
                 bullet_citations[0]["citation_id"],
-                synthesis_payload["prevailing"][0]["citation_ids"][0],
+                synthesis_payload["issues"][0]["prevailing"][0]["citation_ids"][0],
             )
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
@@ -1361,6 +1371,10 @@ class DailyBriefRunnerTests(unittest.TestCase):
             def compose_claims(self, *, brief_input):
                 return []
 
+        class _Critic(CriticProvider):
+            def review_brief(self, *, brief_input):
+                return {"status": "pass", "reason_codes": [], "flagged_claim_ids": []}
+
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch("apps.agent.daily_brief.runner._execute_daily_brief_slice") as execute_mock:
                 execute_mock.return_value = {
@@ -1380,10 +1394,46 @@ class DailyBriefRunnerTests(unittest.TestCase):
                     generated_at_utc="2026-03-10T16:00:00Z",
                     issue_planner=_Planner(),
                     claim_composer=_Composer(),
+                    critic=_Critic(),
                 )
 
         self.assertIsInstance(execute_mock.call_args.kwargs["issue_planner"], _Planner)
         self.assertIsInstance(execute_mock.call_args.kwargs["claim_composer"], _Composer)
+        self.assertIsInstance(execute_mock.call_args.kwargs["critic"], _Critic)
+
+    def test_build_daily_brief_synthesis_calls_critic_after_validation(self):
+        class _Critic(CriticProvider):
+            def __init__(self) -> None:
+                self.last_input = None
+
+            def review_brief(self, *, brief_input):
+                self.last_input = brief_input
+                return {"status": "warn", "reason_codes": ["paraphrase_risk"], "flagged_claim_ids": []}
+
+        stage_inputs = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
+        context = RunContext(
+            run_id="run_daily_fixture",
+            run_type=RunType.DAILY_BRIEF,
+            started_at="2026-03-10T16:00:00Z",
+            status=RunStatus.RUNNING,
+        )
+        corpus = build_daily_brief_corpus(
+            stage_data=stage_inputs,
+            run_id="run_daily_fixture",
+            context=context,
+        )
+        critic = _Critic()
+
+        synthesis = build_daily_brief_synthesis(
+            stage_data=corpus,
+            registry=stage_inputs.registry,
+            run_id="run_daily_fixture",
+            critic=critic,
+        )
+
+        self.assertEqual(synthesis.critic_report["status"], "warn")
+        self.assertEqual(critic.last_input["run_id"], "run_daily_fixture")
+        self.assertIn("issues", critic.last_input["synthesis"])
 
 
 if __name__ == "__main__":

@@ -12,6 +12,8 @@ from typing import Any, cast
 from apps.agent.daily_brief.model_interfaces import (
     ClaimComposerInput,
     ClaimComposerProvider,
+    CriticInput,
+    CriticProvider,
     IssuePlannerInput,
     IssuePlannerProvider,
 )
@@ -40,10 +42,10 @@ from apps.agent.pipeline.identifiers import build_document_id, build_synthesis_i
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
 from apps.agent.pipeline.types import (
-    DAILY_BRIEF_OUTPUT_SECTIONS,
     BulletCitationRow,
     CitationStoreEntry,
     CitationValidationResult,
+    CriticReport,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
     DailyBriefOutputSection,
@@ -60,6 +62,7 @@ from apps.agent.pipeline.types import (
     SourceRow,
     StageResult,
     StructuredClaim,
+    ValidatedDailyBriefSynthesis,
 )
 from apps.agent.portfolio.input_store import load_portfolio_positions
 from apps.agent.portfolio.relevance import build_portfolio_relevance_flags
@@ -142,6 +145,7 @@ def run_fixture_daily_brief(
     smtp_class: Any = SMTP,
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
+    critic: CriticProvider | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -160,6 +164,7 @@ def run_fixture_daily_brief(
                 smtp_class=smtp_class,
                 issue_planner=issue_planner,
                 claim_composer=claim_composer,
+                critic=critic,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -216,6 +221,7 @@ def run_daily_brief(
     smtp_class: Any = SMTP,
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
+    critic: CriticProvider | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -235,6 +241,7 @@ def run_daily_brief(
                 smtp_class=smtp_class,
                 issue_planner=issue_planner,
                 claim_composer=claim_composer,
+                critic=critic,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -293,6 +300,7 @@ def _execute_daily_brief_slice(
     smtp_class: Any = SMTP,
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
+    critic: CriticProvider | None = None,
 ) -> dict[str, Any]:
     report_date = generated_at_utc[:10]
     schedule = delivery_schedule or DailyBriefSchedule()
@@ -322,6 +330,7 @@ def _execute_daily_brief_slice(
         previous_synthesis=_load_previous_synthesis(base_dir=base_dir, report_date=report_date),
         issue_planner=issue_planner,
         claim_composer=claim_composer,
+        critic=critic,
     )
     portfolio_positions = load_portfolio_positions(base_dir=base_dir)
     portfolio_relevance_flags = build_portfolio_relevance_flags(
@@ -379,6 +388,7 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
     _write_json(artifact_dir / "issue_map.json", synthesis_data.issue_map)
     _write_json(artifact_dir / "claim_objects.json", synthesis_data.structured_claims)
+    _write_json(artifact_dir / "critic_report.json", synthesis_data.critic_report)
     _write_json(artifact_dir / "citations.json", synthesis_data.citation_rows)
     _write_json(artifact_dir / "synthesis.json", synthesis_data.final_result["synthesis"])
     _write_json(artifact_dir / "synthesis_bullets.json", synthesis_data.synthesis_bullet_rows)
@@ -399,6 +409,7 @@ def _execute_daily_brief_slice(
             "query_text": synthesis_data.query_text,
             "issue_count": len(synthesis_data.issue_map),
             "claim_count": len(synthesis_data.structured_claims),
+            "critic_status": None if synthesis_data.critic_report is None else synthesis_data.critic_report["status"],
             "docs_fetched": context.counters.docs_fetched,
             "docs_ingested": context.counters.docs_ingested,
             "chunks_indexed": context.counters.chunks_indexed,
@@ -533,6 +544,7 @@ def build_daily_brief_synthesis(
     previous_synthesis: Mapping[str, Any] | None = None,
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
+    critic: CriticProvider | None = None,
 ) -> DailyBriefSynthesisStageData:
     if (issue_planner is None) != (claim_composer is None):
         raise ValueError("Daily brief synthesis requires both issue_planner and claim_composer together.")
@@ -592,13 +604,34 @@ def build_daily_brief_synthesis(
                 run_id=run_id,
                 generated_at_utc=synthesis_generated_at_utc,
             )
-            synthesis = build_synthesis_from_structured_claims(structured_claims=structured_claims)
+            synthesis = build_synthesis_from_structured_claims(
+                issue_map=issue_map,
+                structured_claims=structured_claims,
+                citation_store=citation_store,
+            )
         else:
-            synthesis = build_synthesis(
+            flat_synthesis = build_synthesis(
                 evidence_items=evidence_pack_items,
                 documents_by_id=documents_by_id,
                 citation_store=citation_store,
                 retry_plan=retry_plan,
+            )
+            issue_map = _build_issue_map(
+                query_text=query_text,
+                evidence_pack_items=evidence_pack_items,
+                issue_planner=None,
+                prior_brief_context=prior_brief_context,
+                run_id=run_id,
+                generated_at_utc=synthesis_generated_at_utc,
+            )
+            structured_claims = _build_structured_claims_from_synthesis(
+                issue_map=issue_map,
+                synthesis=flat_synthesis,
+            )
+            synthesis = build_synthesis_from_structured_claims(
+                issue_map=issue_map,
+                structured_claims=structured_claims,
+                citation_store=citation_store,
             )
         current_result = run_stage8_citation_validation(
             synthesis,
@@ -618,11 +651,12 @@ def build_daily_brief_synthesis(
         }
         if current_result["status"] != "retry" or retry_exhausted:
             break
-        retry_plan = _build_retry_plan(
-            synthesis=synthesis,
-            validation_result=current_result,
-            citation_store=citation_store,
-        )
+        if not use_structured_orchestration:
+            retry_plan = _build_retry_plan(
+                synthesis=flat_synthesis,
+                validation_result=current_result,
+                citation_store=citation_store,
+            )
 
     if stage8_result is None:
         raise ValueError("Daily brief synthesis did not produce a validation result.")
@@ -637,20 +671,18 @@ def build_daily_brief_synthesis(
         final_synthesis["changed"] = changed_section
         final_result = {
             **final_result,
-            "synthesis": cast(DailyBriefSynthesis, final_synthesis),
+            "synthesis": cast(ValidatedDailyBriefSynthesis, final_synthesis),
         }
-    if not use_structured_orchestration:
-        issue_map = _build_issue_map(
-            query_text=query_text,
-            evidence_pack_items=evidence_pack_items,
-            issue_planner=None,
-            prior_brief_context=prior_brief_context,
-            run_id=run_id,
-            generated_at_utc=synthesis_generated_at_utc,
-        )
-        structured_claims = _build_structured_claims_from_synthesis(
-            issue_map=issue_map,
-            synthesis=final_result["synthesis"],
+    critic_report: CriticReport | None = None
+    if critic is not None:
+        critic_report = critic.review_brief(
+            brief_input=CriticInput(
+                run_id=run_id,
+                generated_at_utc=synthesis_generated_at_utc,
+                synthesis=cast(dict[str, Any], final_result["synthesis"]),
+                citation_store={key: dict(value) for key, value in stage8_result["citation_store"].items()},
+                prior_brief_context=prior_brief_context,
+            )
         )
     synthesis_id = build_synthesis_id(run_id=run_id)
     return DailyBriefSynthesisStageData(
@@ -662,6 +694,7 @@ def build_daily_brief_synthesis(
         citation_store=stage8_result["citation_store"],
         stage8_result=stage8_result,
         final_result=final_result,
+        critic_report=critic_report,
         citation_rows=list(stage8_result["citation_store"].values()),
         synthesis_bullet_rows=_build_synthesis_bullet_rows(
             synthesis=final_result["synthesis"],
@@ -681,9 +714,10 @@ def _build_retry_plan(
     citation_store: Mapping[str, CitationStoreEntry],
 ) -> SynthesisRetryPlan:
     target_sections = tuple(
-        section
+        str(section).split(".")[-1]
         for section in validation_result["report"].get("empty_core_sections", [])
         if section in {"prevailing", "counter", "minority", "watch"}
+        or str(section).split(".")[-1] in {"prevailing", "counter", "minority", "watch"}
     )
     validated_synthesis = validation_result["synthesis"]
     pinned_chunk_ids_by_section: dict[DailyBriefOutputSection, str] = {}
@@ -857,7 +891,15 @@ def _chunk_ids_for_section(
     section: str,
     citation_store: Mapping[str, CitationStoreEntry],
 ) -> list[str]:
-    bullets = synthesis.get(section, [])
+    issue_items = synthesis.get("issues")
+    if isinstance(issue_items, list) and issue_items:
+        first_issue = issue_items[0]
+        if isinstance(first_issue, Mapping):
+            bullets = first_issue.get(section, [])
+        else:
+            bullets = []
+    else:
+        bullets = synthesis.get(section, [])
     if not isinstance(bullets, list):
         return []
 
@@ -940,55 +982,66 @@ def _attach_doc_ids(
 
 def _build_synthesis_bullet_rows(
     *,
-    synthesis: DailyBriefSynthesis,
+    synthesis: Mapping[str, Any],
     synthesis_id: str,
 ) -> list[DailyBriefSectionBulletRow]:
     rows: list[DailyBriefSectionBulletRow] = []
-    for section in DAILY_BRIEF_OUTPUT_SECTIONS:
-        bullets = synthesis.get(section, [])
-        if not isinstance(bullets, list):
-            continue
-        for bullet_index, bullet in enumerate(bullets):
-            if not isinstance(bullet, Mapping):
-                continue
-            rows.append(
-                {
-                    "synthesis_id": synthesis_id,
-                    "section": section,
-                    "bullet_index": bullet_index,
-                    "text": str(bullet.get("text", "")),
-                    "claim_span_count": 1,
-                    "is_abstain": int("Insufficient evidence" in str(bullet.get("text", ""))),
-                    "confidence_label": bullet.get("confidence_label"),
-                }
-            )
+    for section, bullet_index, bullet in _iter_synthesis_bullets(synthesis):
+        rows.append(
+            {
+                "synthesis_id": synthesis_id,
+                "section": section,
+                "bullet_index": bullet_index,
+                "text": str(bullet.get("text", "")),
+                "claim_span_count": 1,
+                "is_abstain": int("Insufficient evidence" in str(bullet.get("text", ""))),
+                "confidence_label": bullet.get("confidence_label"),
+            }
+        )
     return rows
 
 
 def _build_bullet_citation_rows(
     *,
-    synthesis: DailyBriefSynthesis,
+    synthesis: Mapping[str, Any],
     synthesis_id: str,
 ) -> list[BulletCitationRow]:
     rows: list[BulletCitationRow] = []
-    for section in DAILY_BRIEF_OUTPUT_SECTIONS:
-        bullets = synthesis.get(section, [])
-        if not isinstance(bullets, list):
-            continue
-        for bullet_index, bullet in enumerate(bullets):
-            if not isinstance(bullet, Mapping):
-                continue
-            for citation_id in bullet.get("citation_ids", []):
-                rows.append(
-                    {
-                        "synthesis_id": synthesis_id,
-                        "section": section,
-                        "bullet_index": bullet_index,
-                        "claim_span_index": 0,
-                        "citation_id": str(citation_id),
-                    }
-                )
+    for section, bullet_index, bullet in _iter_synthesis_bullets(synthesis):
+        for citation_id in bullet.get("citation_ids", []):
+            rows.append(
+                {
+                    "synthesis_id": synthesis_id,
+                    "section": section,
+                    "bullet_index": bullet_index,
+                    "claim_span_index": 0,
+                    "citation_id": str(citation_id),
+                }
+            )
     return rows
+
+
+def _iter_synthesis_bullets(
+    synthesis: Mapping[str, Any],
+) -> Iterable[tuple[DailyBriefOutputSection, int, Mapping[str, Any]]]:
+    issues = synthesis.get("issues")
+    if isinstance(issues, list):
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            for section in ("prevailing", "counter", "minority", "watch"):
+                bullets = issue.get(section, [])
+                if not isinstance(bullets, list):
+                    continue
+                for bullet_index, bullet in enumerate(bullets):
+                    if isinstance(bullet, Mapping):
+                        yield section, bullet_index, bullet
+
+    changed_bullets = synthesis.get("changed", [])
+    if isinstance(changed_bullets, list):
+        for bullet_index, bullet in enumerate(changed_bullets):
+            if isinstance(bullet, Mapping):
+                yield "changed", bullet_index, bullet
 
 
 def _write_json(path: Path, payload: Any) -> None:

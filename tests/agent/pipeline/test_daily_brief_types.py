@@ -50,6 +50,7 @@ class DailyBriefTypeContractsTests(unittest.TestCase):
             {
                 "issue_id",
                 "issue_question",
+                "title",
                 "summary",
                 "prevailing",
                 "counter",
@@ -57,7 +58,7 @@ class DailyBriefTypeContractsTests(unittest.TestCase):
                 "watch",
             },
         )
-        self.assertEqual(set(DailyBriefSynthesisV2.__annotations__), {"issues", "meta"})
+        self.assertEqual(set(DailyBriefSynthesisV2.__annotations__), {"issues", "meta", "changed"})
 
     def test_literal_vocabularies_match_redesign(self) -> None:
         self.assertEqual(
