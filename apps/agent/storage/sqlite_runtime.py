@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -36,6 +37,8 @@ def persist_daily_brief_runtime(
     chunks: Iterable[Mapping[str, Any]],
     evidence_pack_items: Iterable[Mapping[str, Any]],
     evidence_pack_report: Mapping[str, Any],
+    issue_map_rows: Iterable[Mapping[str, Any]],
+    structured_claim_rows: Iterable[Mapping[str, Any]],
     citation_rows: Iterable[Mapping[str, Any]],
     synthesis_rows: Iterable[Mapping[str, Any]],
     bullet_citation_rows: Iterable[Mapping[str, Any]],
@@ -52,6 +55,8 @@ def persist_daily_brief_runtime(
         document_rows_list = [dict(row) for row in documents]
         chunk_rows_list = [dict(row) for row in chunks]
         evidence_pack_rows_list = [dict(row) for row in evidence_pack_items]
+        issue_map_rows_list = [dict(row) for row in issue_map_rows]
+        structured_claim_rows_list = [dict(row) for row in structured_claim_rows]
         citation_rows_list = [dict(row) for row in citation_rows]
         synthesis_rows_list = [dict(row) for row in synthesis_rows]
         bullet_citation_rows_list = [dict(row) for row in bullet_citation_rows]
@@ -72,6 +77,18 @@ def persist_daily_brief_runtime(
             stats=evidence_pack_report.get("diversity_stats", {}),
         )
         _persist_evidence_pack_items(connection, pack_id=pack_id, rows=evidence_pack_rows_list)
+        _persist_issue_maps(
+            connection,
+            run_id=str(run_row["run_id"]),
+            generated_at_utc=generated_at_utc,
+            rows=issue_map_rows_list,
+        )
+        _persist_structured_claims(
+            connection,
+            run_id=str(run_row["run_id"]),
+            generated_at_utc=generated_at_utc,
+            rows=structured_claim_rows_list,
+        )
         persisted_citation_ids = _persist_citations(
             connection,
             rows=citation_rows_list,
@@ -219,6 +236,36 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           retry_count INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL,
           created_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS issue_maps (
+          run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+          issue_id TEXT NOT NULL,
+          issue_question TEXT NOT NULL,
+          thesis_hint TEXT NOT NULL,
+          supporting_evidence_ids_json TEXT NOT NULL,
+          opposing_evidence_ids_json TEXT NOT NULL,
+          minority_evidence_ids_json TEXT NOT NULL,
+          watch_evidence_ids_json TEXT NOT NULL,
+          generated_at TEXT NOT NULL,
+          PRIMARY KEY (run_id, issue_id)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS structured_claims (
+          run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+          claim_id TEXT NOT NULL,
+          issue_id TEXT NOT NULL,
+          claim_kind TEXT NOT NULL,
+          claim_text TEXT NOT NULL,
+          supporting_citation_ids_json TEXT NOT NULL,
+          opposing_citation_ids_json TEXT NOT NULL,
+          confidence TEXT NOT NULL,
+          novelty_vs_prior_brief TEXT NOT NULL,
+          why_it_matters TEXT NOT NULL,
+          generated_at TEXT NOT NULL,
+          PRIMARY KEY (run_id, claim_id)
         )
         """,
         """
@@ -619,6 +666,106 @@ def _persist_synthesis(
           confidence_label=excluded.confidence_label
         """,
         rows,
+    )
+
+
+def _persist_issue_maps(
+    connection: sqlite3.Connection,
+    *,
+    run_id: str,
+    generated_at_utc: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    connection.execute("DELETE FROM issue_maps WHERE run_id = ?", (run_id,))
+    if not rows:
+        return
+    payload_rows = [
+        {
+            "run_id": run_id,
+            "issue_id": str(row["issue_id"]),
+            "issue_question": str(row.get("issue_question") or ""),
+            "thesis_hint": str(row.get("thesis_hint") or ""),
+            "supporting_evidence_ids_json": json.dumps(list(row.get("supporting_evidence_ids", []))),
+            "opposing_evidence_ids_json": json.dumps(list(row.get("opposing_evidence_ids", []))),
+            "minority_evidence_ids_json": json.dumps(list(row.get("minority_evidence_ids", []))),
+            "watch_evidence_ids_json": json.dumps(list(row.get("watch_evidence_ids", []))),
+            "generated_at": generated_at_utc,
+        }
+        for row in rows
+    ]
+    connection.executemany(
+        """
+        INSERT INTO issue_maps (
+          run_id, issue_id, issue_question, thesis_hint,
+          supporting_evidence_ids_json, opposing_evidence_ids_json,
+          minority_evidence_ids_json, watch_evidence_ids_json, generated_at
+        ) VALUES (
+          :run_id, :issue_id, :issue_question, :thesis_hint,
+          :supporting_evidence_ids_json, :opposing_evidence_ids_json,
+          :minority_evidence_ids_json, :watch_evidence_ids_json, :generated_at
+        )
+        ON CONFLICT(run_id, issue_id) DO UPDATE SET
+          issue_question=excluded.issue_question,
+          thesis_hint=excluded.thesis_hint,
+          supporting_evidence_ids_json=excluded.supporting_evidence_ids_json,
+          opposing_evidence_ids_json=excluded.opposing_evidence_ids_json,
+          minority_evidence_ids_json=excluded.minority_evidence_ids_json,
+          watch_evidence_ids_json=excluded.watch_evidence_ids_json,
+          generated_at=excluded.generated_at
+        """,
+        payload_rows,
+    )
+
+
+def _persist_structured_claims(
+    connection: sqlite3.Connection,
+    *,
+    run_id: str,
+    generated_at_utc: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    connection.execute("DELETE FROM structured_claims WHERE run_id = ?", (run_id,))
+    if not rows:
+        return
+    payload_rows = [
+        {
+            "run_id": run_id,
+            "claim_id": str(row["claim_id"]),
+            "issue_id": str(row.get("issue_id") or ""),
+            "claim_kind": str(row.get("claim_kind") or ""),
+            "claim_text": str(row.get("claim_text") or ""),
+            "supporting_citation_ids_json": json.dumps(list(row.get("supporting_citation_ids", []))),
+            "opposing_citation_ids_json": json.dumps(list(row.get("opposing_citation_ids", []))),
+            "confidence": str(row.get("confidence") or ""),
+            "novelty_vs_prior_brief": str(row.get("novelty_vs_prior_brief") or "unknown"),
+            "why_it_matters": str(row.get("why_it_matters") or ""),
+            "generated_at": generated_at_utc,
+        }
+        for row in rows
+    ]
+    connection.executemany(
+        """
+        INSERT INTO structured_claims (
+          run_id, claim_id, issue_id, claim_kind, claim_text,
+          supporting_citation_ids_json, opposing_citation_ids_json,
+          confidence, novelty_vs_prior_brief, why_it_matters, generated_at
+        ) VALUES (
+          :run_id, :claim_id, :issue_id, :claim_kind, :claim_text,
+          :supporting_citation_ids_json, :opposing_citation_ids_json,
+          :confidence, :novelty_vs_prior_brief, :why_it_matters, :generated_at
+        )
+        ON CONFLICT(run_id, claim_id) DO UPDATE SET
+          issue_id=excluded.issue_id,
+          claim_kind=excluded.claim_kind,
+          claim_text=excluded.claim_text,
+          supporting_citation_ids_json=excluded.supporting_citation_ids_json,
+          opposing_citation_ids_json=excluded.opposing_citation_ids_json,
+          confidence=excluded.confidence,
+          novelty_vs_prior_brief=excluded.novelty_vs_prior_brief,
+          why_it_matters=excluded.why_it_matters,
+          generated_at=excluded.generated_at
+        """,
+        payload_rows,
     )
 
 

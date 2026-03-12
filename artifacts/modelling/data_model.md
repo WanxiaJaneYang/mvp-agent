@@ -166,6 +166,34 @@ CREATE TABLE IF NOT EXISTS syntheses (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS issue_maps (
+  run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+  issue_id TEXT NOT NULL,
+  issue_question TEXT NOT NULL,
+  thesis_hint TEXT NOT NULL,
+  supporting_evidence_ids_json TEXT NOT NULL,
+  opposing_evidence_ids_json TEXT NOT NULL,
+  minority_evidence_ids_json TEXT NOT NULL,
+  watch_evidence_ids_json TEXT NOT NULL,
+  generated_at TEXT NOT NULL,
+  PRIMARY KEY (run_id, issue_id)
+);
+
+CREATE TABLE IF NOT EXISTS structured_claims (
+  run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+  claim_id TEXT NOT NULL,
+  issue_id TEXT NOT NULL,
+  claim_kind TEXT NOT NULL,
+  claim_text TEXT NOT NULL,
+  supporting_citation_ids_json TEXT NOT NULL,
+  opposing_citation_ids_json TEXT NOT NULL,
+  confidence TEXT NOT NULL,
+  novelty_vs_prior_brief TEXT NOT NULL,
+  why_it_matters TEXT NOT NULL,
+  generated_at TEXT NOT NULL,
+  PRIMARY KEY (run_id, claim_id)
+);
+
 CREATE TABLE IF NOT EXISTS synthesis_bullets (
   synthesis_id TEXT NOT NULL REFERENCES syntheses(synthesis_id) ON DELETE CASCADE,
   section TEXT NOT NULL CHECK (section IN ('prevailing', 'counter', 'minority', 'watch', 'changed')),
