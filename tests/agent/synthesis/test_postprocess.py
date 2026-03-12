@@ -4,7 +4,7 @@ from apps.agent.synthesis.postprocess import build_abstain_synthesis, finalize_v
 
 
 class SynthesisPostprocessTests(unittest.TestCase):
-    def test_builds_explicit_abstain_bullets_for_each_core_section(self):
+    def test_builds_issue_centered_abstain_output(self):
         synthesis = build_abstain_synthesis(
             reason="citation validation failed after retry budget was exhausted"
         )
@@ -12,32 +12,39 @@ class SynthesisPostprocessTests(unittest.TestCase):
         self.assertEqual(
             synthesis,
             {
-                "prevailing": [
+                "issues": [
                     {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
-                    }
-                ],
-                "counter": [
-                    {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
-                    }
-                ],
-                "minority": [
-                    {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
-                    }
-                ],
-                "watch": [
-                    {
-                        "text": "[Insufficient evidence to produce a validated output]",
-                        "citation_ids": [],
-                        "confidence_label": "abstained",
+                        "issue_id": "issue_001",
+                        "title": "Insufficient evidence for a validated issue review",
+                        "summary": "The available evidence did not support a literature-review style issue synthesis.",
+                        "prevailing": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
+                        "counter": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
+                        "minority": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
+                        "watch": [
+                            {
+                                "text": "[Insufficient evidence to produce a validated output]",
+                                "citation_ids": [],
+                                "confidence_label": "abstained",
+                            }
+                        ],
                     }
                 ],
                 "meta": {
@@ -50,7 +57,19 @@ class SynthesisPostprocessTests(unittest.TestCase):
     def test_finalize_validation_outcome_passes_ok_through_unchanged(self):
         validation_result = {
             "status": "ok",
-            "synthesis": {"prevailing": [{"text": "Validated claim", "citation_ids": ["c1"]}]},
+            "synthesis": {
+                "issues": [
+                    {
+                        "issue_id": "issue_001",
+                        "title": "Will oil prices keep rising?",
+                        "summary": "The market is split over near-term supply pressure.",
+                        "prevailing": [{"text": "Validated claim", "citation_ids": ["c1"]}],
+                        "counter": [],
+                        "minority": [],
+                        "watch": [],
+                    }
+                ]
+            },
             "report": {"removed_bullets": 0},
         }
 
@@ -64,7 +83,17 @@ class SynthesisPostprocessTests(unittest.TestCase):
         validation_result = {
             "status": "partial",
             "synthesis": {
-                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
+                "issues": [
+                    {
+                        "issue_id": "issue_001",
+                        "title": "Will oil prices keep rising?",
+                        "summary": "The market is split over near-term supply pressure.",
+                        "prevailing": [{"text": "Validated claim", "citation_ids": ["c1"]}],
+                        "counter": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}],
+                        "minority": [],
+                        "watch": [],
+                    }
+                ]
             },
             "report": {"removed_bullets": 1},
         }
@@ -78,12 +107,10 @@ class SynthesisPostprocessTests(unittest.TestCase):
     def test_finalize_validation_outcome_maps_retry_to_abstained_output(self):
         validation_result = {
             "status": "retry",
-            "synthesis": {
-                "prevailing": [{"text": "[Insufficient evidence to support this claim]", "citation_ids": []}]
-            },
+            "synthesis": {"issues": []},
             "report": {
                 "removed_bullets": 4,
-                "empty_core_sections": ["prevailing", "counter"],
+                "empty_core_sections": ["issues"],
             },
         }
 

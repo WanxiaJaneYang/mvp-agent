@@ -13,10 +13,19 @@ def build_abstain_synthesis(*, reason: str) -> dict[str, Any]:
         "citation_ids": [],
         "confidence_label": "abstained",
     }
-    synthesis = {section: [dict(bullet)] for section in CORE_SECTIONS}
-    synthesis["meta"] = {
+    synthesis = {
+        "issues": [
+            {
+                "issue_id": "issue_001",
+                "title": "Insufficient evidence for a validated issue review",
+                "summary": "The available evidence did not support a literature-review style issue synthesis.",
+                **{section: [dict(bullet)] for section in CORE_SECTIONS},
+            }
+        ],
+        "meta": {
         "status": "abstained",
         "reason": reason,
+        },
     }
     return synthesis
 

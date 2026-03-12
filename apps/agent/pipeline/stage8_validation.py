@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any, Dict, Mapping
 
 from apps.agent.validators.citation_validator import validate_synthesis
 
 
 def run_stage8_citation_validation(
-    synthesis: Mapping[str, Iterable[Any]],
+    synthesis: Mapping[str, Any],
     citation_store: Mapping[str, Mapping[str, Any]],
     *,
     source_registry: Mapping[str, Mapping[str, Any]] | None = None,

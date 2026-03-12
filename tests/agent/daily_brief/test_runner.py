@@ -6,6 +6,9 @@ import unittest
 from pathlib import Path
 
 from apps.agent.daily_brief.runner import (
+    _build_bullet_citation_rows,
+    _build_run_summary,
+    _build_synthesis_bullet_rows,
     build_daily_brief_query,
     load_active_fixture_payloads,
     run_fixture_daily_brief,
@@ -13,6 +16,99 @@ from apps.agent.daily_brief.runner import (
 
 
 class DailyBriefRunnerTests(unittest.TestCase):
+    def test_build_issue_centered_synthesis_bullet_rows_include_issue_context(self):
+        synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "title": "Will oil prices keep rising over the next few weeks?",
+                    "summary": "The balance of evidence still leans bullish in the short term.",
+                    "prevailing": [
+                        {
+                            "text": "Supply risks and recent momentum support the dominant bullish view.",
+                            "citation_ids": ["cite_001"],
+                            "confidence_label": "high",
+                        }
+                    ],
+                    "counter": [
+                        {
+                            "text": "Some analysts expect prices to stabilize as demand cools.",
+                            "citation_ids": ["cite_002"],
+                            "confidence_label": "medium",
+                        }
+                    ],
+                    "minority": [],
+                    "watch": [
+                        {
+                            "text": "Watch the next inventory release for a demand reset.",
+                            "citation_ids": ["cite_003"],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        rows = _build_synthesis_bullet_rows(synthesis=synthesis, synthesis_id="syn_run_issue")
+
+        self.assertEqual([row["section"] for row in rows], ["prevailing", "counter", "watch"])
+        self.assertEqual(rows[0]["issue_id"], "issue_001")
+        self.assertEqual(rows[0]["issue_index"], 0)
+        self.assertEqual(rows[0]["issue_title"], "Will oil prices keep rising over the next few weeks?")
+        self.assertEqual(rows[0]["bullet_index"], 0)
+
+    def test_build_issue_centered_bullet_citation_rows_include_issue_context(self):
+        synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_002",
+                    "title": "Is labor-market cooling changing the policy outlook?",
+                    "summary": "Official releases and market coverage disagree on how quickly cooling matters.",
+                    "prevailing": [
+                        {
+                            "text": "Cooling payroll growth is beginning to matter for policy expectations.",
+                            "citation_ids": ["cite_010", "cite_011"],
+                        }
+                    ],
+                    "counter": [],
+                    "minority": [],
+                    "watch": [],
+                }
+            ]
+        }
+
+        rows = _build_bullet_citation_rows(synthesis=synthesis, synthesis_id="syn_run_issue")
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["issue_id"], "issue_002")
+        self.assertEqual(rows[0]["issue_index"], 0)
+        self.assertEqual(rows[0]["section"], "prevailing")
+        self.assertEqual(rows[0]["citation_id"], "cite_010")
+        self.assertEqual(rows[1]["citation_id"], "cite_011")
+
+    def test_build_run_summary_tracks_generated_issue_count(self):
+        synthesis = {
+            "issues": [
+                {"issue_id": "issue_001"},
+                {"issue_id": "issue_002"},
+            ]
+        }
+
+        summary = _build_run_summary(
+            run_id="run_fixture_ok",
+            report_date="2026-03-10",
+            query_text="oil growth demand policy",
+            docs_fetched=5,
+            docs_ingested=4,
+            chunks_indexed=8,
+            stage8_status="ok",
+            final_status="ok",
+            synthesis=synthesis,
+        )
+
+        self.assertEqual(summary["issue_count"], 2)
+        self.assertEqual(summary["run_id"], "run_fixture_ok")
+        self.assertEqual(summary["final_status"], "ok")
+
     def test_load_active_fixture_payloads_filters_to_runtime_subset(self):
         fixture_payloads = {
             "fed_press_releases": [{"url": "https://example.test/fed"}],

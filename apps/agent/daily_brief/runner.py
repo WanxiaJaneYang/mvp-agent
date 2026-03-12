@@ -246,16 +246,17 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "bullet_citations.json", bullet_citation_rows)
     _write_json(
         artifact_dir / "run_summary.json",
-        {
-            "run_id": run_id,
-            "report_date": report_date,
-            "query_text": query_text,
-            "docs_fetched": context.counters.docs_fetched,
-            "docs_ingested": context.counters.docs_ingested,
-            "chunks_indexed": context.counters.chunks_indexed,
-            "stage8_status": stage8_result["status"],
-            "final_status": final_result["status"],
-        },
+        _build_run_summary(
+            run_id=run_id,
+            report_date=report_date,
+            query_text=query_text,
+            docs_fetched=context.counters.docs_fetched,
+            docs_ingested=context.counters.docs_ingested,
+            chunks_indexed=context.counters.chunks_indexed,
+            stage8_status=stage8_result["status"],
+            final_status=final_result["status"],
+            synthesis=final_result["synthesis"],
+        ),
     )
 
     return {
@@ -335,24 +336,22 @@ def _build_synthesis_bullet_rows(
     synthesis_id: str,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for section in ("prevailing", "counter", "minority", "watch", "changed"):
-        bullets = synthesis.get(section, [])
-        if not isinstance(bullets, list):
-            continue
-        for bullet_index, bullet in enumerate(bullets):
-            if not isinstance(bullet, Mapping):
-                continue
-            rows.append(
-                {
-                    "synthesis_id": synthesis_id,
-                    "section": section,
-                    "bullet_index": bullet_index,
-                    "text": str(bullet.get("text", "")),
-                    "claim_span_count": 1,
-                    "is_abstain": int("Insufficient evidence" in str(bullet.get("text", ""))),
-                    "confidence_label": bullet.get("confidence_label"),
-                }
-            )
+    for bullet_context in _iter_synthesis_bullets(synthesis=synthesis):
+        bullet = bullet_context["bullet"]
+        rows.append(
+            {
+                "synthesis_id": synthesis_id,
+                "issue_id": bullet_context["issue_id"],
+                "issue_index": bullet_context["issue_index"],
+                "issue_title": bullet_context["issue_title"],
+                "section": bullet_context["section"],
+                "bullet_index": bullet_context["bullet_index"],
+                "text": str(bullet.get("text", "")),
+                "claim_span_count": 1,
+                "is_abstain": int("Insufficient evidence" in str(bullet.get("text", ""))),
+                "confidence_label": bullet.get("confidence_label"),
+            }
+        )
     return rows
 
 
@@ -362,6 +361,30 @@ def _build_bullet_citation_rows(
     synthesis_id: str,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    for bullet_context in _iter_synthesis_bullets(synthesis=synthesis):
+        bullet = bullet_context["bullet"]
+        for citation_id in bullet.get("citation_ids", []):
+            rows.append(
+                {
+                    "synthesis_id": synthesis_id,
+                    "issue_id": bullet_context["issue_id"],
+                    "issue_index": bullet_context["issue_index"],
+                    "issue_title": bullet_context["issue_title"],
+                    "section": bullet_context["section"],
+                    "bullet_index": bullet_context["bullet_index"],
+                    "claim_span_index": 0,
+                    "citation_id": str(citation_id),
+                }
+            )
+    return rows
+
+
+def _iter_synthesis_bullets(*, synthesis: Mapping[str, Any]) -> list[dict[str, Any]]:
+    issues = synthesis.get("issues")
+    if isinstance(issues, list):
+        return _iter_issue_centered_bullets(issues=issues)
+
+    rows: list[dict[str, Any]] = []
     for section in ("prevailing", "counter", "minority", "watch", "changed"):
         bullets = synthesis.get(section, [])
         if not isinstance(bullets, list):
@@ -369,17 +392,71 @@ def _build_bullet_citation_rows(
         for bullet_index, bullet in enumerate(bullets):
             if not isinstance(bullet, Mapping):
                 continue
-            for citation_id in bullet.get("citation_ids", []):
+            rows.append(
+                {
+                    "issue_id": None,
+                    "issue_index": None,
+                    "issue_title": None,
+                    "section": section,
+                    "bullet_index": bullet_index,
+                    "bullet": bullet,
+                }
+            )
+    return rows
+
+
+def _iter_issue_centered_bullets(*, issues: Iterable[Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for issue_index, issue in enumerate(issues):
+        if not isinstance(issue, Mapping):
+            continue
+        issue_id = str(issue.get("issue_id") or f"issue_{issue_index + 1:03d}")
+        issue_title = issue.get("title")
+        for section in ("prevailing", "counter", "minority", "watch", "changed"):
+            bullets = issue.get(section, [])
+            if not isinstance(bullets, list):
+                continue
+            for bullet_index, bullet in enumerate(bullets):
+                if not isinstance(bullet, Mapping):
+                    continue
                 rows.append(
                     {
-                        "synthesis_id": synthesis_id,
+                        "issue_id": issue_id,
+                        "issue_index": issue_index,
+                        "issue_title": issue_title,
                         "section": section,
                         "bullet_index": bullet_index,
-                        "claim_span_index": 0,
-                        "citation_id": str(citation_id),
+                        "bullet": bullet,
                     }
                 )
     return rows
+
+
+def _build_run_summary(
+    *,
+    run_id: str,
+    report_date: str,
+    query_text: str,
+    docs_fetched: int,
+    docs_ingested: int,
+    chunks_indexed: int,
+    stage8_status: str,
+    final_status: str,
+    synthesis: Mapping[str, Any],
+) -> dict[str, Any]:
+    issues = synthesis.get("issues")
+    issue_count = len(issues) if isinstance(issues, list) else 0
+    return {
+        "run_id": run_id,
+        "report_date": report_date,
+        "query_text": query_text,
+        "docs_fetched": docs_fetched,
+        "docs_ingested": docs_ingested,
+        "chunks_indexed": chunks_indexed,
+        "stage8_status": stage8_status,
+        "final_status": final_status,
+        "issue_count": issue_count,
+    }
 
 
 def _write_json(path: Path, payload: Any) -> None:
