@@ -53,7 +53,9 @@ The product goal is not to summarize sources one by one. It should identify the 
 
 ### 5.1 Daily brief
 - **Schedule:** 07:05 Asia/Singapore daily
-- **Important issues per brief:** 2-3
+- **Important issues per brief:** target 2; allow 3 only when evidence diversity and information gain support a third distinct issue
+- **Issue budget rule:** never force 3 issues; if the corpus only supports 1-2 distinct issues, the brief must stay at 1-2
+- **Source-scarcity rule:** if the corpus cannot support 2 distinct issues with adequate diversity, render a compressed brief with 1 main issue + 2-3 key takeaways + a short watchlist instead of padding with thin issues
 - **Per issue structure:**
   - issue title or question
   - short synthesis summary
@@ -147,7 +149,17 @@ The daily brief must follow this pipeline:
 This replaces the earlier single-query, section-bullet synthesis design.
 
 ### 6.5 Required daily brief output shape
-Each daily brief should read like a short literature review across 2-3 issues.
+Each daily brief should read like a short literature review across 2-3 issues when evidence supports that count.
+
+Issue-budget and scarcity rules:
+- default to 2 issues when the corpus supports multiple distinct debates
+- allow 3 issues only when the third issue adds clear incremental information and does not materially overlap the first 2
+- if source scarcity, low diversity, or high overlap prevents 2 distinct issues, render a compressed brief with:
+  - `bottom_line` / brief thesis
+  - `top_takeaways`
+  - 1 main issue block
+  - `watchlist`
+- issues that fail distinctness or information-gain thresholds must be merged, demoted to takeaways/watchlist, or dropped rather than forced into the body
 
 For each issue, the system must produce:
 - `issue_question`
