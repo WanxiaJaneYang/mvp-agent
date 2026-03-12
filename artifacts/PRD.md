@@ -53,7 +53,9 @@ The product goal is not to summarize sources one by one. It should identify the 
 
 ### 5.1 Daily brief
 - **Schedule:** 07:05 Asia/Singapore daily
-- **Important issues per brief:** 2-3
+- **Important issues per brief:** target 2; allow 3 only when evidence diversity and information gain support a third distinct issue
+- **Issue budget rule:** never force 3 issues; if the corpus only supports 1-2 distinct issues, the brief must stay at 1-2
+- **Source-scarcity rule:** if the corpus cannot support 2 distinct issues with adequate diversity, render a compressed brief with 1 main issue + 2-3 key takeaways + a short watchlist instead of padding with thin issues
 - **Per issue structure:**
   - issue title or question
   - short synthesis summary
@@ -132,22 +134,35 @@ The daily brief must follow this pipeline:
 
 1. **Deterministic evidence layer**
    - ingestion / normalize / dedup / chunk / retrieval / citation store / budget guard
-2. **Issue planner (model layer)**
-   - consumes bounded evidence pack and optional prior-brief context
+2. **Brief planner (editorial layer)**
+   - consumes bounded brief corpus, optional prior-brief context, and source-diversity stats
+   - outputs structured `BriefPlan` including brief thesis, issue budget, render mode, candidate issue seeds, and watchlist
+3. **Issue planner (model layer)**
+   - consumes `BriefPlan` plus issue-aware evidence scopes
    - outputs structured `IssueMap[]`
-3. **Claim composer (model layer)**
+4. **Claim composer (model layer)**
    - consumes `IssueMap[]` plus citations
    - outputs structured `ClaimObject[]`
-4. **Validator / critic**
+5. **Validator / critic**
    - deterministic citation and evidence checks are mandatory
    - optional critic pass can reject shallow source-by-source paraphrase
-5. **Renderer**
+6. **Renderer**
    - HTML/email consume structured issue and claim objects
 
-This replaces the earlier single-query, section-bullet synthesis design.
+This replaces the earlier single-query, section-bullet synthesis design and makes editorial issue budgeting explicit before issue generation.
 
 ### 6.5 Required daily brief output shape
-Each daily brief should read like a short literature review across 2-3 issues.
+Each daily brief should read like a short literature review across 2-3 issues when evidence supports that count.
+
+Issue-budget and scarcity rules:
+- default to 2 issues when the corpus supports multiple distinct debates
+- allow 3 issues only when the third issue adds clear incremental information and does not materially overlap the first 2
+- if source scarcity, low diversity, or high overlap prevents 2 distinct issues, render a compressed brief with:
+  - `bottom_line` / brief thesis
+  - `top_takeaways`
+  - 1 main issue block
+  - `watchlist`
+- issues that fail distinctness or information-gain thresholds must be merged, demoted to takeaways/watchlist, or dropped rather than forced into the body
 
 For each issue, the system must produce:
 - `issue_question`
@@ -285,6 +300,9 @@ Outputs:
 ### Issue planning
 - Daily brief generation does not depend on a single top-term query alone.
 - The system produces 2-3 issue candidates when evidence diversity supports it.
+- The system must not force 3 issues when evidence supports fewer distinct debates.
+- When source diversity is insufficient, the system falls back to a compressed brief with 1 main issue plus top takeaways/watchlist.
+- Final issues must be distinct enough to justify separate slots in the issue budget; overlapping issues are merged, demoted, or dropped.
 - `prevailing`, `counter`, and `minority` claims for an issue all address the same issue question.
 
 ### Claim composition
@@ -300,6 +318,7 @@ Outputs:
 - Stable structured output.
 - Includes Tier 1 sources when topic is policy-related (if available).
 - Renderer displays issue summaries plus evidence-backed arguments.
+- Renderer can switch between `full` and `compressed` brief modes based on the `BriefPlan` issue budget and source-scarcity policy.
 
 ### Alerts
 - Max alerts/day enforced.

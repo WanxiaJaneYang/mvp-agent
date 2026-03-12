@@ -23,23 +23,36 @@ def send_daily_brief_email(
     report_date: str,
     run_id: str,
     html_body: str,
-    status_title: str,
+    status_title: str = "Ready",
+    synthesis: dict[str, Any] | None = None,
+    citation_status: str = "ok",
+    analytical_status: str = "pass",
+    publish_decision: str = "publish",
     smtp_class: Any = SMTP,
 ) -> dict[str, Any]:
     if not config.recipient_emails:
         raise ValueError("recipient_emails must include at least one address.")
 
     subject = f"{config.subject_prefix}: {report_date}"
+    if publish_decision != "publish":
+        subject = f"{config.subject_prefix} [{publish_decision.upper()}]: {report_date}"
+    elif citation_status != "ok" or analytical_status != "pass":
+        subject = f"{config.subject_prefix} [{citation_status.upper()}/{analytical_status.upper()}]: {report_date}"
     message = EmailMessage()
     message["From"] = config.sender_email
     message["To"] = ", ".join(config.recipient_emails)
     message["Subject"] = subject
+    summary_lines = _build_plain_text_summary(synthesis=synthesis)
     message.set_content(
         "\n".join(
             [
                 f"Daily Brief status: {status_title}",
+                f"Citation status: {citation_status}",
+                f"Analytical quality: {analytical_status}",
+                f"Publish decision: {publish_decision}",
                 f"Report date: {report_date}",
                 f"Run: {run_id}",
+                *summary_lines,
             ]
         )
     )
@@ -54,4 +67,51 @@ def send_daily_brief_email(
         "recipient_count": len(config.recipient_emails),
         "subject": subject,
         "smtp_host": config.smtp_host,
+        "publish_decision": publish_decision,
     }
+
+
+def _build_plain_text_summary(*, synthesis: dict[str, Any] | None) -> list[str]:
+    if not isinstance(synthesis, dict):
+        return []
+
+    lines: list[str] = []
+    brief = synthesis.get("brief")
+    if isinstance(brief, dict):
+        bottom_line = str(brief.get("bottom_line") or "").strip()
+        if bottom_line:
+            lines.append(f"Bottom line: {bottom_line}")
+        takeaways = brief.get("top_takeaways", [])
+        if isinstance(takeaways, list):
+            for takeaway in takeaways[:3]:
+                if isinstance(takeaway, str) and takeaway.strip():
+                    lines.append(f"- {takeaway.strip()}")
+
+    issues = synthesis.get("issues", [])
+    if not isinstance(issues, list):
+        return lines
+
+    for issue in issues[:1]:
+        if not isinstance(issue, dict):
+            continue
+        issue_title = str(issue.get("title") or issue.get("issue_question") or "").strip()
+        if issue_title:
+            lines.append(f"Issue: {issue_title}")
+        for section in ("prevailing", "counter", "minority", "watch"):
+            bullets = issue.get(section, [])
+            if not isinstance(bullets, list) or not bullets:
+                continue
+            bullet = bullets[0]
+            if not isinstance(bullet, dict):
+                continue
+            novelty = str(bullet.get("novelty_vs_prior_brief") or "").strip()
+            claim_text = str(bullet.get("text") or "").strip()
+            why_it_matters = str(bullet.get("why_it_matters") or "").strip()
+            if claim_text:
+                prefix = f"{section}: "
+                if novelty:
+                    prefix = f"{section} [{novelty}]: "
+                lines.append(prefix + claim_text)
+            if why_it_matters:
+                lines.append(f"Why it matters: {why_it_matters}")
+    return lines

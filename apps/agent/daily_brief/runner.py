@@ -9,7 +9,18 @@ from pathlib import Path
 from smtplib import SMTP
 from typing import Any, cast
 
+from apps.agent.daily_brief.delta import build_changed_section_from_deltas, build_claim_deltas
+from apps.agent.daily_brief.editorial_planner import (
+    LocalBriefPlanner,
+    build_corpus_summary,
+)
+from apps.agent.daily_brief.issue_dedup import dedupe_issues
+from apps.agent.daily_brief.issue_retrieval import (
+    build_brief_corpus_report,
+    build_issue_evidence_scopes,
+)
 from apps.agent.daily_brief.model_interfaces import (
+    BriefPlannerProvider,
     ClaimComposerInput,
     ClaimComposerProvider,
     CriticInput,
@@ -20,7 +31,6 @@ from apps.agent.daily_brief.model_interfaces import (
 from apps.agent.daily_brief.prior_brief_context import build_prior_brief_context
 from apps.agent.daily_brief.synthesis import (
     SynthesisRetryPlan,
-    build_changed_section,
     build_citation_store,
     build_synthesis,
     build_synthesis_from_structured_claims,
@@ -43,8 +53,10 @@ from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
 from apps.agent.pipeline.types import (
     BulletCitationRow,
+    BriefPlan,
     CitationStoreEntry,
     CitationValidationResult,
+    ClaimDelta,
     CriticReport,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
@@ -53,8 +65,12 @@ from apps.agent.pipeline.types import (
     DailyBriefSynthesis,
     DailyBriefSynthesisStageData,
     EvidencePackItem,
+    IssueEvidenceScope,
+    IssueInformationGain,
     FtsRow,
     IssueMap,
+    IssueOverlapReport,
+    PublishDecision,
     RunStatus,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
@@ -68,11 +84,11 @@ from apps.agent.portfolio.input_store import load_portfolio_positions
 from apps.agent.portfolio.relevance import build_portfolio_relevance_flags
 from apps.agent.retrieval.chunker import build_chunk_rows
 from apps.agent.retrieval.evidence_pack import build_evidence_pack_report
-from apps.agent.retrieval.fts_index import build_fts_rows
+from apps.agent.retrieval.fts_index import build_fts_rows, search_runtime_fts_rows
 from apps.agent.runtime.budget_guard import BudgetCaps
 from apps.agent.runtime.cost_ledger import BudgetWindowSnapshot
 from apps.agent.runtime.source_scope import load_active_source_subset, load_source_registry
-from apps.agent.storage.sqlite_runtime import persist_daily_brief_runtime
+from apps.agent.storage.sqlite_runtime import persist_daily_brief_runtime, persist_runtime_corpus
 from apps.agent.synthesis.postprocess import finalize_validation_outcome
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -146,6 +162,7 @@ def run_fixture_daily_brief(
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -165,6 +182,7 @@ def run_fixture_daily_brief(
                 issue_planner=issue_planner,
                 claim_composer=claim_composer,
                 critic=critic,
+                provider_resolution=provider_resolution,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -193,6 +211,7 @@ def run_fixture_daily_brief(
                 run_id=run_id,
                 generated_at_utc=timestamp,
                 pipeline_result=pipeline_result,
+                provider_resolution=provider_resolution,
             )
         )
     execution.setdefault("status", pipeline_result["status"])
@@ -222,6 +241,7 @@ def run_daily_brief(
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -242,6 +262,7 @@ def run_daily_brief(
                 issue_planner=issue_planner,
                 claim_composer=claim_composer,
                 critic=critic,
+                provider_resolution=provider_resolution,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -270,6 +291,7 @@ def run_daily_brief(
                 run_id=run_id,
                 generated_at_utc=timestamp,
                 pipeline_result=pipeline_result,
+                provider_resolution=provider_resolution,
             )
         )
     execution.setdefault("status", pipeline_result["status"])
@@ -301,6 +323,7 @@ def _execute_daily_brief_slice(
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     report_date = generated_at_utc[:10]
     schedule = delivery_schedule or DailyBriefSchedule()
@@ -322,8 +345,16 @@ def _execute_daily_brief_slice(
         run_id=run_id,
         context=context,
     )
+    persist_runtime_corpus(
+        base_dir=base_dir,
+        source_rows=corpus_data.source_rows,
+        documents=corpus_data.documents,
+        chunks=corpus_data.chunks,
+        fts_rows=corpus_data.fts_rows,
+    )
     synthesis_data = build_daily_brief_synthesis(
         stage_data=corpus_data,
+        base_dir=base_dir,
         registry=input_data.registry,
         run_id=run_id,
         generated_at_utc=generated_at_utc,
@@ -347,7 +378,14 @@ def _execute_daily_brief_slice(
         final_status=synthesis_data.final_result["status"],
         budget_snapshot=budget_snapshot,
         diversity_report=synthesis_data.evidence_pack_report,
+        critic_report=synthesis_data.critic_report,
     )
+    publish_summary = _publish_summary(
+        stage8_result=synthesis_data.stage8_result,
+        critic_report=synthesis_data.critic_report,
+        email_requested=email_config is not None,
+    )
+    guardrail_checks = {**guardrail_checks, **publish_summary}
     render_daily_brief_html(
         output_path=output_path,
         report_date=report_date,
@@ -357,13 +395,17 @@ def _execute_daily_brief_slice(
         guardrail_checks=guardrail_checks,
     )
     email_delivery = None
-    if email_config is not None:
+    if email_config is not None and publish_summary["publish_decision"] == "publish":
         email_delivery = send_daily_brief_email(
             config=email_config,
             report_date=local_report_date,
             run_id=run_id,
             html_body=output_path.read_text(encoding="utf-8"),
-            status_title="Abstained" if synthesis_data.final_result["status"] == "abstained" else "Validated",
+            status_title="Abstained" if synthesis_data.final_result["status"] == "abstained" else "Ready",
+            synthesis=cast(dict[str, Any], synthesis_data.final_result["synthesis"]),
+            citation_status=publish_summary["citation_status"],
+            analytical_status=publish_summary["analytical_status"],
+            publish_decision=publish_summary["publish_decision"],
             smtp_class=smtp_class,
         )
 
@@ -376,6 +418,10 @@ def _execute_daily_brief_slice(
         removed_bullets=int(synthesis_data.stage8_result["report"]["removed_bullets"]),
         budget_snapshot=budget_snapshot,
         guardrail_checks=guardrail_checks,
+        citation_status=publish_summary["citation_status"],
+        analytical_status=publish_summary["analytical_status"],
+        publish_decision=publish_summary["publish_decision"],
+        reason_codes=publish_summary["reason_codes"],
         output_path=output_path,
         generated_at_utc=generated_at_utc,
     )
@@ -385,9 +431,15 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "documents.json", corpus_data.documents)
     _write_json(artifact_dir / "chunks.json", corpus_data.chunks)
     _write_json(artifact_dir / "fts_rows.json", corpus_data.fts_rows)
+    _write_json(artifact_dir / "brief_plan.json", synthesis_data.brief_plan)
+    _write_json(artifact_dir / "brief_corpus_items.json", synthesis_data.brief_corpus_items)
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
+    _write_json(artifact_dir / "issue_evidence_scopes.json", synthesis_data.issue_evidence_scopes)
     _write_json(artifact_dir / "issue_map.json", synthesis_data.issue_map)
+    _write_json(artifact_dir / "issue_overlap_reports.json", synthesis_data.issue_overlap_reports)
+    _write_json(artifact_dir / "information_gain_reports.json", synthesis_data.information_gain_reports)
     _write_json(artifact_dir / "claim_objects.json", synthesis_data.structured_claims)
+    _write_json(artifact_dir / "claim_deltas.json", synthesis_data.claim_deltas)
     _write_json(artifact_dir / "critic_report.json", synthesis_data.critic_report)
     _write_json(artifact_dir / "citations.json", synthesis_data.citation_rows)
     _write_json(artifact_dir / "synthesis.json", synthesis_data.final_result["synthesis"])
@@ -410,6 +462,7 @@ def _execute_daily_brief_slice(
             "issue_count": len(synthesis_data.issue_map),
             "claim_count": len(synthesis_data.structured_claims),
             "critic_status": None if synthesis_data.critic_report is None else synthesis_data.critic_report["status"],
+            "render_mode": synthesis_data.brief_plan["render_mode"],
             "docs_fetched": context.counters.docs_fetched,
             "docs_ingested": context.counters.docs_ingested,
             "chunks_indexed": context.counters.chunks_indexed,
@@ -427,6 +480,12 @@ def _execute_daily_brief_slice(
             "diversity_stats": synthesis_data.evidence_pack_report["diversity_stats"],
             "portfolio_positions_count": len(portfolio_positions),
             "portfolio_relevance_count": len(portfolio_relevance_flags),
+            "citation_status": publish_summary["citation_status"],
+            "analytical_status": publish_summary["analytical_status"],
+            "publish_decision": publish_summary["publish_decision"],
+            "reason_codes": publish_summary["reason_codes"],
+            "delivery_mode": publish_summary["delivery_mode"],
+            **_provider_summary(provider_resolution=provider_resolution),
         },
     )
 
@@ -440,6 +499,12 @@ def _execute_daily_brief_slice(
         "scheduled_for_local_date": local_report_date,
         "next_scheduled_run_at_utc": next_scheduled_run_at_utc,
         "email_delivery": email_delivery,
+        "citation_status": publish_summary["citation_status"],
+        "analytical_status": publish_summary["analytical_status"],
+        "publish_decision": publish_summary["publish_decision"],
+        "reason_codes": publish_summary["reason_codes"],
+        "delivery_mode": publish_summary["delivery_mode"],
+        **_provider_summary(provider_resolution=provider_resolution),
     }
 
 
@@ -526,22 +591,27 @@ def build_daily_brief_corpus(
     context.counters.docs_fetched = len(stage_data.planned_items)
     context.counters.docs_ingested = len(documents)
     context.counters.chunks_indexed = len(chunks)
+    corpus_report = build_brief_corpus_report(fts_rows=fts_rows, pack_size=30)
 
     return DailyBriefCorpusStageData(
         source_rows=stage_data.source_rows,
         documents=documents,
         chunks=chunks,
         fts_rows=fts_rows,
+        corpus_items=corpus_report["items"],
+        diversity_stats=corpus_report["diversity_stats"],
     )
 
 
 def build_daily_brief_synthesis(
     *,
     stage_data: DailyBriefCorpusStageData,
+    base_dir: Path | None = None,
     registry: Mapping[str, SourceRegistryEntry],
     run_id: str,
     generated_at_utc: str | None = None,
     previous_synthesis: Mapping[str, Any] | None = None,
+    brief_planner: BriefPlannerProvider | None = None,
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
@@ -550,17 +620,47 @@ def build_daily_brief_synthesis(
         raise ValueError("Daily brief synthesis requires both issue_planner and claim_composer together.")
 
     synthesis_generated_at_utc = generated_at_utc or _utc_now_iso()
-    query_text = build_daily_brief_query(documents=stage_data.documents)
-    evidence_pack_report = build_evidence_pack_report(
-        fts_rows=stage_data.fts_rows,
-        query_text=query_text,
-        pack_size=30,
-    )
-    evidence_pack_items = evidence_pack_report["items"]
-    evidence_pack_items = _attach_doc_ids(
-        evidence_pack_items=evidence_pack_items,
-        fts_rows=stage_data.fts_rows,
-    )
+    use_structured_orchestration = issue_planner is not None and claim_composer is not None
+    brief_corpus_items = list(stage_data.corpus_items)
+    if not brief_corpus_items:
+        corpus_report = build_brief_corpus_report(fts_rows=stage_data.fts_rows, pack_size=30)
+        brief_corpus_items = list(corpus_report["items"])
+        diversity_stats = dict(corpus_report["diversity_stats"])
+    else:
+        diversity_stats = dict(stage_data.diversity_stats)
+    evidence_pack_report = {
+        "items": brief_corpus_items,
+        "diversity_check": "pass" if int(diversity_stats.get("unique_publishers", 0) or 0) >= 3 else "warn",
+        "diversity_stats": diversity_stats,
+        "notes": [],
+    }
+    query_text = ""
+    if use_structured_orchestration:
+        evidence_pack_items = brief_corpus_items
+    else:
+        query_text = build_daily_brief_query(documents=stage_data.documents)
+        retrieval_rows: list[Mapping[str, Any]] = list(stage_data.fts_rows)
+        if base_dir is not None and query_text:
+            runtime_matches = search_runtime_fts_rows(
+                base_dir=base_dir,
+                query_text=query_text,
+                limit=60,
+            )
+            match_chunk_ids = {str(row["chunk_id"]) for row in runtime_matches}
+            retrieval_rows = [
+                row
+                for row in stage_data.fts_rows
+                if str(row["chunk_id"]) in match_chunk_ids
+            ] or list(stage_data.fts_rows)
+        evidence_pack_report = build_evidence_pack_report(
+            fts_rows=retrieval_rows,
+            query_text=query_text,
+            pack_size=30,
+        )
+        evidence_pack_items = _attach_doc_ids(
+            evidence_pack_items=evidence_pack_report["items"],
+            fts_rows=retrieval_rows,
+        )
 
     documents_by_id = {str(document["doc_id"]): document for document in stage_data.documents}
     chunks_by_id = {str(chunk["chunk_id"]): chunk for chunk in stage_data.chunks}
@@ -573,18 +673,38 @@ def build_daily_brief_synthesis(
         previous_synthesis=previous_synthesis,
         previous_generated_at_utc=None,
     )
-    use_structured_orchestration = issue_planner is not None and claim_composer is not None
+    brief_plan = _build_brief_plan(
+        brief_corpus_items=brief_corpus_items,
+        documents_by_id=documents_by_id,
+        diversity_stats=diversity_stats,
+        prior_brief_context=prior_brief_context,
+        brief_planner=brief_planner,
+        run_id=run_id,
+        generated_at_utc=synthesis_generated_at_utc,
+    )
+    issue_evidence_scopes = build_issue_evidence_scopes(
+        brief_plan=brief_plan,
+        corpus_items=brief_corpus_items,
+        fts_rows=stage_data.fts_rows,
+        registry=registry,
+    )
     issue_map: list[IssueMap] = []
+    issue_overlap_reports: list[IssueOverlapReport] = []
+    information_gain_reports: list[IssueInformationGain] = []
     structured_claims: list[StructuredClaim] = []
     if use_structured_orchestration:
         issue_map = _build_issue_map(
-            query_text=query_text,
-            evidence_pack_items=evidence_pack_items,
+            brief_plan=brief_plan,
+            issue_evidence_scopes=issue_evidence_scopes,
             issue_planner=issue_planner,
             prior_brief_context=prior_brief_context,
             run_id=run_id,
             generated_at_utc=synthesis_generated_at_utc,
         )
+    issue_map, issue_overlap_reports, information_gain_reports = dedupe_issues(
+        issue_map=issue_map,
+        brief_plan=brief_plan,
+    )
     validation_registry = _build_validation_registry(
         registry=registry,
         documents=stage_data.documents,
@@ -605,7 +725,9 @@ def build_daily_brief_synthesis(
                 generated_at_utc=synthesis_generated_at_utc,
             )
             synthesis = build_synthesis_from_structured_claims(
+                brief_plan=brief_plan,
                 issue_map=issue_map,
+                issue_evidence_scopes=issue_evidence_scopes,
                 structured_claims=structured_claims,
                 citation_store=citation_store,
             )
@@ -616,20 +738,20 @@ def build_daily_brief_synthesis(
                 citation_store=citation_store,
                 retry_plan=retry_plan,
             )
-            issue_map = _build_issue_map(
+            issue_map = _build_legacy_issue_map(
                 query_text=query_text,
                 evidence_pack_items=evidence_pack_items,
-                issue_planner=None,
-                prior_brief_context=prior_brief_context,
-                run_id=run_id,
-                generated_at_utc=synthesis_generated_at_utc,
             )
+            issue_overlap_reports = []
+            information_gain_reports = []
             structured_claims = _build_structured_claims_from_synthesis(
                 issue_map=issue_map,
                 synthesis=flat_synthesis,
             )
             synthesis = build_synthesis_from_structured_claims(
+                brief_plan=brief_plan,
                 issue_map=issue_map,
+                issue_evidence_scopes=issue_evidence_scopes,
                 structured_claims=structured_claims,
                 citation_store=citation_store,
             )
@@ -662,9 +784,13 @@ def build_daily_brief_synthesis(
         raise ValueError("Daily brief synthesis did not produce a validation result.")
 
     final_result = finalize_validation_outcome(validation_result=stage8_result)
-    changed_section = build_changed_section(
-        current_synthesis=final_result["synthesis"],
-        previous_synthesis=previous_synthesis,
+    claim_deltas = build_claim_deltas(
+        structured_claims=structured_claims,
+        prior_brief_context=prior_brief_context,
+    )
+    changed_section = build_changed_section_from_deltas(
+        structured_claims=structured_claims,
+        claim_deltas=claim_deltas,
     )
     if changed_section:
         final_synthesis = dict(final_result["synthesis"])
@@ -684,13 +810,33 @@ def build_daily_brief_synthesis(
                 prior_brief_context=prior_brief_context,
             )
         )
+    publish_decision = _build_publish_decision(
+        stage8_status=str(stage8_result["status"]),
+        critic_report=critic_report,
+    )
+    final_synthesis = _decorate_synthesis_meta(
+        synthesis=final_result["synthesis"],
+        publish_decision=publish_decision,
+        claim_deltas=claim_deltas,
+    )
+    final_result = {
+        **final_result,
+        "synthesis": cast(ValidatedDailyBriefSynthesis, final_synthesis),
+    }
     synthesis_id = build_synthesis_id(run_id=run_id)
     return DailyBriefSynthesisStageData(
         query_text=query_text,
+        brief_plan=brief_plan,
+        brief_corpus_items=brief_corpus_items,
         evidence_pack_items=evidence_pack_items,
         evidence_pack_report=evidence_pack_report,
+        issue_evidence_scopes=issue_evidence_scopes,
         issue_map=issue_map,
+        issue_overlap_reports=issue_overlap_reports,
+        information_gain_reports=information_gain_reports,
         structured_claims=structured_claims,
+        claim_deltas=claim_deltas,
+        publish_decision=publish_decision,
         citation_store=stage8_result["citation_store"],
         stage8_result=stage8_result,
         final_result=final_result,
@@ -764,10 +910,36 @@ def _build_retry_plan(
     )
 
 
+def _build_brief_plan(
+    *,
+    brief_corpus_items: list[EvidencePackItem],
+    documents_by_id: Mapping[str, RuntimeDocumentRecord],
+    diversity_stats: Mapping[str, Any],
+    prior_brief_context: Mapping[str, Any] | None,
+    brief_planner: BriefPlannerProvider | None,
+    run_id: str,
+    generated_at_utc: str,
+) -> BriefPlan:
+    corpus_summary = build_corpus_summary(
+        corpus_items=brief_corpus_items,
+        documents_by_id=documents_by_id,
+    )
+    planner = brief_planner or LocalBriefPlanner()
+    return planner.plan_brief(
+        brief_input={
+            "run_id": run_id,
+            "generated_at_utc": generated_at_utc,
+            "corpus_summary": corpus_summary,
+            "source_diversity_stats": dict(diversity_stats),
+            "prior_brief_context": None if prior_brief_context is None else dict(prior_brief_context),
+        }
+    )
+
+
 def _build_issue_map(
     *,
-    query_text: str,
-    evidence_pack_items: list[EvidencePackItem],
+    brief_plan: BriefPlan,
+    issue_evidence_scopes: list[IssueEvidenceScope],
     issue_planner: IssuePlannerProvider | None,
     prior_brief_context: dict[str, Any] | None,
     run_id: str,
@@ -778,11 +950,35 @@ def _build_issue_map(
             brief_input=IssuePlannerInput(
                 run_id=run_id,
                 generated_at_utc=generated_at_utc,
-                evidence_pack=[dict(item) for item in evidence_pack_items],
+                brief_plan=dict(brief_plan),
+                issue_evidence_scopes=[dict(scope) for scope in issue_evidence_scopes],
                 prior_brief_context=prior_brief_context,
             )
         )
 
+    issue_map: list[IssueMap] = []
+    seeds = list(brief_plan.get("candidate_issue_seeds", []))
+    for index, scope in enumerate(issue_evidence_scopes):
+        issue_seed = seeds[index] if index < len(seeds) else "market narrative"
+        issue_map.append(
+            IssueMap(
+                issue_id=str(scope["issue_id"]),
+                issue_question=f"What changed in {issue_seed}?",
+                thesis_hint=f"{issue_seed.capitalize()} is one of the main editorial threads in today's brief.",
+                supporting_evidence_ids=list(scope.get("primary_chunk_ids", [])),
+                opposing_evidence_ids=list(scope.get("opposing_chunk_ids", [])),
+                minority_evidence_ids=list(scope.get("minority_chunk_ids", [])),
+                watch_evidence_ids=list(scope.get("watch_chunk_ids", [])),
+            )
+        )
+    return issue_map[: max(1, int(brief_plan["issue_budget"]) + 1)]
+
+
+def _build_legacy_issue_map(
+    *,
+    query_text: str,
+    evidence_pack_items: list[EvidencePackItem],
+) -> list[IssueMap]:
     fallback_topic = query_text or "today's dominant narrative"
     issue_question = (
         f"What is the latest debate around {query_text}?"
@@ -966,6 +1162,65 @@ def _build_validation_registry(
     return normalized_registry
 
 
+def _build_publish_decision(
+    *,
+    stage8_status: str,
+    critic_report: CriticReport | None,
+) -> PublishDecision:
+    if stage8_status == "ok":
+        citation_status = "ok"
+    elif stage8_status == "partial":
+        citation_status = "partial"
+    else:
+        citation_status = "abstained"
+
+    analytical_status = "pass"
+    reason_codes: list[str] = []
+    if critic_report is not None:
+        analytical_status = str(critic_report["status"])
+        reason_codes.extend(str(code) for code in critic_report.get("reason_codes", []))
+
+    publish_decision = "publish"
+    delivery_mode = "email_and_html"
+    if citation_status == "abstained" or analytical_status == "fail":
+        publish_decision = "hold"
+        delivery_mode = "html_only"
+    elif citation_status == "partial":
+        delivery_mode = "html_only"
+
+    if citation_status == "abstained":
+        reason_codes.append("citation_validation_abstained")
+
+    deduped_reason_codes: list[str] = []
+    for code in reason_codes:
+        if code not in deduped_reason_codes:
+            deduped_reason_codes.append(code)
+    return {
+        "citation_status": citation_status,
+        "analytical_status": analytical_status,
+        "publish_decision": publish_decision,
+        "reason_codes": deduped_reason_codes,
+        "delivery_mode": delivery_mode,
+    }
+
+
+def _decorate_synthesis_meta(
+    *,
+    synthesis: Mapping[str, Any],
+    publish_decision: PublishDecision,
+    claim_deltas: list[ClaimDelta],
+) -> dict[str, Any]:
+    final_synthesis = dict(synthesis)
+    meta = dict(final_synthesis.get("meta", {})) if isinstance(final_synthesis.get("meta"), Mapping) else {}
+    meta["citation_status"] = publish_decision["citation_status"]
+    meta["analytical_status"] = publish_decision["analytical_status"]
+    meta["publish_decision"] = publish_decision["publish_decision"]
+    meta["reason_codes"] = list(publish_decision["reason_codes"])
+    final_synthesis["meta"] = meta
+    final_synthesis["claim_deltas"] = [dict(delta) for delta in claim_deltas]
+    return final_synthesis
+
+
 def _attach_doc_ids(
     *,
     evidence_pack_items: Iterable[Mapping[str, Any]],
@@ -1069,6 +1324,7 @@ def _guardrail_checks(
     final_status: str,
     budget_snapshot: Mapping[str, Any],
     diversity_report: Mapping[str, Any] | None,
+    critic_report: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     citation_level = "warn" if stage8_result is None else "pass"
     if stage8_result is not None and stage8_result["status"] == "partial":
@@ -1109,7 +1365,29 @@ def _guardrail_checks(
         "paywall_check": "pass",
         "diversity_check": diversity_level,
         "budget_check": "pass" if budget_allowed else "fail",
+        "analytical_status": "pass" if critic_report is None else str(critic_report.get("status", "pass")),
         "notes": notes,
+    }
+
+
+def _publish_summary(
+    *,
+    stage8_result: Mapping[str, Any] | None,
+    critic_report: Mapping[str, Any] | None,
+    email_requested: bool,
+) -> dict[str, Any]:
+    decision = _build_publish_decision(
+        stage8_status="retry" if stage8_result is None else str(stage8_result.get("status", "retry")),
+        critic_report=cast(CriticReport | None, critic_report),
+    )
+    delivery_mode = decision["delivery_mode"]
+    if decision["publish_decision"] == "publish" and email_requested and delivery_mode == "html_only":
+        delivery_mode = "email_and_html"
+    if not email_requested and delivery_mode == "email_and_html":
+        delivery_mode = "html_only"
+    return {
+        **decision,
+        "delivery_mode": delivery_mode,
     }
 
 
@@ -1168,6 +1446,7 @@ def _persist_budget_stop_outputs(
     run_id: str,
     generated_at_utc: str,
     pipeline_result: Mapping[str, Any],
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     report_date = generated_at_utc[:10]
     artifact_dir = _artifact_dir(base_dir=base_dir, report_date=report_date, run_id=run_id)
@@ -1205,6 +1484,12 @@ def _persist_budget_stop_outputs(
             "budget_ledger_rows": list(pipeline_result.get("budget_ledger_rows", [])),
             "guardrail_checks": guardrail_checks,
             "diversity_stats": {},
+            "citation_status": "abstained",
+            "analytical_status": "pass",
+            "publish_decision": "hold",
+            "reason_codes": ["budget_preflight_blocked"],
+            "delivery_mode": "hold",
+            **_provider_summary(provider_resolution=provider_resolution),
         },
     )
     return {
@@ -1214,6 +1499,12 @@ def _persist_budget_stop_outputs(
         "artifact_dir": str(artifact_dir),
         "query_text": None,
         "abstain_reason": pipeline_result.get("error_summary"),
+        "citation_status": "abstained",
+        "analytical_status": "pass",
+        "publish_decision": "hold",
+        "reason_codes": ["budget_preflight_blocked"],
+        "delivery_mode": "hold",
+        **_provider_summary(provider_resolution=provider_resolution),
     }
 
 
@@ -1241,6 +1532,8 @@ def _persist_run_state(
                 chunks=[],
                 evidence_pack_items=[],
                 evidence_pack_report={"diversity_stats": {}},
+                issue_map_rows=[],
+                structured_claim_rows=[],
                 citation_rows=[],
                 synthesis_rows=[],
                 bullet_citation_rows=[],
@@ -1253,6 +1546,8 @@ def _persist_run_state(
         evidence_pack_items = json.loads(
             (artifact_dir / "evidence_pack_items.json").read_text(encoding="utf-8")
         )
+        issue_map_rows = json.loads((artifact_dir / "issue_map.json").read_text(encoding="utf-8"))
+        structured_claim_rows = json.loads((artifact_dir / "claim_objects.json").read_text(encoding="utf-8"))
         citations = json.loads((artifact_dir / "citations.json").read_text(encoding="utf-8"))
         synthesis_bullets = json.loads(
             (artifact_dir / "synthesis_bullets.json").read_text(encoding="utf-8")
@@ -1274,6 +1569,8 @@ def _persist_run_state(
             chunks=chunks,
             evidence_pack_items=evidence_pack_items,
             evidence_pack_report={"diversity_stats": run_summary.get("diversity_stats", {})},
+            issue_map_rows=issue_map_rows,
+            structured_claim_rows=structured_claim_rows,
             citation_rows=citations,
             synthesis_rows=synthesis_bullets,
             bullet_citation_rows=bullet_citations,
@@ -1292,12 +1589,30 @@ def _persist_run_state(
         chunks=[],
         evidence_pack_items=[],
         evidence_pack_report={"diversity_stats": {}},
+        issue_map_rows=[],
+        structured_claim_rows=[],
         citation_rows=[],
         synthesis_rows=[],
         bullet_citation_rows=[],
         run_row=run_row,
         budget_ledger_rows=pipeline_result.get("budget_ledger_rows", []),
     )
+
+
+def _provider_summary(*, provider_resolution: Mapping[str, Any] | None) -> dict[str, Any]:
+    if isinstance(provider_resolution, Mapping):
+        return {
+            "requested_provider": provider_resolution.get("requested_provider"),
+            "resolved_provider": provider_resolution.get("resolved_provider"),
+            "provider_mode": provider_resolution.get("provider_mode"),
+            "provider_fallback_used": bool(provider_resolution.get("provider_fallback_used", False)),
+        }
+    return {
+        "requested_provider": None,
+        "resolved_provider": None,
+        "provider_mode": None,
+        "provider_fallback_used": False,
+    }
 
 
 def _utc_now_iso() -> str:

@@ -1,0 +1,46 @@
+{
+  "id": "literature_review_duplicate_issue",
+  "type": "literature_review",
+  "synthesis": {
+    "brief": {
+      "bottom_line": "Two issue slots are restating the same debate.",
+      "top_takeaways": [
+        "The brief is repetitive."
+      ]
+    },
+    "issues": [
+      {
+        "issue_id": "issue_001",
+        "issue_question": "Will softer growth change near-term Fed expectations?",
+        "prevailing": [
+          {
+            "text": "Softer growth is raising later-cut expectations.",
+            "novelty_vs_prior_brief": "continued",
+            "why_it_matters": "Rates can reprice quickly."
+          }
+        ],
+        "counter": [],
+        "minority": [],
+        "watch": []
+      },
+      {
+        "issue_id": "issue_002",
+        "issue_question": "Will softer growth change near-term Fed expectations?",
+        "prevailing": [
+          {
+            "text": "Growth cooling is shifting rate expectations.",
+            "novelty_vs_prior_brief": "continued",
+            "why_it_matters": "The same debate is being repeated."
+          }
+        ],
+        "counter": [],
+        "minority": [],
+        "watch": []
+      }
+    ]
+  },
+  "expected": {
+    "passes": false,
+    "reason_codes": ["duplicate_issue"]
+  }
+}

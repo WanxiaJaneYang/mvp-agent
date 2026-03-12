@@ -4,9 +4,10 @@ Local-first financial news and macro literature-review assistant.
 
 This repository contains the modelling artifacts and early runtime components for an assistant that:
 - ingests financial/macro sources (RSS, HTML, PDF),
+- indexes evidence in local SQLite/FTS5 with hybrid lexical plus semantic retrieval scoring,
 - produces citation-grounded daily briefs,
 - delivers daily briefs to local HTML plus optional email on a user-timezone schedule,
-- implements alert scoring and policy gates while keeping alert delivery as a planned follow-on step,
+- implements alert scoring, policy gates, and local alert delivery runtime,
 - enforces strict budget and safety guardrails.
 
 ## Current Phase
@@ -15,12 +16,10 @@ This project is currently in early implementation with the modelling pack still 
 
 Implemented in-tree today:
 - daily-brief runtime, scheduled HTML/email delivery, and citation/postprocess guardrails
-- alert scoring and policy-gate helpers
-- eval harness with 12 golden cases
+- persistent SQLite/FTS5 retrieval with lexical plus semantic scoring
+- alert scoring, policy-gate helpers, and alert delivery runtime
+- eval harness with 17 golden cases
 - manual portfolio relevance mapping with local runtime persistence
-
-Planned next:
-- alert delivery
 
 Completed modelling artifacts:
 - `artifacts/modelling/source_registry.yaml`

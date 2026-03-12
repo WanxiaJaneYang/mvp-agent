@@ -5,7 +5,10 @@ import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+from apps.agent.retrieval.fts_index import search_runtime_fts_rows
 
 
 def build_evidence_pack(
@@ -13,11 +16,13 @@ def build_evidence_pack(
     fts_rows: Iterable[Mapping[str, Any]],
     query_text: str,
     pack_size: int = 30,
+    base_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
     return build_evidence_pack_report(
         fts_rows=fts_rows,
         query_text=query_text,
         pack_size=pack_size,
+        base_dir=base_dir,
     )["items"]
 
 
@@ -26,6 +31,7 @@ def build_evidence_pack_report(
     fts_rows: Iterable[Mapping[str, Any]],
     query_text: str,
     pack_size: int = 30,
+    base_dir: Path | None = None,
 ) -> dict[str, Any]:
     query_terms = _tokenize(query_text)
     if not query_terms or pack_size <= 0:
@@ -36,7 +42,12 @@ def build_evidence_pack_report(
             "notes": ["No matching evidence rows were available for evidence-pack construction."],
         }
 
-    matching_rows = _matching_rows(fts_rows=fts_rows, query_terms=query_terms)
+    matching_rows = _matching_rows(
+        fts_rows=fts_rows,
+        query_terms=query_terms,
+        query_text=query_text,
+        base_dir=base_dir,
+    )
     if not matching_rows:
         return {
             "items": [],
@@ -90,19 +101,43 @@ def _keyword_score(*, text: str, query_terms: list[str]) -> float:
     return float(sum(tokens.count(term) for term in query_terms))
 
 
+def _semantic_score(*, text: str, query_terms: list[str]) -> float:
+    text_tokens = set(_tokenize(text))
+    query_token_set = set(query_terms)
+    if not text_tokens or not query_token_set:
+        return 0.0
+    overlap = len(text_tokens & query_token_set) / len(text_tokens | query_token_set)
+    normalized_text = " ".join(_tokenize(text))
+    normalized_query = " ".join(query_terms)
+    phrase_bonus = 0.25 if normalized_query and normalized_query in normalized_text else 0.0
+    return round(min(1.0, overlap + phrase_bonus), 6)
+
+
 def _matching_rows(
-    *, fts_rows: Iterable[Mapping[str, Any]], query_terms: list[str]
+    *,
+    fts_rows: Iterable[Mapping[str, Any]],
+    query_terms: list[str],
+    query_text: str,
+    base_dir: Path | None,
 ) -> list[dict[str, Any]]:
+    runtime_scores: dict[str, float] = {}
+    if base_dir is not None:
+        runtime_scores = {
+            str(item["chunk_id"]): float(item["score"])
+            for item in search_runtime_fts_rows(base_dir=base_dir, query_text=query_text, limit=100)
+        }
     matching_rows: list[dict[str, Any]] = []
     for row in fts_rows:
         _validate_row(row)
         keyword_score = _keyword_score(text=str(row["text"]), query_terms=query_terms)
-        if keyword_score <= 0:
+        runtime_score = runtime_scores.get(str(row["chunk_id"]), 0.0)
+        if keyword_score <= 0 and runtime_score <= 0:
             continue
         matching_rows.append(
             {
                 "row": row,
-                "keyword_score": keyword_score,
+                "keyword_score": max(keyword_score, runtime_score),
+                "semantic_score": _semantic_score(text=str(row["text"]), query_terms=query_terms),
                 "published_timestamp": _published_timestamp(row),
             }
         )
@@ -118,6 +153,7 @@ def _score_rows(
     scored_rows: list[dict[str, Any]] = []
     for match in matching_rows:
         row = match["row"]
+        semantic_score = float(match.get("semantic_score", 0.0))
         recency_score = _recency_score(
             published_timestamp=float(match["published_timestamp"]),
             oldest_timestamp=oldest_timestamp,
@@ -125,7 +161,11 @@ def _score_rows(
         )
         credibility_score = _credibility_score(int(row["credibility_tier"]))
         retrieval_score = round(
-            float(match["keyword_score"]) * 0.5 + recency_score * 0.3 + credibility_score * 0.2, 6
+            float(match["keyword_score"]) * 0.45
+            + semantic_score * 0.20
+            + recency_score * 0.20
+            + credibility_score * 0.15,
+            6,
         )
         scored_rows.append(
             {
@@ -134,7 +174,7 @@ def _score_rows(
                 "publisher": row["publisher"],
                 "credibility_tier": row["credibility_tier"],
                 "retrieval_score": retrieval_score,
-                "semantic_score": None,
+                "semantic_score": semantic_score,
                 "recency_score": recency_score,
                 "credibility_score": credibility_score,
                 "_published_timestamp": match["published_timestamp"],

@@ -13,8 +13,9 @@ MAX_EVIDENCE_TEXT_CHARS = 280
 MAX_PRIOR_CONTEXT_TEXT_CHARS = 240
 REQUEST_TASK = "daily_brief_issue_planner"
 ISSUE_PLANNER_SYSTEM_PROMPT = (
-    "You are planning 2-3 issue-centered literature review topics for a daily brief. "
-    "Use only the provided evidence pack. Return strict JSON matching the issue map schema."
+    "You are planning issue-centered literature review topics for a daily brief. "
+    "Use only the provided brief plan and issue-aware evidence scopes. "
+    "Return strict JSON matching the issue map schema."
 )
 ISSUE_MAP_JSON_SCHEMA: dict[str, Any] = {
     "name": "issue_map_list",
@@ -80,9 +81,10 @@ def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
     bounded_input = {
         "run_id": brief_input["run_id"],
         "generated_at_utc": brief_input["generated_at_utc"],
-        "evidence_pack": [
-            _normalize_evidence_item(item)
-            for item in brief_input["evidence_pack"][:MAX_EVIDENCE_PACK_ITEMS]
+        "brief_plan": dict(brief_input["brief_plan"]),
+        "issue_evidence_scopes": [
+            _normalize_issue_scope(scope)
+            for scope in brief_input["issue_evidence_scopes"][:MAX_EVIDENCE_PACK_ITEMS]
         ],
         "prior_brief_context": _normalize_prior_brief_context(brief_input.get("prior_brief_context")),
     }
@@ -96,7 +98,7 @@ def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
             {
                 "role": "user",
                 "content": (
-                    "Plan 2-3 issue-centered daily brief topics from the bounded evidence pack. "
+                    "Plan issue-centered daily brief topics from the brief plan and issue-aware evidence scopes. "
                     "Return only strict JSON matching the provided schema."
                 ),
             },
@@ -105,12 +107,18 @@ def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
     }
 
 
-def _normalize_evidence_item(item: dict[str, Any]) -> dict[str, Any]:
+def _normalize_issue_scope(item: dict[str, Any]) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
-    for field in ("chunk_id", "doc_id", "publisher", "title", "retrieval_score"):
+    for field in (
+        "issue_id",
+        "primary_chunk_ids",
+        "opposing_chunk_ids",
+        "minority_chunk_ids",
+        "watch_chunk_ids",
+        "coverage_summary",
+    ):
         if field in item:
             normalized[field] = item[field]
-    normalized["text"] = _truncate_text(item.get("text"))
     return normalized
 
 
@@ -163,10 +171,16 @@ def _parse_response_payload(payload: Any) -> Any:
 
 def _extract_evidence_ids(brief_input: IssuePlannerInput) -> set[str]:
     evidence_ids: set[str] = set()
-    for item in brief_input["evidence_pack"]:
-        chunk_id = item.get("chunk_id")
-        if isinstance(chunk_id, str) and chunk_id:
-            evidence_ids.add(chunk_id)
+    for scope in brief_input["issue_evidence_scopes"]:
+        for field in (
+            "primary_chunk_ids",
+            "opposing_chunk_ids",
+            "minority_chunk_ids",
+            "watch_chunk_ids",
+        ):
+            for chunk_id in scope.get(field, []):
+                if isinstance(chunk_id, str) and chunk_id:
+                    evidence_ids.add(chunk_id)
     return evidence_ids
 
 

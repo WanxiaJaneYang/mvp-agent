@@ -229,7 +229,7 @@ class EvidencePackTests(unittest.TestCase):
                     "publisher": "Federal Reserve",
                     "credibility_tier": 1,
                     "retrieval_score": pack[0]["retrieval_score"],
-                    "semantic_score": None,
+                    "semantic_score": pack[0]["semantic_score"],
                     "recency_score": 1.0,
                     "credibility_score": 1.0,
                     "rank_in_pack": 1,
@@ -237,6 +237,7 @@ class EvidencePackTests(unittest.TestCase):
             ],
         )
         self.assertGreater(pack[0]["retrieval_score"], 0.0)
+        self.assertGreater(pack[0]["semantic_score"], 0.0)
 
     def test_missing_required_row_field_raises_value_error(self):
         fts_rows = [

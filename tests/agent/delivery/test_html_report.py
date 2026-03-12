@@ -15,6 +15,16 @@ class HtmlReportTests(unittest.TestCase):
                 report_date="2026-03-10",
                 run_id="run_daily_fixture",
                 synthesis={
+                    "brief": {
+                        "bottom_line": "Supply pressure and demand softness are the two main debates.",
+                        "top_takeaways": [
+                            "Supply pressure remains live.",
+                            "Demand softness may cap the move.",
+                        ],
+                        "watchlist": ["Watch OPEC guidance next week."],
+                        "render_mode": "full",
+                        "source_scarcity_mode": "normal",
+                    },
                     "issues": [
                         {
                             "issue_id": "issue_001",
@@ -27,6 +37,8 @@ class HtmlReportTests(unittest.TestCase):
                                 {
                                     "text": "The prevailing argument emphasizes near-term supply pressure.",
                                     "citation_ids": ["cite_001"],
+                                    "novelty_vs_prior_brief": "strengthened",
+                                    "why_it_matters": "Energy inflation risk stays elevated if supply pressure persists.",
                                     "evidence": [
                                         {
                                             "citation_id": "cite_001",
@@ -79,8 +91,15 @@ class HtmlReportTests(unittest.TestCase):
             html = output_path.read_text(encoding="utf-8")
 
         self.assertEqual(result, output_path)
+        self.assertIn("Citation status", html)
+        self.assertIn("Analytical quality", html)
+        self.assertIn("Bottom Line", html)
+        self.assertIn("Key Takeaways", html)
         self.assertIn("Will oil prices keep rising over the next few weeks?", html)
         self.assertIn("What to Watch", html)
+        self.assertIn("Strengthened", html)
+        self.assertIn("Why it matters", html)
+        self.assertIn("Energy inflation risk stays elevated", html)
         self.assertIn("Supply disruptions stayed in focus for oil traders.", html)
         self.assertIn("https://example.test/reuters", html)
 
@@ -202,7 +221,7 @@ class HtmlReportTests(unittest.TestCase):
 
             html = output_path.read_text(encoding="utf-8")
 
-        self.assertIn("Changed Since Yesterday", html)
+        self.assertIn("What Changed", html)
         self.assertIn("Prevailing changed versus yesterday", html)
 
 

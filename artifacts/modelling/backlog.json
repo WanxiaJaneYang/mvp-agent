@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generated_on": "2026-03-10",
+  "generated_on": "2026-03-12",
   "phase": "implementation",
   "tickets": [
     {
@@ -159,15 +159,17 @@
     {
       "id": "M010",
       "title": "Implement alert delivery after the daily-brief path is stable",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P2",
       "depends_on": ["M006", "M007"],
       "files": [
-        "apps/agent/delivery/alert_delivery.py"
+        "apps/agent/delivery/alert_delivery.py",
+        "apps/agent/storage/sqlite_runtime.py",
+        "tests/agent/delivery/test_alert_delivery.py"
       ],
       "acceptance_criteria": [
         "Alert output follows 3-6 bullet format with citations",
-        "Alert delivery happens only after the daily-brief path is working",
+        "Alert delivery semantics, cooldown suppression, and daily-cap suppression are explicit in the runtime result",
         "Alert delivery failures are logged and retry-eligible next run"
       ]
     }

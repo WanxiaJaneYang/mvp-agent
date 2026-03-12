@@ -25,8 +25,12 @@ def render_daily_brief_html(
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     abstained = _is_abstained(synthesis)
-    status_title = "Abstained" if abstained else "Validated"
+    brief = synthesis.get("brief", {}) if isinstance(synthesis.get("brief"), Mapping) else {}
+    citation_status = str((guardrail_checks or {}).get("citation_status") or ("abstained" if abstained else "ok"))
+    analytical_status = str((guardrail_checks or {}).get("analytical_status") or "pass")
+    publish_decision = str((guardrail_checks or {}).get("publish_decision") or ("hold" if abstained else "publish"))
     issues = _normalized_issues(synthesis)
+    overview_html = _render_overview(brief)
 
     issues_html = "".join(_render_issue(issue) for issue in issues if isinstance(issue, Mapping))
     changed_html = _render_changed_section(synthesis.get("changed"))
@@ -158,9 +162,12 @@ def render_daily_brief_html(
       <div class="meta">
         <span>Date: {escape(report_date)}</span>
         <span>Run: {escape(run_id)}</span>
-        <span>Status: {escape(status_title)}</span>
+        <span>Citation status: {escape(_label(citation_status))}</span>
+        <span>Analytical quality: {escape(_label(analytical_status))}</span>
+        <span>Publish decision: {escape(_label(publish_decision))}</span>
       </div>
     </header>
+    {overview_html}
     <section class="issues">
       {issues_html}
     </section>
@@ -180,6 +187,7 @@ def render_daily_brief_html(
 def _render_issue(issue: Mapping[str, Any]) -> str:
     title = escape(str(issue.get("title") or issue.get("issue_question") or "Key issue"))
     summary = escape(str(issue.get("summary", "")))
+    coverage_html = _render_coverage(issue.get("coverage_summary"))
     sections_html = "".join(
         _render_issue_section(title=title_text, bullets=issue.get(section, []))
         for section, title_text in SECTION_TITLES.items()
@@ -188,6 +196,7 @@ def _render_issue(issue: Mapping[str, Any]) -> str:
         '<article class="issue">'
         f"<h2>{title}</h2>"
         f'<p class="summary">{summary}</p>'
+        f"{coverage_html}"
         f'<div class="arguments">{sections_html}</div>'
         "</article>"
     )
@@ -211,10 +220,16 @@ def _render_bullet(bullet: Mapping[str, Any]) -> str:
         f' <a class="citation-link" href="#{escape(citation_id)}">[{escape(citation_id)}]</a>'
         for citation_id in citation_ids
     )
+    novelty = str(bullet.get("novelty_vs_prior_brief") or bullet.get("delta_label") or "").strip()
+    novelty_html = f' <strong>({escape(_label(novelty))})</strong>' if novelty else ""
+    why_it_matters = str(bullet.get("why_it_matters") or "").strip()
+    delta_explanation = str(bullet.get("delta_explanation") or "").strip()
     evidence_html = _render_evidence_block(bullet.get("evidence"))
     return (
         "<li>"
-        f"{escape(str(bullet.get('text', '')))}{citation_links}"
+        f"{escape(str(bullet.get('text', '')))}{novelty_html}{citation_links}"
+        f"{_render_callout('Why it matters', why_it_matters)}"
+        f"{_render_callout('Delta', delta_explanation)}"
         f"{evidence_html}"
         "</li>"
     )
@@ -249,7 +264,7 @@ def _render_changed_section(changed_bullets: Any) -> str:
     items = "".join(_render_bullet(bullet) for bullet in changed_bullets if isinstance(bullet, Mapping))
     return (
         '<section class="changed">'
-        "<h2>Changed Since Yesterday</h2>"
+        "<h2>What Changed</h2>"
         f"<ul>{items}</ul>"
         "</section>"
     )
@@ -276,9 +291,63 @@ def _render_guardrails(guardrail_checks: Mapping[str, Any] | None) -> str:
         f"<li>Budget: {escape(_label(str(guardrail_checks.get('budget_check', 'warn'))))}</li>"
         f"<li>Diversity: {escape(_label(str(guardrail_checks.get('diversity_check', 'warn'))))}</li>"
         f"<li>Citations: {escape(_label(str(guardrail_checks.get('citation_check', 'warn'))))}</li>"
+        f"<li>Analytical quality: {escape(_label(str(guardrail_checks.get('analytical_status', 'pass'))))}</li>"
         f"{notes}"
         "</ul>"
         "</section>"
+    )
+
+
+def _render_overview(brief: Mapping[str, Any]) -> str:
+    if not brief:
+        return ""
+    bottom_line = escape(str(brief.get("bottom_line") or ""))
+    takeaways = brief.get("top_takeaways", [])
+    watchlist = brief.get("watchlist", [])
+    render_mode = escape(_label(str(brief.get("render_mode") or "full")))
+    takeaway_items = ""
+    if isinstance(takeaways, list):
+        takeaway_items = "".join(
+            f"<li>{escape(str(item))}</li>"
+            for item in takeaways
+            if isinstance(item, str) and item.strip()
+        )
+    watch_items = ""
+    if isinstance(watchlist, list):
+        watch_items = "".join(
+            f"<li>{escape(str(item))}</li>"
+            for item in watchlist
+            if isinstance(item, str) and item.strip()
+        )
+    return (
+        '<section class="issues">'
+        "<h2>Bottom Line</h2>"
+        f"<p>{bottom_line}</p>"
+        f"<p class=\"summary\">Render mode: {render_mode}</p>"
+        "<h2>Key Takeaways</h2>"
+        f"<ul>{takeaway_items}</ul>"
+        f"{('<h2>Watchlist</h2><ul>' + watch_items + '</ul>') if watch_items else ''}"
+        "</section>"
+    )
+
+
+def _render_callout(title: str, value: str) -> str:
+    if not value:
+        return ""
+    return f'<p><strong>{escape(title)}:</strong> {escape(value)}</p>'
+
+
+def _render_coverage(coverage_summary: Any) -> str:
+    if not isinstance(coverage_summary, Mapping) or not coverage_summary:
+        return ""
+    roles = coverage_summary.get("source_roles", [])
+    roles_label = ", ".join(str(role) for role in roles) if isinstance(roles, list) else ""
+    return (
+        '<p class="summary">'
+        f"Coverage: {escape(str(coverage_summary.get('unique_publishers', 0)))} publishers"
+        f"{'; roles: ' + escape(roles_label) if roles_label else ''}"
+        f"{'; span: ' + escape(str(coverage_summary.get('time_span_hours', 0)))}h"
+        "</p>"
     )
 
 

@@ -24,9 +24,15 @@ class RunStatus(str, Enum):
 DailyBriefOutputSection = Literal["prevailing", "counter", "minority", "watch", "changed"]
 DailyBriefClaimKind = Literal["prevailing", "counter", "minority", "watch"]
 DailyBriefNoveltyLabel = Literal["new", "continued", "reframed", "weakened", "strengthened", "reversed", "unknown"]
+DailyBriefRenderMode = Literal["full", "compressed"]
+SourceScarcityMode = Literal["normal", "scarce"]
 CitationValidationStatus = Literal["ok", "partial", "retry"]
 FinalSynthesisStatus = Literal["ok", "partial", "abstained"]
 CriticStatus = Literal["pass", "warn", "fail"]
+IssueOverlapDecision = Literal["keep", "merge", "drop"]
+IssueInformationGainDecision = Literal["keep", "drop"]
+PublishDecisionStatus = Literal["publish", "hold"]
+DeliveryMode = Literal["email_and_html", "html_only", "none"]
 
 
 DAILY_BRIEF_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = (
@@ -142,6 +148,66 @@ class EvidencePackItem(TypedDict):
     doc_id: str
 
 
+class BriefCorpusItem(TypedDict, total=False):
+    chunk_id: str
+    doc_id: str
+    source_id: str
+    publisher: str
+    title: str | None
+    text: str
+    published_at: str | None
+    credibility_tier: int
+    source_role: str
+    retrieval_score: float
+
+
+class BriefPlan(TypedDict):
+    brief_id: str
+    brief_thesis: str
+    top_takeaways: list[str]
+    issue_budget: int
+    render_mode: DailyBriefRenderMode
+    source_scarcity_mode: SourceScarcityMode
+    candidate_issue_seeds: list[str]
+    issue_order: list[str]
+    watchlist: list[str]
+    reason_codes: list[str]
+
+
+class IssueEvidenceCoverageSummary(TypedDict):
+    unique_publishers: int
+    source_roles: list[str]
+    time_span_hours: float
+
+
+class IssueEvidenceScope(TypedDict):
+    issue_id: str
+    issue_seed: str
+    primary_chunk_ids: list[str]
+    opposing_chunk_ids: list[str]
+    minority_chunk_ids: list[str]
+    watch_chunk_ids: list[str]
+    coverage_summary: IssueEvidenceCoverageSummary
+
+
+class IssueOverlapReport(TypedDict):
+    left_issue_id: str
+    right_issue_id: str
+    question_token_overlap: float
+    citation_overlap: float
+    source_overlap: float
+    thesis_overlap: str
+    decision: IssueOverlapDecision
+    reason_codes: list[str]
+
+
+class IssueInformationGain(TypedDict):
+    issue_id: str
+    information_gain_score: float
+    decision: IssueInformationGainDecision
+    reason_codes: list[str]
+
+
 class CitationStoreEntry(TypedDict):
     citation_id: str
     source_id: str
@@ -158,16 +224,26 @@ class CitationStoreEntry(TypedDict):
 
 
 class DailyBriefBullet(TypedDict, total=False):
+    claim_id: str
+    claim_kind: DailyBriefClaimKind
     text: str
     citation_ids: list[str]
     confidence_label: str
     validator_action: str
     claim_span_citations: list[list[str]]
     evidence: list["ClaimEvidenceItem"]
+    why_it_matters: str
+    novelty_vs_prior_brief: DailyBriefNoveltyLabel
+    delta_label: DailyBriefNoveltyLabel
+    delta_explanation: str
 
 class DailyBriefMeta(TypedDict, total=False):
     status: str
     reason: str
+    citation_status: str
+    analytical_status: str
+    publish_decision: PublishDecisionStatus
+    reason_codes: list[str]
 
 
 class ClaimEvidenceItem(TypedDict, total=False):
@@ -199,6 +275,23 @@ class StructuredClaim(TypedDict):
     why_it_matters: str
 
 
+class ClaimDelta(TypedDict):
+    claim_id: str
+    prior_claim_ref: str | None
+    novelty_label: DailyBriefNoveltyLabel
+    delta_explanation: str
+    supporting_prior_overlap: dict[str, Any]
+
+
+class DailyBriefOverview(TypedDict, total=False):
+    bottom_line: str
+    top_takeaways: list[str]
+    watchlist: list[str]
+    render_mode: DailyBriefRenderMode
+    source_scarcity_mode: SourceScarcityMode
+    issue_budget: int
+
+
 class DailyBriefIssue(TypedDict, total=False):
     issue_id: str
     issue_question: str
@@ -208,10 +301,21 @@ class DailyBriefIssue(TypedDict, total=False):
     counter: list[DailyBriefBullet]
     minority: list[DailyBriefBullet]
     watch: list[DailyBriefBullet]
+    coverage_summary: IssueEvidenceCoverageSummary
+
+
+class PublishDecision(TypedDict):
+    citation_status: str
+    analytical_status: str
+    publish_decision: PublishDecisionStatus
+    reason_codes: list[str]
+    delivery_mode: DeliveryMode
 
 
 class DailyBriefSynthesisV2(TypedDict, total=False):
+    brief: DailyBriefOverview
     issues: list[DailyBriefIssue]
+    claim_deltas: list[ClaimDelta]
     meta: DailyBriefMeta
     changed: list[DailyBriefBullet]
 
@@ -350,15 +454,24 @@ class DailyBriefCorpusStageData:
     documents: list[RuntimeDocumentRecord]
     chunks: list[RuntimeChunkRow]
     fts_rows: list[FtsRow]
+    corpus_items: list[BriefCorpusItem] = field(default_factory=list)
+    diversity_stats: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class DailyBriefSynthesisStageData:
     query_text: str
+    brief_plan: BriefPlan
+    brief_corpus_items: list[BriefCorpusItem]
     evidence_pack_items: list[EvidencePackItem]
     evidence_pack_report: dict[str, Any]
+    issue_evidence_scopes: list[IssueEvidenceScope]
     issue_map: list[IssueMap]
+    issue_overlap_reports: list[IssueOverlapReport]
+    information_gain_reports: list[IssueInformationGain]
     structured_claims: list[StructuredClaim]
+    claim_deltas: list[ClaimDelta]
+    publish_decision: PublishDecision
     citation_store: dict[str, CitationStoreEntry]
     stage8_result: CitationValidationResult
     final_result: FinalSynthesisResult
