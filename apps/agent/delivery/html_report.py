@@ -169,6 +169,7 @@ def render_daily_brief_html(
     </header>
     {overview_html}
     <section class="issues">
+      <h2>Issues</h2>
       {issues_html}
     </section>
     {changed_html}

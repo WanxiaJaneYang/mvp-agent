@@ -109,6 +109,7 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("Publish decision", html)
         self.assertIn("Bottom Line", html)
         self.assertIn("Key Takeaways", html)
+        self.assertIn(">Issues<", html)
         self.assertIn("Will oil prices keep rising over the next few weeks?", html)
         self.assertIn("What to Watch", html)
         self.assertIn("Strengthened", html)
