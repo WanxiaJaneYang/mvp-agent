@@ -29,6 +29,18 @@ Required fields:
 - `watchlist`
 - `reason_codes`
 
+Add an `IssueEvidenceScope` contract between `BriefPlan` and `IssueMap`.
+
+Required fields:
+
+- `issue_id`
+- `issue_seed`
+- `primary_chunk_ids`
+- `opposing_chunk_ids`
+- `minority_chunk_ids`
+- `watch_chunk_ids`
+- `coverage_summary`
+
 ## Runner Changes
 
 The runner should expose an explicit planner stage:
@@ -36,7 +48,8 @@ The runner should expose an explicit planner stage:
 1. build the evidence pack
 2. summarize the evidence corpus
 3. generate a `BriefPlan`
-4. pass `BriefPlan` into issue planning
+4. derive issue-aware evidence scopes from the corpus
+5. pass `BriefPlan` plus issue-aware evidence scopes into issue planning
 
 The first implementation can use a local planner provider and heuristic corpus summary.
 
@@ -55,5 +68,6 @@ That is the minimum editorial layer required before the issue cards.
 - source-rich corpus -> `render_mode=full`, `issue_budget=2`
 - source-scarce corpus -> `render_mode=compressed`, `issue_budget=1`
 - issue planner input includes `brief_plan`
+- issue planner input includes `issue_evidence_scopes`
 - rendered HTML shows `Bottom line` and `Key takeaways`
 - runtime artifacts persist `brief_plan.json`

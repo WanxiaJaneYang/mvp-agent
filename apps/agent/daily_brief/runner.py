@@ -10,6 +10,7 @@ from smtplib import SMTP
 from typing import Any, cast
 
 from apps.agent.daily_brief.editorial_planner import LocalBriefPlanner, build_corpus_summary
+from apps.agent.daily_brief.issue_retrieval import build_brief_corpus_report, build_issue_evidence_scopes
 from apps.agent.daily_brief.model_interfaces import (
     BriefPlannerProvider,
     ClaimComposerInput,
@@ -57,6 +58,7 @@ from apps.agent.pipeline.types import (
     DailyBriefSynthesisStageData,
     EvidencePackItem,
     FtsRow,
+    IssueEvidenceScope,
     IssueMap,
     RunStatus,
     RuntimeChunkRow,
@@ -390,6 +392,7 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "fts_rows.json", corpus_data.fts_rows)
     _write_json(artifact_dir / "brief_plan.json", synthesis_data.brief_plan)
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
+    _write_json(artifact_dir / "issue_evidence_scopes.json", synthesis_data.issue_evidence_scopes)
     _write_json(artifact_dir / "issue_map.json", synthesis_data.issue_map)
     _write_json(artifact_dir / "claim_objects.json", synthesis_data.structured_claims)
     _write_json(artifact_dir / "critic_report.json", synthesis_data.critic_report)
@@ -531,12 +534,15 @@ def build_daily_brief_corpus(
     context.counters.docs_fetched = len(stage_data.planned_items)
     context.counters.docs_ingested = len(documents)
     context.counters.chunks_indexed = len(chunks)
+    corpus_report = build_brief_corpus_report(fts_rows=fts_rows, pack_size=30)
 
     return DailyBriefCorpusStageData(
         source_rows=stage_data.source_rows,
         documents=documents,
         chunks=chunks,
         fts_rows=fts_rows,
+        corpus_items=corpus_report["items"],
+        diversity_stats=corpus_report["diversity_stats"],
     )
 
 
@@ -556,17 +562,35 @@ def build_daily_brief_synthesis(
         raise ValueError("Daily brief synthesis requires both issue_planner and claim_composer together.")
 
     synthesis_generated_at_utc = generated_at_utc or _utc_now_iso()
-    query_text = build_daily_brief_query(documents=stage_data.documents)
-    evidence_pack_report = build_evidence_pack_report(
-        fts_rows=stage_data.fts_rows,
-        query_text=query_text,
-        pack_size=30,
-    )
-    evidence_pack_items = evidence_pack_report["items"]
-    evidence_pack_items = _attach_doc_ids(
-        evidence_pack_items=evidence_pack_items,
-        fts_rows=stage_data.fts_rows,
-    )
+    use_structured_orchestration = issue_planner is not None and claim_composer is not None
+    evidence_pack_items: list[EvidencePackItem]
+    evidence_pack_report: dict[str, Any]
+    query_text = ""
+    if use_structured_orchestration:
+        evidence_pack_items = list(stage_data.corpus_items)
+        diversity_check = (
+            "pass"
+            if int(stage_data.diversity_stats.get("unique_publishers", 0) or 0) >= 3
+            else "warn"
+        )
+        evidence_pack_report = {
+            "items": evidence_pack_items,
+            "diversity_stats": dict(stage_data.diversity_stats),
+            "diversity_check": diversity_check,
+            "notes": [],
+        }
+    else:
+        query_text = build_daily_brief_query(documents=stage_data.documents)
+        evidence_pack_report = build_evidence_pack_report(
+            fts_rows=stage_data.fts_rows,
+            query_text=query_text,
+            pack_size=30,
+        )
+        evidence_pack_items = evidence_pack_report["items"]
+        evidence_pack_items = _attach_doc_ids(
+            evidence_pack_items=evidence_pack_items,
+            fts_rows=stage_data.fts_rows,
+        )
 
     documents_by_id = {str(document["doc_id"]): document for document in stage_data.documents}
     chunks_by_id = {str(chunk["chunk_id"]): chunk for chunk in stage_data.chunks}
@@ -588,14 +612,21 @@ def build_daily_brief_synthesis(
         run_id=run_id,
         generated_at_utc=synthesis_generated_at_utc,
     )
-    use_structured_orchestration = issue_planner is not None and claim_composer is not None
     issue_map: list[IssueMap] = []
+    issue_evidence_scopes: list[IssueEvidenceScope] = []
     structured_claims: list[StructuredClaim] = []
     if use_structured_orchestration:
+        issue_evidence_scopes = build_issue_evidence_scopes(
+            brief_plan=brief_plan,
+            corpus_items=evidence_pack_items,
+            fts_rows=stage_data.fts_rows,
+            registry=registry,
+        )
         issue_map = _build_issue_map(
             brief_plan=brief_plan,
-            query_text=query_text,
-            evidence_pack_items=evidence_pack_items,
+            query_text="",
+            evidence_pack_items=[],
+            issue_evidence_scopes=issue_evidence_scopes,
             issue_planner=issue_planner,
             prior_brief_context=prior_brief_context,
             run_id=run_id,
@@ -637,6 +668,7 @@ def build_daily_brief_synthesis(
                 brief_plan=brief_plan,
                 query_text=query_text,
                 evidence_pack_items=evidence_pack_items,
+                issue_evidence_scopes=None,
                 issue_planner=None,
                 prior_brief_context=prior_brief_context,
                 run_id=run_id,
@@ -709,6 +741,7 @@ def build_daily_brief_synthesis(
         brief_plan=brief_plan,
         evidence_pack_items=evidence_pack_items,
         evidence_pack_report=evidence_pack_report,
+        issue_evidence_scopes=issue_evidence_scopes,
         issue_map=issue_map,
         structured_claims=structured_claims,
         citation_store=stage8_result["citation_store"],
@@ -815,6 +848,7 @@ def _build_issue_map(
     brief_plan: BriefPlan,
     query_text: str,
     evidence_pack_items: list[EvidencePackItem],
+    issue_evidence_scopes: list[IssueEvidenceScope] | None,
     issue_planner: IssuePlannerProvider | None,
     prior_brief_context: dict[str, Any] | None,
     run_id: str,
@@ -826,7 +860,11 @@ def _build_issue_map(
                 run_id=run_id,
                 generated_at_utc=generated_at_utc,
                 brief_plan=brief_plan,
-                evidence_pack=[dict(item) for item in evidence_pack_items],
+                issue_evidence_scopes=(
+                    []
+                    if issue_evidence_scopes is None
+                    else [cast(IssueEvidenceScope, dict(item)) for item in issue_evidence_scopes]
+                ),
                 prior_brief_context=prior_brief_context,
             )
         )

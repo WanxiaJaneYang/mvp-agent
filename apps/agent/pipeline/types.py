@@ -157,6 +157,22 @@ class BriefPlan(TypedDict):
     reason_codes: list[str]
 
 
+class IssueEvidenceCoverageSummary(TypedDict):
+    unique_publishers: int
+    source_roles: list[str]
+    time_span_hours: float
+
+
+class IssueEvidenceScope(TypedDict):
+    issue_id: str
+    issue_seed: str
+    primary_chunk_ids: list[str]
+    opposing_chunk_ids: list[str]
+    minority_chunk_ids: list[str]
+    watch_chunk_ids: list[str]
+    coverage_summary: IssueEvidenceCoverageSummary
+
+
 class CitationStoreEntry(TypedDict):
     citation_id: str
     source_id: str
@@ -375,6 +391,8 @@ class DailyBriefCorpusStageData:
     documents: list[RuntimeDocumentRecord]
     chunks: list[RuntimeChunkRow]
     fts_rows: list[FtsRow]
+    corpus_items: list[EvidencePackItem] = field(default_factory=list)
+    diversity_stats: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -383,6 +401,7 @@ class DailyBriefSynthesisStageData:
     brief_plan: BriefPlan
     evidence_pack_items: list[EvidencePackItem]
     evidence_pack_report: dict[str, Any]
+    issue_evidence_scopes: list[IssueEvidenceScope]
     issue_map: list[IssueMap]
     structured_claims: list[StructuredClaim]
     citation_store: dict[str, CitationStoreEntry]
