@@ -25,12 +25,19 @@ def send_daily_brief_email(
     html_body: str,
     status_title: str,
     synthesis: dict[str, Any] | None = None,
+    citation_status: str = "ok",
+    analytical_status: str = "pass",
+    publish_decision: str = "publish",
     smtp_class: Any = SMTP,
 ) -> dict[str, Any]:
     if not config.recipient_emails:
         raise ValueError("recipient_emails must include at least one address.")
 
     subject = f"{config.subject_prefix}: {report_date}"
+    if publish_decision != "publish":
+        subject = f"{config.subject_prefix} [{publish_decision.upper()}]: {report_date}"
+    elif citation_status != "ok" or analytical_status != "pass":
+        subject = f"{config.subject_prefix} [{citation_status.upper()}/{analytical_status.upper()}]: {report_date}"
     message = EmailMessage()
     message["From"] = config.sender_email
     message["To"] = ", ".join(config.recipient_emails)
@@ -39,6 +46,9 @@ def send_daily_brief_email(
         "\n".join(
             [
                 f"Daily Brief status: {status_title}",
+                f"Citation status: {citation_status}",
+                f"Analytical quality: {analytical_status}",
+                f"Publish decision: {publish_decision}",
                 f"Report date: {report_date}",
                 f"Run: {run_id}",
                 *_build_plain_text_summary(synthesis=synthesis),
@@ -56,6 +66,7 @@ def send_daily_brief_email(
         "recipient_count": len(config.recipient_emails),
         "subject": subject,
         "smtp_host": config.smtp_host,
+        "publish_decision": publish_decision,
     }
 
 

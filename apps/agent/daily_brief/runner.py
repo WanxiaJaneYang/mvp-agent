@@ -58,12 +58,15 @@ from apps.agent.pipeline.types import (
     DailyBriefSectionBulletRow,
     DailyBriefSynthesis,
     DailyBriefSynthesisStageData,
+    DeliveryMode,
     EvidencePackItem,
     FtsRow,
     IssueEvidenceScope,
     IssueInformationGain,
     IssueMap,
     IssueOverlapReport,
+    PublishDecision,
+    PublishDecisionStatus,
     RunStatus,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
@@ -357,6 +360,13 @@ def _execute_daily_brief_slice(
         budget_snapshot=budget_snapshot,
         diversity_report=synthesis_data.evidence_pack_report,
     )
+    publish_summary = _publish_summary(
+        stage8_result=synthesis_data.stage8_result,
+        final_status=synthesis_data.final_result["status"],
+        critic_report=synthesis_data.critic_report,
+        email_requested=email_config is not None,
+    )
+    guardrail_checks = {**guardrail_checks, **publish_summary}
     render_daily_brief_html(
         output_path=output_path,
         report_date=report_date,
@@ -366,14 +376,17 @@ def _execute_daily_brief_slice(
         guardrail_checks=guardrail_checks,
     )
     email_delivery = None
-    if email_config is not None:
+    if email_config is not None and publish_summary["publish_decision"] == "publish":
         email_delivery = send_daily_brief_email(
             config=email_config,
             report_date=local_report_date,
             run_id=run_id,
             html_body=output_path.read_text(encoding="utf-8"),
-            status_title="Abstained" if synthesis_data.final_result["status"] == "abstained" else "Validated",
+            status_title="Abstained" if synthesis_data.final_result["status"] == "abstained" else "Ready",
             synthesis=cast(dict[str, Any], synthesis_data.final_result["synthesis"]),
+            citation_status=publish_summary["citation_status"],
+            analytical_status=publish_summary["analytical_status"],
+            publish_decision=publish_summary["publish_decision"],
             smtp_class=smtp_class,
         )
 
@@ -386,6 +399,10 @@ def _execute_daily_brief_slice(
         removed_bullets=int(synthesis_data.stage8_result["report"]["removed_bullets"]),
         budget_snapshot=budget_snapshot,
         guardrail_checks=guardrail_checks,
+        citation_status=publish_summary["citation_status"],
+        analytical_status=publish_summary["analytical_status"],
+        publish_decision=publish_summary["publish_decision"],
+        reason_codes=publish_summary["reason_codes"],
         output_path=output_path,
         generated_at_utc=generated_at_utc,
     )
@@ -443,6 +460,11 @@ def _execute_daily_brief_slice(
             "diversity_stats": synthesis_data.evidence_pack_report["diversity_stats"],
             "portfolio_positions_count": len(portfolio_positions),
             "portfolio_relevance_count": len(portfolio_relevance_flags),
+            "citation_status": publish_summary["citation_status"],
+            "analytical_status": publish_summary["analytical_status"],
+            "publish_decision": publish_summary["publish_decision"],
+            "reason_codes": publish_summary["reason_codes"],
+            "delivery_mode": publish_summary["delivery_mode"],
         },
     )
 
@@ -456,6 +478,11 @@ def _execute_daily_brief_slice(
         "scheduled_for_local_date": local_report_date,
         "next_scheduled_run_at_utc": next_scheduled_run_at_utc,
         "email_delivery": email_delivery,
+        "citation_status": publish_summary["citation_status"],
+        "analytical_status": publish_summary["analytical_status"],
+        "publish_decision": publish_summary["publish_decision"],
+        "reason_codes": publish_summary["reason_codes"],
+        "delivery_mode": publish_summary["delivery_mode"],
     }
 
 
@@ -761,6 +788,19 @@ def build_daily_brief_synthesis(
                 prior_brief_context=prior_brief_context,
             )
         )
+    publish_decision = _build_publish_decision(
+        stage8_status=str(stage8_result["status"]),
+        final_status=final_result["status"],
+        critic_report=critic_report,
+    )
+    final_synthesis = _decorate_synthesis_meta(
+        synthesis=final_result["synthesis"],
+        publish_decision=publish_decision,
+    )
+    final_result = {
+        **final_result,
+        "synthesis": cast(ValidatedDailyBriefSynthesis, final_synthesis),
+    }
     synthesis_id = build_synthesis_id(run_id=run_id)
     return DailyBriefSynthesisStageData(
         query_text=query_text,
@@ -773,6 +813,7 @@ def build_daily_brief_synthesis(
         information_gain_reports=information_gain_reports,
         structured_claims=structured_claims,
         claim_deltas=claim_deltas,
+        publish_decision=publish_decision,
         citation_store=stage8_result["citation_store"],
         stage8_result=stage8_result,
         final_result=final_result,
@@ -1259,6 +1300,82 @@ def _guardrail_checks(
         "budget_check": "pass" if budget_allowed else "fail",
         "notes": notes,
     }
+
+
+def _publish_summary(
+    *,
+    stage8_result: Mapping[str, Any] | None,
+    final_status: str,
+    critic_report: Mapping[str, Any] | None,
+    email_requested: bool,
+) -> PublishDecision:
+    citation_status = "ok"
+    if stage8_result is None or final_status == "abstained":
+        citation_status = "abstained"
+    elif str(stage8_result.get("status")) == "partial":
+        citation_status = "partial"
+    elif str(stage8_result.get("status")) == "retry":
+        citation_status = "abstained"
+
+    analytical_status = "pass"
+    reason_codes: list[str] = []
+    if critic_report is not None:
+        analytical_status = str(critic_report.get("status") or "pass")
+        reason_codes = [
+            str(code)
+            for code in critic_report.get("reason_codes", [])
+            if isinstance(code, str)
+        ]
+
+    publish_decision: PublishDecisionStatus = "publish"
+    if citation_status == "abstained" or analytical_status == "fail":
+        publish_decision = "hold"
+
+    delivery_mode: DeliveryMode = "html_only"
+    if publish_decision == "publish" and email_requested:
+        delivery_mode = "email_and_html"
+
+    return {
+        "citation_status": citation_status,
+        "analytical_status": analytical_status,
+        "publish_decision": publish_decision,
+        "reason_codes": reason_codes,
+        "delivery_mode": delivery_mode,
+    }
+
+
+def _build_publish_decision(
+    *,
+    stage8_status: str,
+    final_status: str,
+    critic_report: Mapping[str, Any] | None,
+) -> PublishDecision:
+    return _publish_summary(
+        stage8_result={"status": stage8_status},
+        final_status=final_status,
+        critic_report=critic_report,
+        email_requested=False,
+    )
+
+
+def _decorate_synthesis_meta(
+    *,
+    synthesis: Mapping[str, Any],
+    publish_decision: PublishDecision,
+) -> dict[str, Any]:
+    meta = synthesis.get("meta")
+    normalized_meta = dict(meta) if isinstance(meta, Mapping) else {}
+    normalized_meta.update(
+        {
+            "citation_status": publish_decision["citation_status"],
+            "analytical_status": publish_decision["analytical_status"],
+            "publish_decision": publish_decision["publish_decision"],
+            "reason_codes": list(publish_decision["reason_codes"]),
+        }
+    )
+    decorated = dict(synthesis)
+    decorated["meta"] = normalized_meta
+    return decorated
 
 
 def _default_budget_preflight(*, generated_at_utc: str) -> dict[str, Any]:

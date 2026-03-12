@@ -29,8 +29,7 @@ The renderer-facing bullet model should preserve these claim-level fields end to
 - `novelty_vs_prior_brief`
 - `evidence`
 
-This PR only adds the claim rendering contract. Later work can extend the same view
-model with delta-specific fields without replacing the contract again.
+This document also defines the publish gate that consumes those same structured fields.
 
 ## Delta Contract
 
@@ -46,6 +45,27 @@ Required fields:
 
 The renderer must stop inferring change from bullet text diffs. `What Changed` should
 be produced from `ClaimDelta[]` plus the current structured claims.
+
+## Critic / Publish Decision Contract
+
+Publication should consume a first-class decision object:
+
+```json
+{
+  "citation_status": "ok",
+  "analytical_status": "warn",
+  "publish_decision": "publish",
+  "reason_codes": ["source_by_source_paraphrase"],
+  "delivery_mode": "html_only"
+}
+```
+
+Policy:
+
+- `citation_status` comes from stage-8 validation and abstain policy
+- `analytical_status` comes from the critic
+- `publish_decision=hold` when citation status is abstained or analytical status is fail
+- `delivery_mode=html_only` when email should not be sent even if local HTML is still written
 
 ## HTML And Email Changes
 
@@ -69,7 +89,8 @@ This keeps editorial semantics available for later diffing, review, and publish-
 2. populate the fields in structured synthesis
 3. render the fields in HTML and email
 4. add claim-level delta generation and render `What Changed` from delta objects
-5. cover the flow with renderer and pipeline tests
+5. split citation status vs analytical quality and gate publication on the combined decision
+6. cover the flow with renderer and pipeline tests
 
 ## Test Plan
 
@@ -79,3 +100,4 @@ This keeps editorial semantics available for later diffing, review, and publish-
 - rendered HTML shows novelty labels and why-it-matters callouts
 - email plain text includes simplified novelty plus why-it-matters lines
 - decision records preserve the claim editorial fields
+- critic fail blocks email publication and records `publish_decision=hold`
