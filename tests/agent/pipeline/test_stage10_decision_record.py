@@ -26,8 +26,26 @@ class Stage10DecisionRecordTests(unittest.TestCase):
                             "issue_question": "Will oil prices keep rising?",
                             "title": "Will oil prices keep rising?",
                             "summary": "Supply and demand evidence point in different directions.",
-                            "prevailing": [{"text": "Supply risks support near-term upside.", "citation_ids": ["c1"]}],
-                            "counter": [{"text": "Demand softness could steady prices soon.", "citation_ids": ["c2"]}],
+                            "prevailing": [
+                                {
+                                    "claim_id": "claim_001",
+                                    "claim_kind": "prevailing",
+                                    "text": "Supply risks support near-term upside.",
+                                    "citation_ids": ["c1"],
+                                    "why_it_matters": "Energy inflation can stay sticky.",
+                                    "novelty_vs_prior_brief": "strengthened",
+                                }
+                            ],
+                            "counter": [
+                                {
+                                    "claim_id": "claim_002",
+                                    "claim_kind": "counter",
+                                    "text": "Demand softness could steady prices soon.",
+                                    "citation_ids": ["c2"],
+                                    "why_it_matters": "The rally can stall quickly.",
+                                    "novelty_vs_prior_brief": "continued",
+                                }
+                            ],
                             "minority": [],
                             "watch": [],
                         }
@@ -58,7 +76,11 @@ class Stage10DecisionRecordTests(unittest.TestCase):
             self.assertEqual([claim["section"] for claim in claims], ["prevailing", "counter"])
             self.assertEqual(claims[0]["issue_id"], "issue_001")
             self.assertEqual(claims[0]["issue_title"], "Will oil prices keep rising?")
+            self.assertEqual(claims[0]["claim_id"], "claim_001")
+            self.assertEqual(claims[0]["claim_kind"], "prevailing")
             self.assertEqual(claims[0]["citation_ids"], ["c1"])
+            self.assertEqual(claims[0]["why_it_matters"], "Energy inflation can stay sticky.")
+            self.assertEqual(claims[0]["novelty_vs_prior_brief"], "strengthened")
             self.assertEqual(validate_decision_record(result["decision_record"]), [])
     def test_persists_decision_record_to_date_partitioned_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:

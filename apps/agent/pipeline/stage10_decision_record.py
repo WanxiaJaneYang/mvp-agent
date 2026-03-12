@@ -101,11 +101,14 @@ def build_and_persist_decision_record(
         if not isinstance(citation_ids, list):
             citation_ids = []
         claim: dict[str, Any] = {
-            "claim_id": f"c_{claim_counter:03d}",
+            "claim_id": str(bullet.get("claim_id") or f"c_{claim_counter:03d}"),
             "section": _normalize_section(str(claim_input["section"])),
             "text": str(bullet.get("text", "")),
             "citation_ids": citation_ids,
             "coverage_status": "supported" if len(citation_ids) >= 1 else "insufficient_evidence",
+            "claim_kind": str(bullet.get("claim_kind") or _normalize_section(str(claim_input["section"]))),
+            "why_it_matters": str(bullet.get("why_it_matters") or ""),
+            "novelty_vs_prior_brief": str(bullet.get("novelty_vs_prior_brief") or "unknown"),
         }
         if claim["section"] not in ALLOWED_CLAIM_SECTIONS:
             continue

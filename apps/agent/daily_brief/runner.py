@@ -372,6 +372,7 @@ def _execute_daily_brief_slice(
             run_id=run_id,
             html_body=output_path.read_text(encoding="utf-8"),
             status_title="Abstained" if synthesis_data.final_result["status"] == "abstained" else "Validated",
+            synthesis=cast(dict[str, Any], synthesis_data.final_result["synthesis"]),
             smtp_class=smtp_class,
         )
 
