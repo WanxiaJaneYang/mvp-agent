@@ -65,7 +65,11 @@ class OpenAIRuntimeSchemaTests(unittest.TestCase):
                         "opposing_chunk_ids": ["chunk_002"],
                         "minority_chunk_ids": ["chunk_003"],
                         "watch_chunk_ids": ["chunk_004"],
-                        "coverage_summary": {"unique_publishers": 4, "source_roles": ["official", "market_media"], "time_span_hours": 12},
+                        "coverage_summary": {
+                            "unique_publishers": 4,
+                            "source_roles": ["official", "market_media"],
+                            "time_span_hours": 12,
+                        },
                     }
                 ],
                 prior_brief_context=None,

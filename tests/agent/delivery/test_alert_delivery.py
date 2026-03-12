@@ -75,7 +75,10 @@ def _content() -> AlertDeliveryContent:
         bullets=(
             AlertBullet(text="The statement stayed cautious despite softer macro data.", citations=(citation,)),
             AlertBullet(text="Rate-sensitive assets rallied on a dovish read-through.", citations=(citation,)),
-            AlertBullet(text="The next inflation print matters more than the headline reaction.", citations=(citation,)),
+            AlertBullet(
+                text="The next inflation print matters more than the headline reaction.",
+                citations=(citation,),
+            ),
         ),
         why_it_matters="A wider market-policy gap can reverse quickly on the next official release.",
         what_to_watch="Next CPI and any Fedspeak that narrows the interpretation gap.",

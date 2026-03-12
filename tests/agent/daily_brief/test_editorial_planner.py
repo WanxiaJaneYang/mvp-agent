@@ -45,7 +45,11 @@ class EditorialPlannerTests(unittest.TestCase):
             ],
             documents_by_id={
                 "doc_001": {"rss_snippet": "Growth cooled.", "title": "Growth cooled.", "doc_id": "doc_001"},
-                "doc_002": {"rss_snippet": "Policy stayed cautious.", "title": "Policy stayed cautious.", "doc_id": "doc_002"},
+                "doc_002": {
+                    "rss_snippet": "Policy stayed cautious.",
+                    "title": "Policy stayed cautious.",
+                    "doc_id": "doc_002",
+                },
                 "doc_003": {"rss_snippet": "Growth cooled.", "title": "Growth cooled.", "doc_id": "doc_003"},
             },
         )

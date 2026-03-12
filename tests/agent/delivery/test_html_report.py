@@ -38,7 +38,9 @@ class HtmlReportTests(unittest.TestCase):
                                     "text": "The prevailing argument emphasizes near-term supply pressure.",
                                     "citation_ids": ["cite_001"],
                                     "novelty_vs_prior_brief": "strengthened",
-                                    "why_it_matters": "Energy inflation risk stays elevated if supply pressure persists.",
+                                    "why_it_matters": (
+                                        "Energy inflation risk stays elevated if supply pressure persists."
+                                    ),
                                     "evidence": [
                                         {
                                             "citation_id": "cite_001",

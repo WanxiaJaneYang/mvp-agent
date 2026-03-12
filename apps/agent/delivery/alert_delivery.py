@@ -221,7 +221,11 @@ def deliver_runtime_alert(
         channels=channels,
     )
 
-    delivered_email_at = created_at if result.delivery_status == "delivered" and "email" in result.delivered_channels else None
+    delivered_email_at = (
+        created_at
+        if result.delivery_status == "delivered" and "email" in result.delivered_channels
+        else None
+    )
     delivered_local_page_at = (
         created_at if result.delivery_status == "delivered" and "local_page" in result.delivered_channels else None
     )

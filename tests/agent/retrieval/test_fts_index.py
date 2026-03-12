@@ -1,5 +1,5 @@
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
 
 from apps.agent.retrieval.fts_index import build_fts_rows, search_fts_rows, search_runtime_fts_rows

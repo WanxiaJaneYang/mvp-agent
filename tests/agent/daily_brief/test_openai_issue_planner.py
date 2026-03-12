@@ -29,7 +29,11 @@ def _planner_input() -> IssuePlannerInput:
                 "opposing_chunk_ids": ["chunk_3"],
                 "minority_chunk_ids": ["chunk_4"],
                 "watch_chunk_ids": ["chunk_5"],
-                "coverage_summary": {"unique_publishers": 5, "source_roles": ["official", "market_media"], "time_span_hours": 18},
+                "coverage_summary": {
+                    "unique_publishers": 5,
+                    "source_roles": ["official", "market_media"],
+                    "time_span_hours": 18,
+                },
             }
         ],
         prior_brief_context=None,
@@ -73,7 +77,14 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
         self.assertEqual(len(captured_request["input"]["issue_evidence_scopes"]), 1)
         self.assertEqual(
             set(captured_request["input"]["issue_evidence_scopes"][0]),
-            {"issue_id", "primary_chunk_ids", "opposing_chunk_ids", "minority_chunk_ids", "watch_chunk_ids", "coverage_summary"},
+            {
+                "issue_id",
+                "primary_chunk_ids",
+                "opposing_chunk_ids",
+                "minority_chunk_ids",
+                "watch_chunk_ids",
+                "coverage_summary",
+            },
         )
         self.assertLessEqual(len(captured_request["input"]["prior_brief_context"]["oversized"]), 240)
 

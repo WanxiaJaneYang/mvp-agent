@@ -111,7 +111,9 @@ def build_and_persist_decision_record(
             "citation_ids": citation_ids,
             "coverage_status": "supported" if len(citation_ids) >= 1 else "insufficient_evidence",
             "why_it_matters": str(bullet.get("why_it_matters") or ""),
-            "novelty_vs_prior_brief": str(bullet.get("novelty_vs_prior_brief") or bullet.get("delta_label") or "unknown"),
+            "novelty_vs_prior_brief": str(
+                bullet.get("novelty_vs_prior_brief") or bullet.get("delta_label") or "unknown"
+            ),
         }
         if claim["section"] not in ALLOWED_CLAIM_SECTIONS:
             continue
