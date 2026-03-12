@@ -205,6 +205,14 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 {"text": "Bond traders push back on the soft-landing consensus as growth cools.", "doc_id": "doc_counter_invalid", "chunk_id": "doc_counter_invalid_chunk_000", "publisher": "Reuters", "source_id": "reuters_business", "published_at": None, "credibility_tier": 2},
                 {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_counter_retry", "chunk_id": "doc_counter_retry_chunk_000", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
             ],
+            corpus_items=[
+                {"chunk_id": "doc_watch_chunk_000", "doc_id": "doc_watch", "source_id": "bls_preview", "publisher": "BLS Preview Desk", "text": "Watch Friday CPI for shelter inflation surprises.", "published_at": "2026-03-10T16:00:00Z", "credibility_tier": 1, "source_role": "official", "retrieval_score": 0.95},
+                {"chunk_id": "doc_minority_chunk_000", "doc_id": "doc_minority", "source_id": "market_commentary", "publisher": "Market Commentary", "text": "A minority of investors still expects a hard landing.", "published_at": "2026-03-10T15:30:00Z", "credibility_tier": 3, "source_role": "market_media", "retrieval_score": 0.9},
+                {"chunk_id": "doc_prevailing_chunk_000", "doc_id": "doc_prevailing", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "text": "Fed officials kept policy steady while inflation progress remained uneven.", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1, "source_role": "official", "retrieval_score": 0.88},
+                {"chunk_id": "doc_counter_invalid_chunk_000", "doc_id": "doc_counter_invalid", "source_id": "reuters_business", "publisher": "Reuters", "text": "Bond traders push back on the soft-landing consensus as growth cools.", "published_at": None, "credibility_tier": 2, "source_role": "market_media", "retrieval_score": 0.86},
+                {"chunk_id": "doc_counter_retry_chunk_000", "doc_id": "doc_counter_retry", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "text": "Investors question the soft-landing narrative as growth data weakens.", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2, "source_role": "market_media", "retrieval_score": 0.84},
+            ],
+            diversity_stats={"unique_publishers": 5},
         )
         registry = {
             "bls_preview": {"id": "bls_preview", "name": "BLS Preview Desk", "url": "https://example.test/watch", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["macro_data"]},
@@ -650,6 +658,19 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 syntheses = connection.execute(
                     "SELECT synthesis_id, kind, status FROM syntheses"
                 ).fetchall()
+                issue_maps = connection.execute(
+                    "SELECT issue_id, issue_question FROM issue_maps WHERE run_id = ? ORDER BY issue_id",
+                    ("run_fixture_sqlite",),
+                ).fetchall()
+                structured_claims = connection.execute(
+                    """
+                    SELECT claim_id, novelty_vs_prior_brief, why_it_matters
+                    FROM structured_claims
+                    WHERE run_id = ?
+                    ORDER BY claim_id
+                    """,
+                    ("run_fixture_sqlite",),
+                ).fetchall()
                 runs = connection.execute(
                     "SELECT run_id, run_type, status FROM runs"
                 ).fetchall()
@@ -664,6 +685,10 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(len(syntheses), 1)
         self.assertTrue(syntheses[0][0].startswith("syn_"))
         self.assertEqual(syntheses[0][1:], ("daily_brief", "ok"))
+        self.assertGreater(len(issue_maps), 0)
+        self.assertTrue(all(issue_id.startswith("issue_") for issue_id, _question in issue_maps))
+        self.assertGreater(len(structured_claims), 0)
+        self.assertTrue(all(claim_id for claim_id, _novelty, _why in structured_claims))
         self.assertEqual(runs, [("run_fixture_sqlite", "daily_brief", "ok")])
 
     def test_run_fixture_daily_brief_reuses_stable_document_ids_across_runs(self):
@@ -785,6 +810,30 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(run_summary["docs_fetched"], 5)
             self.assertEqual(result["pipeline_status"], "ok")
 
+    def test_run_daily_brief_persists_provider_resolution_metadata_in_run_summary(self):
+        fixture_payloads = load_active_fixture_payloads()
+
+        with patch("apps.agent.daily_brief.runner.fetch_live_payloads_for_source") as live_fetch_mock, tempfile.TemporaryDirectory() as tmpdir:
+            live_fetch_mock.side_effect = lambda *, source, fetched_at_utc: fixture_payloads.get(str(source["id"]), [])
+            result = run_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_live_provider_auto",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                provider_resolution={
+                    "requested_provider": "auto",
+                    "resolved_provider": "openai",
+                    "provider_mode": "model-assisted",
+                    "provider_fallback_used": True,
+                },
+            )
+
+            run_summary = json.loads((Path(result["artifact_dir"]) / "run_summary.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(run_summary["requested_provider"], "auto")
+        self.assertEqual(run_summary["resolved_provider"], "openai")
+        self.assertEqual(run_summary["provider_mode"], "model-assisted")
+        self.assertTrue(run_summary["provider_fallback_used"])
+
     def test_run_fixture_daily_brief_includes_changed_section_when_previous_synthesis_exists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir)
@@ -821,7 +870,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
 
         self.assertIn("changed", synthesis_payload)
         self.assertGreater(len(synthesis_payload["changed"]), 0)
-        self.assertIn("Changed Since Yesterday", html)
+        self.assertIn("What Changed", html)
 
     def test_run_fixture_daily_brief_persists_budget_preflight_truthfully(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1138,6 +1187,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
             def plan_issues(self, *, brief_input):
                 call_order.append("planner")
                 test_case.assertEqual(brief_input["generated_at_utc"], "2026-03-10T16:00:00Z")
+                test_case.assertIn("brief_plan", brief_input)
+                test_case.assertIn("issue_evidence_scopes", brief_input)
                 return [
                     IssueMap(
                         issue_id="issue_001",
@@ -1306,6 +1357,13 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_prevailing", "chunk_id": "doc_prevailing_chunk_000", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
                 {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_counter_retry", "chunk_id": "doc_counter_retry_chunk_000", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
             ],
+            corpus_items=[
+                {"chunk_id": "doc_watch_chunk_000", "doc_id": "doc_watch", "source_id": "bls_preview", "publisher": "BLS Preview Desk", "text": "Watch Friday CPI for shelter inflation surprises.", "published_at": "2026-03-10T16:00:00Z", "credibility_tier": 1, "source_role": "official", "retrieval_score": 0.95},
+                {"chunk_id": "doc_minority_chunk_000", "doc_id": "doc_minority", "source_id": "market_commentary", "publisher": "Market Commentary", "text": "A minority of investors still expects a hard landing.", "published_at": "2026-03-10T15:30:00Z", "credibility_tier": 3, "source_role": "market_media", "retrieval_score": 0.9},
+                {"chunk_id": "doc_prevailing_chunk_000", "doc_id": "doc_prevailing", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "text": "Fed officials kept policy steady while inflation progress remained uneven.", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1, "source_role": "official", "retrieval_score": 0.88},
+                {"chunk_id": "doc_counter_retry_chunk_000", "doc_id": "doc_counter_retry", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "text": "Investors question the soft-landing narrative as growth data weakens.", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2, "source_role": "market_media", "retrieval_score": 0.84},
+            ],
+            diversity_stats={"unique_publishers": 4},
         )
         registry = {
             "bls_preview": {"id": "bls_preview", "name": "BLS Preview Desk", "url": "https://example.test/watch", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["macro_data"]},
@@ -1348,6 +1406,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
             documents=[],
             chunks=[],
             fts_rows=[],
+            corpus_items=[],
+            diversity_stats={},
         )
 
         class _Planner(IssuePlannerProvider):

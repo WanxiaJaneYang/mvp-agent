@@ -20,7 +20,9 @@ class PriorBriefContextTests(unittest.TestCase):
 
         self.assertEqual(context["previous_generated_at_utc"], "2026-03-11T00:00:00Z")
         self.assertEqual(context["claim_summaries"], ["Prevailing claim.", "Counter claim."])
+        self.assertEqual(context["claim_texts"], ["Prevailing claim.", "Counter claim."])
         self.assertEqual(context["citation_ids"], ["cite_001", "cite_002"])
+        self.assertEqual(context["issue_questions"], ["Previous daily brief"])
         self.assertEqual(context["issues"][0]["issue_question"], "Previous daily brief")
         self.assertEqual(context["issues"][0]["claim_summaries"], ["Prevailing claim.", "Counter claim."])
 

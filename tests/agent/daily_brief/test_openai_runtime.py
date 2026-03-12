@@ -45,11 +45,32 @@ class OpenAIRuntimeSchemaTests(unittest.TestCase):
             brief_input=IssuePlannerInput(
                 run_id="run_demo",
                 generated_at_utc="2026-03-12T10:00:00Z",
-                evidence_pack=[
-                    {"chunk_id": "chunk_001", "doc_id": "doc_001", "publisher": "Reuters", "text": "Growth cools."},
-                    {"chunk_id": "chunk_002", "doc_id": "doc_002", "publisher": "Fed", "text": "Policy steady."},
-                    {"chunk_id": "chunk_003", "doc_id": "doc_003", "publisher": "WSJ", "text": "Hard landing view."},
-                    {"chunk_id": "chunk_004", "doc_id": "doc_004", "publisher": "BLS", "text": "Watch CPI."},
+                brief_plan={
+                    "brief_id": "brief_2026-03-12",
+                    "brief_thesis": "Growth is cooling while policy stays cautious.",
+                    "top_takeaways": ["Growth cools.", "Policy stays cautious."],
+                    "issue_budget": 2,
+                    "render_mode": "full",
+                    "source_scarcity_mode": "normal",
+                    "candidate_issue_seeds": ["growth cooling", "policy caution"],
+                    "issue_order": ["seed_001", "seed_002"],
+                    "watchlist": ["Watch CPI."],
+                    "reason_codes": ["two_distinct_debates_supported"],
+                },
+                issue_evidence_scopes=[
+                    {
+                        "issue_id": "issue_001",
+                        "issue_seed": "growth cooling",
+                        "primary_chunk_ids": ["chunk_001"],
+                        "opposing_chunk_ids": ["chunk_002"],
+                        "minority_chunk_ids": ["chunk_003"],
+                        "watch_chunk_ids": ["chunk_004"],
+                        "coverage_summary": {
+                            "unique_publishers": 4,
+                            "source_roles": ["official", "market_media"],
+                            "time_span_hours": 12,
+                        },
+                    }
                 ],
                 prior_brief_context=None,
             )

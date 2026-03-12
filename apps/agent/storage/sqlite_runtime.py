@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -25,6 +26,27 @@ def ensure_runtime_db(*, base_dir: Path) -> Path:
     return db_path
 
 
+def persist_runtime_corpus(
+    *,
+    base_dir: Path,
+    source_rows: Iterable[Mapping[str, Any]],
+    documents: Iterable[Mapping[str, Any]],
+    chunks: Iterable[Mapping[str, Any]],
+    fts_rows: Iterable[Mapping[str, Any]],
+) -> Path:
+    db_path = ensure_runtime_db(base_dir=base_dir)
+    connection = sqlite3.connect(db_path)
+    try:
+        _persist_sources(connection, rows=[dict(row) for row in source_rows])
+        _persist_documents(connection, rows=[dict(row) for row in documents])
+        _persist_chunks(connection, rows=[dict(row) for row in chunks])
+        _persist_fts_rows(connection, rows=[dict(row) for row in fts_rows])
+        connection.commit()
+    finally:
+        connection.close()
+    return db_path
+
+
 def persist_daily_brief_runtime(
     *,
     base_dir: Path,
@@ -36,6 +58,8 @@ def persist_daily_brief_runtime(
     chunks: Iterable[Mapping[str, Any]],
     evidence_pack_items: Iterable[Mapping[str, Any]],
     evidence_pack_report: Mapping[str, Any],
+    issue_map_rows: Iterable[Mapping[str, Any]],
+    structured_claim_rows: Iterable[Mapping[str, Any]],
     citation_rows: Iterable[Mapping[str, Any]],
     synthesis_rows: Iterable[Mapping[str, Any]],
     bullet_citation_rows: Iterable[Mapping[str, Any]],
@@ -52,6 +76,8 @@ def persist_daily_brief_runtime(
         document_rows_list = [dict(row) for row in documents]
         chunk_rows_list = [dict(row) for row in chunks]
         evidence_pack_rows_list = [dict(row) for row in evidence_pack_items]
+        issue_map_rows_list = [dict(row) for row in issue_map_rows]
+        structured_claim_rows_list = [dict(row) for row in structured_claim_rows]
         citation_rows_list = [dict(row) for row in citation_rows]
         synthesis_rows_list = [dict(row) for row in synthesis_rows]
         bullet_citation_rows_list = [dict(row) for row in bullet_citation_rows]
@@ -72,6 +98,18 @@ def persist_daily_brief_runtime(
             stats=evidence_pack_report.get("diversity_stats", {}),
         )
         _persist_evidence_pack_items(connection, pack_id=pack_id, rows=evidence_pack_rows_list)
+        _persist_issue_maps(
+            connection,
+            run_id=str(run_row["run_id"]),
+            generated_at_utc=generated_at_utc,
+            rows=issue_map_rows_list,
+        )
+        _persist_structured_claims(
+            connection,
+            run_id=str(run_row["run_id"]),
+            generated_at_utc=generated_at_utc,
+            rows=structured_claim_rows_list,
+        )
         persisted_citation_ids = _persist_citations(
             connection,
             rows=citation_rows_list,
@@ -97,6 +135,21 @@ def persist_daily_brief_runtime(
             synthesis_id=synthesis_id,
             rows=relevance_flag_rows_list,
         )
+        connection.commit()
+    finally:
+        connection.close()
+    return db_path
+
+
+def persist_alert_record(
+    *,
+    base_dir: Path,
+    row: Mapping[str, Any],
+) -> Path:
+    db_path = ensure_runtime_db(base_dir=base_dir)
+    connection = sqlite3.connect(db_path)
+    try:
+        _persist_alerts(connection, rows=[dict(row)])
         connection.commit()
     finally:
         connection.close()
@@ -162,6 +215,16 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
         )
         """,
         """
+        CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(
+          chunk_id UNINDEXED,
+          doc_id UNINDEXED,
+          publisher UNINDEXED,
+          source_id UNINDEXED,
+          published_at UNINDEXED,
+          text
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS evidence_packs (
           pack_id TEXT PRIMARY KEY,
           purpose TEXT NOT NULL,
@@ -204,6 +267,36 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           retry_count INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL,
           created_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS issue_maps (
+          run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+          issue_id TEXT NOT NULL,
+          issue_question TEXT NOT NULL,
+          thesis_hint TEXT NOT NULL,
+          supporting_evidence_ids_json TEXT NOT NULL,
+          opposing_evidence_ids_json TEXT NOT NULL,
+          minority_evidence_ids_json TEXT NOT NULL,
+          watch_evidence_ids_json TEXT NOT NULL,
+          generated_at TEXT NOT NULL,
+          PRIMARY KEY (run_id, issue_id)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS structured_claims (
+          run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+          claim_id TEXT NOT NULL,
+          issue_id TEXT NOT NULL,
+          claim_kind TEXT NOT NULL,
+          claim_text TEXT NOT NULL,
+          supporting_citation_ids_json TEXT NOT NULL,
+          opposing_citation_ids_json TEXT NOT NULL,
+          confidence TEXT NOT NULL,
+          novelty_vs_prior_brief TEXT NOT NULL,
+          why_it_matters TEXT NOT NULL,
+          generated_at TEXT NOT NULL,
+          PRIMARY KEY (run_id, claim_id)
         )
         """,
         """
@@ -302,6 +395,32 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           risk_flag TEXT NOT NULL,
           rationale TEXT,
           created_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS alerts (
+          alert_id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          category TEXT NOT NULL,
+          title TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          action TEXT NOT NULL,
+          delivery_status TEXT NOT NULL,
+          score_total REAL NOT NULL,
+          score_importance REAL NOT NULL,
+          score_evidence REAL NOT NULL,
+          score_confidence REAL NOT NULL,
+          score_relevance REAL NOT NULL,
+          score_noise_risk REAL NOT NULL,
+          triggered_at TEXT NOT NULL,
+          delivered_email_at TEXT,
+          delivered_local_page_at TEXT,
+          bundle_for_daily_brief INTEGER NOT NULL DEFAULT 0,
+          suppression_reason TEXT,
+          failure_reason TEXT,
+          html_path TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
         )
         """,
     )
@@ -581,6 +700,26 @@ def _persist_synthesis(
     )
 
 
+def _persist_fts_rows(connection: sqlite3.Connection, *, rows: list[dict[str, Any]]) -> None:
+    chunk_ids = [str(row["chunk_id"]) for row in rows if row.get("chunk_id")]
+    if chunk_ids:
+        placeholders = ", ".join("?" for _ in chunk_ids)
+        connection.execute(
+            f"DELETE FROM chunk_fts WHERE chunk_id IN ({placeholders})",
+            chunk_ids,
+        )
+    connection.executemany(
+        """
+        INSERT INTO chunk_fts (
+          chunk_id, doc_id, publisher, source_id, published_at, text
+        ) VALUES (
+          :chunk_id, :doc_id, :publisher, :source_id, :published_at, :text
+        )
+        """,
+        rows,
+    )
+
+
 def _persist_bullet_citations(
     connection: sqlite3.Connection,
     *,
@@ -678,4 +817,146 @@ def _persist_relevance_flags(
           created_at=excluded.created_at
         """,
         rows,
+    )
+
+
+def _persist_alerts(connection: sqlite3.Connection, *, rows: list[dict[str, Any]]) -> None:
+    connection.executemany(
+        """
+        INSERT INTO alerts (
+          alert_id, run_id, category, title, summary, action, delivery_status,
+          score_total, score_importance, score_evidence, score_confidence,
+          score_relevance, score_noise_risk, triggered_at, delivered_email_at,
+          delivered_local_page_at, bundle_for_daily_brief, suppression_reason,
+          failure_reason, html_path, created_at, updated_at
+        ) VALUES (
+          :alert_id, :run_id, :category, :title, :summary, :action, :delivery_status,
+          :score_total, :score_importance, :score_evidence, :score_confidence,
+          :score_relevance, :score_noise_risk, :triggered_at, :delivered_email_at,
+          :delivered_local_page_at, :bundle_for_daily_brief, :suppression_reason,
+          :failure_reason, :html_path, :created_at, :updated_at
+        )
+        ON CONFLICT(alert_id) DO UPDATE SET
+          run_id=excluded.run_id,
+          category=excluded.category,
+          title=excluded.title,
+          summary=excluded.summary,
+          action=excluded.action,
+          delivery_status=excluded.delivery_status,
+          score_total=excluded.score_total,
+          score_importance=excluded.score_importance,
+          score_evidence=excluded.score_evidence,
+          score_confidence=excluded.score_confidence,
+          score_relevance=excluded.score_relevance,
+          score_noise_risk=excluded.score_noise_risk,
+          triggered_at=excluded.triggered_at,
+          delivered_email_at=excluded.delivered_email_at,
+          delivered_local_page_at=excluded.delivered_local_page_at,
+          bundle_for_daily_brief=excluded.bundle_for_daily_brief,
+          suppression_reason=excluded.suppression_reason,
+          failure_reason=excluded.failure_reason,
+          html_path=excluded.html_path,
+          updated_at=excluded.updated_at
+        """,
+        rows,
+    )
+
+
+def _persist_issue_maps(
+    connection: sqlite3.Connection,
+    *,
+    run_id: str,
+    generated_at_utc: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    connection.execute("DELETE FROM issue_maps WHERE run_id = ?", (run_id,))
+    if not rows:
+        return
+    payload_rows = [
+        {
+            "run_id": run_id,
+            "issue_id": str(row["issue_id"]),
+            "issue_question": str(row.get("issue_question") or ""),
+            "thesis_hint": str(row.get("thesis_hint") or ""),
+            "supporting_evidence_ids_json": json.dumps(list(row.get("supporting_evidence_ids", []))),
+            "opposing_evidence_ids_json": json.dumps(list(row.get("opposing_evidence_ids", []))),
+            "minority_evidence_ids_json": json.dumps(list(row.get("minority_evidence_ids", []))),
+            "watch_evidence_ids_json": json.dumps(list(row.get("watch_evidence_ids", []))),
+            "generated_at": generated_at_utc,
+        }
+        for row in rows
+    ]
+    connection.executemany(
+        """
+        INSERT INTO issue_maps (
+          run_id, issue_id, issue_question, thesis_hint,
+          supporting_evidence_ids_json, opposing_evidence_ids_json,
+          minority_evidence_ids_json, watch_evidence_ids_json, generated_at
+        ) VALUES (
+          :run_id, :issue_id, :issue_question, :thesis_hint,
+          :supporting_evidence_ids_json, :opposing_evidence_ids_json,
+          :minority_evidence_ids_json, :watch_evidence_ids_json, :generated_at
+        )
+        ON CONFLICT(run_id, issue_id) DO UPDATE SET
+          issue_question=excluded.issue_question,
+          thesis_hint=excluded.thesis_hint,
+          supporting_evidence_ids_json=excluded.supporting_evidence_ids_json,
+          opposing_evidence_ids_json=excluded.opposing_evidence_ids_json,
+          minority_evidence_ids_json=excluded.minority_evidence_ids_json,
+          watch_evidence_ids_json=excluded.watch_evidence_ids_json,
+          generated_at=excluded.generated_at
+        """,
+        payload_rows,
+    )
+
+
+def _persist_structured_claims(
+    connection: sqlite3.Connection,
+    *,
+    run_id: str,
+    generated_at_utc: str,
+    rows: list[dict[str, Any]],
+) -> None:
+    connection.execute("DELETE FROM structured_claims WHERE run_id = ?", (run_id,))
+    if not rows:
+        return
+    payload_rows = [
+        {
+            "run_id": run_id,
+            "claim_id": str(row["claim_id"]),
+            "issue_id": str(row.get("issue_id") or ""),
+            "claim_kind": str(row.get("claim_kind") or ""),
+            "claim_text": str(row.get("claim_text") or ""),
+            "supporting_citation_ids_json": json.dumps(list(row.get("supporting_citation_ids", []))),
+            "opposing_citation_ids_json": json.dumps(list(row.get("opposing_citation_ids", []))),
+            "confidence": str(row.get("confidence") or ""),
+            "novelty_vs_prior_brief": str(row.get("novelty_vs_prior_brief") or "unknown"),
+            "why_it_matters": str(row.get("why_it_matters") or ""),
+            "generated_at": generated_at_utc,
+        }
+        for row in rows
+    ]
+    connection.executemany(
+        """
+        INSERT INTO structured_claims (
+          run_id, claim_id, issue_id, claim_kind, claim_text,
+          supporting_citation_ids_json, opposing_citation_ids_json,
+          confidence, novelty_vs_prior_brief, why_it_matters, generated_at
+        ) VALUES (
+          :run_id, :claim_id, :issue_id, :claim_kind, :claim_text,
+          :supporting_citation_ids_json, :opposing_citation_ids_json,
+          :confidence, :novelty_vs_prior_brief, :why_it_matters, :generated_at
+        )
+        ON CONFLICT(run_id, claim_id) DO UPDATE SET
+          issue_id=excluded.issue_id,
+          claim_kind=excluded.claim_kind,
+          claim_text=excluded.claim_text,
+          supporting_citation_ids_json=excluded.supporting_citation_ids_json,
+          opposing_citation_ids_json=excluded.opposing_citation_ids_json,
+          confidence=excluded.confidence,
+          novelty_vs_prior_brief=excluded.novelty_vs_prior_brief,
+          why_it_matters=excluded.why_it_matters,
+          generated_at=excluded.generated_at
+        """,
+        payload_rows,
     )

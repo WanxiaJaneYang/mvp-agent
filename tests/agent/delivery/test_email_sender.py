@@ -39,18 +39,44 @@ class DailyBriefEmailSenderTests(unittest.TestCase):
             report_date="2026-03-10",
             run_id="run_delivery",
             html_body="<html><body><h1>Daily Brief</h1></body></html>",
-            status_title="Validated",
+            status_title="Ready",
+            synthesis={
+                "brief": {
+                    "bottom_line": "Growth is cooling while policy language stays cautious.",
+                    "top_takeaways": ["Growth is cooling.", "Policy remains cautious."],
+                },
+                "issues": [
+                    {
+                        "title": "Will softer growth change near-term Fed expectations?",
+                        "prevailing": [
+                            {
+                                "text": "Softer growth is raising later-cut expectations.",
+                                "novelty_vs_prior_brief": "strengthened",
+                                "why_it_matters": "Rate-sensitive assets can reprice quickly.",
+                            }
+                        ],
+                    }
+                ],
+            },
+            citation_status="partial",
+            analytical_status="warn",
+            publish_decision="publish",
             smtp_class=_FakeSMTP,
         )
 
         message = _FakeSMTP.last_instance.sent_messages[0]
 
         self.assertEqual(result["recipient_count"], 2)
-        self.assertEqual(result["subject"], "Daily Brief: 2026-03-10")
+        self.assertEqual(result["subject"], "Daily Brief [PARTIAL/WARN]: 2026-03-10")
         self.assertTrue(_FakeSMTP.last_instance.started_tls)
         self.assertEqual(message["To"], "pm@example.test, risk@example.test")
-        self.assertEqual(message["Subject"], "Daily Brief: 2026-03-10")
-        self.assertIn("Daily Brief", message.as_string())
+        self.assertEqual(message["Subject"], "Daily Brief [PARTIAL/WARN]: 2026-03-10")
+        rendered = message.as_string()
+        self.assertIn("Citation status: partial", rendered)
+        self.assertIn("Analytical quality: warn", rendered)
+        self.assertIn("Bottom line: Growth is cooling while policy language stays cautious.", rendered)
+        self.assertIn("prevailing [strengthened]: Softer growth is raising later-cut expectations.", rendered)
+        self.assertIn("Why it matters: Rate-sensitive assets can reprice quickly.", rendered)
 
 
 if __name__ == "__main__":

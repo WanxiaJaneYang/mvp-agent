@@ -23,7 +23,9 @@ def build_prior_brief_context(
     return {
         "previous_generated_at_utc": previous_generated_at_utc,
         "issue_count": len(issues),
+        "issue_questions": [issue["issue_question"] for issue in issues],
         "issues": issues,
+        "claim_texts": claim_summaries,
         "claim_summaries": claim_summaries,
         "citation_ids": citation_ids,
     }

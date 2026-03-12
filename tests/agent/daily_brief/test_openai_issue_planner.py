@@ -6,6 +6,40 @@ from apps.agent.daily_brief.model_interfaces import IssuePlannerInput
 from apps.agent.daily_brief.openai_issue_planner import OpenAIIssuePlanner
 
 
+def _planner_input() -> IssuePlannerInput:
+    return IssuePlannerInput(
+        run_id="run_001",
+        generated_at_utc="2026-03-12T00:00:00Z",
+        brief_plan={
+            "brief_id": "brief_2026-03-12",
+            "brief_thesis": "Oil markets are being driven by supply pressure and demand skepticism.",
+            "top_takeaways": ["Supply pressure remains live.", "Demand softness may cap the move."],
+            "issue_budget": 2,
+            "render_mode": "full",
+            "source_scarcity_mode": "normal",
+            "candidate_issue_seeds": ["oil supply pressure", "oil demand slowdown"],
+            "issue_order": ["seed_001", "seed_002"],
+            "watchlist": ["Watch weekly inventories."],
+            "reason_codes": ["two_distinct_debates_supported"],
+        },
+        issue_evidence_scopes=[
+            {
+                "issue_id": "issue_oil",
+                "primary_chunk_ids": ["chunk_1", "chunk_2"],
+                "opposing_chunk_ids": ["chunk_3"],
+                "minority_chunk_ids": ["chunk_4"],
+                "watch_chunk_ids": ["chunk_5"],
+                "coverage_summary": {
+                    "unique_publishers": 5,
+                    "source_roles": ["official", "market_media"],
+                    "time_span_hours": 18,
+                },
+            }
+        ],
+        prior_brief_context=None,
+    )
+
+
 class OpenAIIssuePlannerTests(unittest.TestCase):
     def test_builds_bounded_structured_request_payload_before_parsing(self) -> None:
         captured_request: dict[str, object] = {}
@@ -31,49 +65,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
         planner = OpenAIIssuePlanner(response_loader=loader)
 
         result = planner.plan_issues(
-            brief_input=IssuePlannerInput(
-                run_id="run_001",
-                generated_at_utc="2026-03-12T00:00:00Z",
-                evidence_pack=[
-                    {
-                        "chunk_id": "chunk_1",
-                        "doc_id": "doc_1",
-                        "publisher": "Reuters",
-                        "title": "Oil rises on supply concerns",
-                        "text": "Supply concerns kept oil prices supported as traders watched shipping disruptions.",
-                        "retrieval_score": 0.91,
-                    },
-                    {
-                        "chunk_id": "chunk_2",
-                        "doc_id": "doc_2",
-                        "publisher": "WSJ",
-                        "text": "Refiners are watching inventory pressure.",
-                    },
-                    {
-                        "chunk_id": "chunk_3",
-                        "doc_id": "doc_3",
-                        "publisher": "BLS",
-                        "text": "Demand indicators softened.",
-                    },
-                    {
-                        "chunk_id": "chunk_4",
-                        "doc_id": "doc_4",
-                        "publisher": "BEA",
-                        "text": "Long-term consumption remains firm.",
-                    },
-                    {
-                        "chunk_id": "chunk_5",
-                        "doc_id": "doc_5",
-                        "publisher": "EIA",
-                        "text": "Watch inventory data next week.",
-                    },
-                ],
-                prior_brief_context={
-                    "prior_issue_questions": ["Will oil prices keep rising?"],
-                    "prior_generated_at_utc": "2026-03-11T00:00:00Z",
-                    "oversized": "x" * 600,
-                },
-            )
+            brief_input={**_planner_input(), "prior_brief_context": {"oversized": "x" * 600}}
         )
 
         self.assertEqual(result[0]["issue_id"], "issue_oil")
@@ -82,10 +74,17 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
         self.assertEqual(captured_request["generated_at_utc"], "2026-03-12T00:00:00Z")
         self.assertEqual(captured_request["response_format"]["type"], "json_schema")
         self.assertEqual(captured_request["messages"][0]["role"], "system")
-        self.assertEqual(len(captured_request["input"]["evidence_pack"]), 5)
+        self.assertEqual(len(captured_request["input"]["issue_evidence_scopes"]), 1)
         self.assertEqual(
-            set(captured_request["input"]["evidence_pack"][0]),
-            {"chunk_id", "doc_id", "publisher", "title", "text", "retrieval_score"},
+            set(captured_request["input"]["issue_evidence_scopes"][0]),
+            {
+                "issue_id",
+                "primary_chunk_ids",
+                "opposing_chunk_ids",
+                "minority_chunk_ids",
+                "watch_chunk_ids",
+                "coverage_summary",
+            },
         )
         self.assertLessEqual(len(captured_request["input"]["prior_brief_context"]["oversized"]), 240)
 
@@ -107,18 +106,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
         )
 
         result = planner.plan_issues(
-            brief_input=IssuePlannerInput(
-                run_id="run_001",
-                generated_at_utc="2026-03-12T00:00:00Z",
-                evidence_pack=[
-                    {"chunk_id": "chunk_1"},
-                    {"chunk_id": "chunk_2"},
-                    {"chunk_id": "chunk_3"},
-                    {"chunk_id": "chunk_4"},
-                    {"chunk_id": "chunk_5"},
-                ],
-                prior_brief_context=None,
-            )
+            brief_input=_planner_input()
         )
 
         self.assertEqual(result[0]["issue_id"], "issue_oil")
@@ -129,12 +117,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             planner.plan_issues(
-                brief_input=IssuePlannerInput(
-                    run_id="run_001",
-                    generated_at_utc="2026-03-12T00:00:00Z",
-                    evidence_pack=[],
-                    prior_brief_context=None,
-                )
+                brief_input=_planner_input()
             )
 
     def test_rejects_wrong_issue_map_field_types(self) -> None:
@@ -156,12 +139,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             planner.plan_issues(
-                brief_input=IssuePlannerInput(
-                    run_id="run_001",
-                    generated_at_utc="2026-03-12T00:00:00Z",
-                    evidence_pack=[],
-                    prior_brief_context=None,
-                )
+                brief_input=_planner_input()
             )
 
     def test_rejects_empty_issue_list_output(self) -> None:
@@ -169,12 +147,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             planner.plan_issues(
-                brief_input=IssuePlannerInput(
-                    run_id="run_001",
-                    generated_at_utc="2026-03-12T00:00:00Z",
-                    evidence_pack=[],
-                    prior_brief_context=None,
-                )
+                brief_input=_planner_input()
             )
 
     def test_rejects_issue_output_that_references_unknown_evidence_ids(self) -> None:
@@ -196,12 +169,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             planner.plan_issues(
-                brief_input=IssuePlannerInput(
-                    run_id="run_001",
-                    generated_at_utc="2026-03-12T00:00:00Z",
-                    evidence_pack=[{"chunk_id": "chunk_1"}],
-                    prior_brief_context=None,
-                )
+                brief_input=_planner_input()
             )
 
 

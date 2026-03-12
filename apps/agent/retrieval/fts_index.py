@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import Any
 
 from apps.agent.pipeline.types import FtsRow
+from apps.agent.storage.sqlite_runtime import runtime_db_path
 
 
 def build_fts_rows(
@@ -51,6 +54,52 @@ def search_fts_rows(
     return matches[:limit]
 
 
+def search_runtime_fts_rows(
+    *,
+    base_dir: Path,
+    query_text: str,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    if not query_text.strip():
+        return []
+
+    connection = sqlite3.connect(runtime_db_path(base_dir=base_dir))
+    try:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT
+              chunk_id,
+              doc_id,
+              publisher,
+              source_id,
+              published_at,
+              text,
+              bm25(chunk_fts) AS score
+            FROM chunk_fts
+            WHERE chunk_fts MATCH ?
+            ORDER BY score, chunk_id
+            LIMIT ?
+            """,
+            (_fts_query(query_text), limit),
+        ).fetchall()
+    finally:
+        connection.close()
+
+    return [
+        {
+            "chunk_id": str(row["chunk_id"]),
+            "doc_id": str(row["doc_id"]),
+            "publisher": str(row["publisher"]),
+            "source_id": str(row["source_id"]),
+            "published_at": row["published_at"],
+            "text": str(row["text"]),
+            "score": abs(float(row["score"])),
+        }
+        for row in rows
+    ]
+
+
 def _validate_chunk_row(chunk_row: Mapping[str, Any]) -> None:
     required_fields = ("chunk_id", "doc_id", "text")
     missing_fields = [
@@ -60,3 +109,8 @@ def _validate_chunk_row(chunk_row: Mapping[str, Any]) -> None:
     ]
     if missing_fields:
         raise ValueError(f"Invalid chunk row for FTS indexing: missing {', '.join(missing_fields)}")
+
+
+def _fts_query(query_text: str) -> str:
+    terms = [term.strip() for term in query_text.split() if term.strip()]
+    return " OR ".join(terms)

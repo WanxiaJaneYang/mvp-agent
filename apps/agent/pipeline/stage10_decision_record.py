@@ -86,6 +86,10 @@ def build_and_persist_decision_record(
     removed_bullets: int,
     budget_snapshot: Mapping[str, Any],
     guardrail_checks: Mapping[str, Any],
+    citation_status: str | None = None,
+    analytical_status: str | None = None,
+    publish_decision: str | None = None,
+    reason_codes: list[str] | None = None,
     output_path: Path | None = None,
     generated_at_utc: str | None = None,
 ) -> dict[str, Any]:
@@ -106,6 +110,10 @@ def build_and_persist_decision_record(
             "text": str(bullet.get("text", "")),
             "citation_ids": citation_ids,
             "coverage_status": "supported" if len(citation_ids) >= 1 else "insufficient_evidence",
+            "why_it_matters": str(bullet.get("why_it_matters") or ""),
+            "novelty_vs_prior_brief": str(
+                bullet.get("novelty_vs_prior_brief") or bullet.get("delta_label") or "unknown"
+            ),
         }
         if claim["section"] not in ALLOWED_CLAIM_SECTIONS:
             continue
@@ -164,6 +172,10 @@ def build_and_persist_decision_record(
         "run_type": run_type,
         "generated_at_utc": timestamp,
         "status": status,
+        "citation_status": citation_status or str(guardrail_checks.get("citation_status") or "ok"),
+        "analytical_status": analytical_status or str(guardrail_checks.get("analytical_status") or "pass"),
+        "publish_decision": publish_decision or str(guardrail_checks.get("publish_decision") or "publish"),
+        "reason_codes": list(reason_codes or guardrail_checks.get("reason_codes", [])),
         "claims": claims,
         "rejected_alternatives": rejected_alternatives,
         "risk_flags": risk_flags,
