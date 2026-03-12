@@ -219,6 +219,8 @@ class DailyBriefBullet(TypedDict, total=False):
     evidence: list["ClaimEvidenceItem"]
     why_it_matters: str
     novelty_vs_prior_brief: DailyBriefNoveltyLabel
+    delta_label: DailyBriefNoveltyLabel
+    delta_explanation: str
 
 class DailyBriefMeta(TypedDict, total=False):
     status: str
@@ -252,6 +254,14 @@ class StructuredClaim(TypedDict):
     confidence: str
     novelty_vs_prior_brief: DailyBriefNoveltyLabel
     why_it_matters: str
+
+
+class ClaimDelta(TypedDict):
+    claim_id: str
+    prior_claim_ref: str | None
+    novelty_label: DailyBriefNoveltyLabel
+    delta_explanation: str
+    supporting_prior_overlap: dict[str, Any]
 
 
 class DailyBriefOverview(TypedDict, total=False):
@@ -430,6 +440,7 @@ class DailyBriefSynthesisStageData:
     issue_overlap_reports: list[IssueOverlapReport]
     information_gain_reports: list[IssueInformationGain]
     structured_claims: list[StructuredClaim]
+    claim_deltas: list[ClaimDelta]
     citation_store: dict[str, CitationStoreEntry]
     stage8_result: CitationValidationResult
     final_result: FinalSynthesisResult

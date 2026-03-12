@@ -19,13 +19,18 @@ def build_prior_brief_context(
     issues = _extract_issue_contexts(previous_synthesis=previous_synthesis)
     claim_summaries = [claim for issue in issues for claim in issue["claim_summaries"]]
     citation_ids = [citation_id for issue in issues for citation_id in issue["citation_ids"]]
+    issue_questions = [issue["issue_question"] for issue in issues]
+    source_refs = [source_ref for issue in issues for source_ref in issue["source_refs"]]
 
     return {
         "previous_generated_at_utc": previous_generated_at_utc,
         "issue_count": len(issues),
+        "issue_questions": issue_questions,
         "issues": issues,
+        "claim_texts": claim_summaries,
         "claim_summaries": claim_summaries,
         "citation_ids": citation_ids,
+        "source_refs": _dedupe_preserve_order(source_refs),
     }
 
 

@@ -32,6 +32,21 @@ The renderer-facing bullet model should preserve these claim-level fields end to
 This PR only adds the claim rendering contract. Later work can extend the same view
 model with delta-specific fields without replacing the contract again.
 
+## Delta Contract
+
+Add a `ClaimDelta` artifact between prior-brief context and changed-section rendering.
+
+Required fields:
+
+- `claim_id`
+- `prior_claim_ref`
+- `novelty_label`
+- `delta_explanation`
+- `supporting_prior_overlap`
+
+The renderer must stop inferring change from bullet text diffs. `What Changed` should
+be produced from `ClaimDelta[]` plus the current structured claims.
+
 ## HTML And Email Changes
 
 - HTML bullets show the claim text plus a novelty label when present
@@ -53,12 +68,14 @@ This keeps editorial semantics available for later diffing, review, and publish-
 1. extend `DailyBriefBullet`
 2. populate the fields in structured synthesis
 3. render the fields in HTML and email
-4. persist the fields in the decision record
+4. add claim-level delta generation and render `What Changed` from delta objects
 5. cover the flow with renderer and pipeline tests
 
 ## Test Plan
 
 - synthesis bullets retain `claim_id`, `claim_kind`, `why_it_matters`, and `novelty_vs_prior_brief`
+- claim deltas preserve prior matches and novelty labels
+- changed-section rendering comes from `ClaimDelta[]` instead of text diff
 - rendered HTML shows novelty labels and why-it-matters callouts
 - email plain text includes simplified novelty plus why-it-matters lines
 - decision records preserve the claim editorial fields

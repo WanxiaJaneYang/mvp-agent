@@ -207,8 +207,10 @@ class HtmlReportTests(unittest.TestCase):
                     "watch": [{"text": "Watch payroll revisions.", "citation_ids": ["cite_004"]}],
                     "changed": [
                         {
-                            "text": "Prevailing changed versus yesterday: Fed kept policy steady.",
+                            "text": "Strengthened: Fed kept policy steady.",
                             "citation_ids": ["cite_001"],
+                            "delta_label": "strengthened",
+                            "delta_explanation": "An additional official release reinforced the same thesis.",
                         }
                     ],
                 },
@@ -222,8 +224,10 @@ class HtmlReportTests(unittest.TestCase):
 
             html = output_path.read_text(encoding="utf-8")
 
-        self.assertIn("Changed Since Yesterday", html)
-        self.assertIn("Prevailing changed versus yesterday", html)
+        self.assertIn("What Changed", html)
+        self.assertIn("Strengthened", html)
+        self.assertIn("Delta", html)
+        self.assertIn("additional official release", html)
 
 
 if __name__ == "__main__":

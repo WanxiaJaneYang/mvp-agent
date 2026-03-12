@@ -31,6 +31,7 @@ from apps.agent.pipeline.types import (
     BulletCitationRow,
     CitationStoreEntry,
     CitationValidationResult,
+    ClaimDelta,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
     DailyBriefSectionBulletRow,
@@ -423,6 +424,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(get_args(corpus_hints["fts_rows"])[0], FtsRow)
 
         self.assertEqual(get_args(synthesis_hints["evidence_pack_items"])[0], EvidencePackItem)
+        self.assertEqual(get_args(synthesis_hints["claim_deltas"])[0], ClaimDelta)
         self.assertEqual(get_args(synthesis_hints["issue_overlap_reports"])[0], IssueOverlapReport)
         self.assertEqual(get_args(synthesis_hints["information_gain_reports"])[0], IssueInformationGain)
         self.assertEqual(get_args(synthesis_hints["citation_store"])[1], CitationStoreEntry)
@@ -617,6 +619,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_dir / "evidence_pack_items.json").exists())
             self.assertTrue((artifact_dir / "issue_overlap_reports.json").exists())
             self.assertTrue((artifact_dir / "information_gain_reports.json").exists())
+            self.assertTrue((artifact_dir / "claim_deltas.json").exists())
             self.assertTrue((artifact_dir / "synthesis_bullets.json").exists())
             self.assertTrue((artifact_dir / "bullet_citations.json").exists())
             self.assertEqual(result["lifecycle"][0]["status"], "running")
@@ -830,11 +833,14 @@ class DailyBriefRunnerTests(unittest.TestCase):
             )
 
             synthesis_payload = json.loads((Path(result["artifact_dir"]) / "synthesis.json").read_text(encoding="utf-8"))
+            claim_deltas_exists = (Path(result["artifact_dir"]) / "claim_deltas.json").exists()
             html = Path(result["html_path"]).read_text(encoding="utf-8")
 
         self.assertIn("changed", synthesis_payload)
         self.assertGreater(len(synthesis_payload["changed"]), 0)
-        self.assertIn("Changed Since Yesterday", html)
+        self.assertTrue(claim_deltas_exists)
+        self.assertIn("What Changed", html)
+        self.assertIn("Delta", html)
 
     def test_run_fixture_daily_brief_persists_budget_preflight_truthfully(self):
         with tempfile.TemporaryDirectory() as tmpdir:
