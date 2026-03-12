@@ -41,6 +41,26 @@ Required fields:
 - `watch_chunk_ids`
 - `coverage_summary`
 
+Add an editorial dedup layer after `IssueMap` generation.
+
+Required `IssueOverlapReport` fields:
+
+- `left_issue_id`
+- `right_issue_id`
+- `question_token_overlap`
+- `citation_overlap`
+- `source_overlap`
+- `thesis_overlap`
+- `decision`
+- `reason_codes`
+
+Required `IssueInformationGain` fields:
+
+- `issue_id`
+- `information_gain_score`
+- `decision`
+- `reason_codes`
+
 ## Runner Changes
 
 The runner should expose an explicit planner stage:
@@ -50,8 +70,18 @@ The runner should expose an explicit planner stage:
 3. generate a `BriefPlan`
 4. derive issue-aware evidence scopes from the corpus
 5. pass `BriefPlan` plus issue-aware evidence scopes into issue planning
+6. run overlap scoring plus minimum information-gain gating before claim composition
 
 The first implementation can use a local planner provider and heuristic corpus summary.
+The first overlap gate can also stay deterministic: token overlap, citation overlap,
+source overlap, and thesis lexical overlap are enough for the initial merge/drop policy.
+
+## Information Gain Policy
+
+- cap retained issues at `issue_budget`
+- merge issues whose question/citation/source/thesis overlap breaches the high-overlap threshold
+- drop issues whose incremental information-gain score falls below the minimum threshold
+- in source-scarce mode, prefer one strong retained issue over filling the budget with restatements
 
 ## Rendering Changes
 
@@ -69,5 +99,7 @@ That is the minimum editorial layer required before the issue cards.
 - source-scarce corpus -> `render_mode=compressed`, `issue_budget=1`
 - issue planner input includes `brief_plan`
 - issue planner input includes `issue_evidence_scopes`
+- high-overlap issues are merged before claim composition
+- low-information-gain issues are dropped before claim composition
 - rendered HTML shows `Bottom line` and `Key takeaways`
 - runtime artifacts persist `brief_plan.json`
