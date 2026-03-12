@@ -1,0 +1,33 @@
+{
+  "id": "literature_review_valid",
+  "type": "literature_review",
+  "synthesis": {
+    "brief": {
+      "bottom_line": "Growth is cooling while policy language remains cautious.",
+      "top_takeaways": [
+        "Growth is cooling.",
+        "Policy language remains cautious."
+      ]
+    },
+    "issues": [
+      {
+        "issue_id": "issue_001",
+        "issue_question": "Will softer growth change near-term Fed expectations?",
+        "prevailing": [
+          {
+            "text": "Softer growth is raising later-cut expectations.",
+            "novelty_vs_prior_brief": "strengthened",
+            "why_it_matters": "Rates can reprice quickly."
+          }
+        ],
+        "counter": [],
+        "minority": [],
+        "watch": []
+      }
+    ]
+  },
+  "expected": {
+    "passes": true,
+    "reason_codes": []
+  }
+}
