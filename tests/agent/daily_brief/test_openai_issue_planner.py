@@ -34,6 +34,18 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
             brief_input=IssuePlannerInput(
                 run_id="run_001",
                 generated_at_utc="2026-03-12T00:00:00Z",
+                brief_plan={
+                    "brief_id": "brief_2026-03-12_run_001",
+                    "brief_thesis": "Supply pressure and softer demand are the two main debates today.",
+                    "top_takeaways": ["Supply pressure remained live."],
+                    "issue_budget": 2,
+                    "render_mode": "full",
+                    "source_scarcity_mode": "normal",
+                    "candidate_issue_seeds": ["supply pressure", "demand softness"],
+                    "issue_order": ["seed_001", "seed_002"],
+                    "watchlist": ["Watch inventories next week."],
+                    "reason_codes": ["two_distinct_debates_supported"],
+                },
                 evidence_pack=[
                     {
                         "chunk_id": "chunk_1",
@@ -82,6 +94,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
         self.assertEqual(captured_request["generated_at_utc"], "2026-03-12T00:00:00Z")
         self.assertEqual(captured_request["response_format"]["type"], "json_schema")
         self.assertEqual(captured_request["messages"][0]["role"], "system")
+        self.assertIn("brief_plan", captured_request["input"])
         self.assertEqual(len(captured_request["input"]["evidence_pack"]), 5)
         self.assertEqual(
             set(captured_request["input"]["evidence_pack"][0]),
@@ -110,6 +123,18 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
             brief_input=IssuePlannerInput(
                 run_id="run_001",
                 generated_at_utc="2026-03-12T00:00:00Z",
+                brief_plan={
+                    "brief_id": "brief_2026-03-12_run_001",
+                    "brief_thesis": "Supply pressure and softer demand are the two main debates today.",
+                    "top_takeaways": ["Supply pressure remained live."],
+                    "issue_budget": 2,
+                    "render_mode": "full",
+                    "source_scarcity_mode": "normal",
+                    "candidate_issue_seeds": ["supply pressure", "demand softness"],
+                    "issue_order": ["seed_001", "seed_002"],
+                    "watchlist": ["Watch inventories next week."],
+                    "reason_codes": ["two_distinct_debates_supported"],
+                },
                 evidence_pack=[
                     {"chunk_id": "chunk_1"},
                     {"chunk_id": "chunk_2"},
@@ -132,6 +157,18 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                 brief_input=IssuePlannerInput(
                     run_id="run_001",
                     generated_at_utc="2026-03-12T00:00:00Z",
+                    brief_plan={
+                        "brief_id": "brief_2026-03-12_run_001",
+                        "brief_thesis": "Supply pressure is the main debate.",
+                        "top_takeaways": [],
+                        "issue_budget": 1,
+                        "render_mode": "compressed",
+                        "source_scarcity_mode": "scarce",
+                        "candidate_issue_seeds": ["supply pressure"],
+                        "issue_order": ["seed_001"],
+                        "watchlist": [],
+                        "reason_codes": ["source_scarcity_detected"],
+                    },
                     evidence_pack=[],
                     prior_brief_context=None,
                 )
@@ -159,6 +196,18 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                 brief_input=IssuePlannerInput(
                     run_id="run_001",
                     generated_at_utc="2026-03-12T00:00:00Z",
+                    brief_plan={
+                        "brief_id": "brief_2026-03-12_run_001",
+                        "brief_thesis": "Supply pressure is the main debate.",
+                        "top_takeaways": [],
+                        "issue_budget": 1,
+                        "render_mode": "compressed",
+                        "source_scarcity_mode": "scarce",
+                        "candidate_issue_seeds": ["supply pressure"],
+                        "issue_order": ["seed_001"],
+                        "watchlist": [],
+                        "reason_codes": ["source_scarcity_detected"],
+                    },
                     evidence_pack=[],
                     prior_brief_context=None,
                 )
@@ -172,6 +221,18 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                 brief_input=IssuePlannerInput(
                     run_id="run_001",
                     generated_at_utc="2026-03-12T00:00:00Z",
+                    brief_plan={
+                        "brief_id": "brief_2026-03-12_run_001",
+                        "brief_thesis": "Supply pressure is the main debate.",
+                        "top_takeaways": [],
+                        "issue_budget": 1,
+                        "render_mode": "compressed",
+                        "source_scarcity_mode": "scarce",
+                        "candidate_issue_seeds": ["supply pressure"],
+                        "issue_order": ["seed_001"],
+                        "watchlist": [],
+                        "reason_codes": ["source_scarcity_detected"],
+                    },
                     evidence_pack=[],
                     prior_brief_context=None,
                 )
@@ -199,6 +260,18 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                 brief_input=IssuePlannerInput(
                     run_id="run_001",
                     generated_at_utc="2026-03-12T00:00:00Z",
+                    brief_plan={
+                        "brief_id": "brief_2026-03-12_run_001",
+                        "brief_thesis": "Supply pressure is the main debate.",
+                        "top_takeaways": [],
+                        "issue_budget": 1,
+                        "render_mode": "compressed",
+                        "source_scarcity_mode": "scarce",
+                        "candidate_issue_seeds": ["supply pressure"],
+                        "issue_order": ["seed_001"],
+                        "watchlist": [],
+                        "reason_codes": ["source_scarcity_detected"],
+                    },
                     evidence_pack=[{"chunk_id": "chunk_1"}],
                     prior_brief_context=None,
                 )

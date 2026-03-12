@@ -15,6 +15,17 @@ class HtmlReportTests(unittest.TestCase):
                 report_date="2026-03-10",
                 run_id="run_daily_fixture",
                 synthesis={
+                    "brief": {
+                        "bottom_line": "Supply pressure and demand softness are the two main debates.",
+                        "top_takeaways": [
+                            "Supply pressure remains live.",
+                            "Demand softness may cap the move.",
+                        ],
+                        "watchlist": ["Watch OPEC guidance next week."],
+                        "render_mode": "full",
+                        "source_scarcity_mode": "normal",
+                        "issue_budget": 2,
+                    },
                     "issues": [
                         {
                             "issue_id": "issue_001",
@@ -79,6 +90,8 @@ class HtmlReportTests(unittest.TestCase):
             html = output_path.read_text(encoding="utf-8")
 
         self.assertEqual(result, output_path)
+        self.assertIn("Bottom Line", html)
+        self.assertIn("Key Takeaways", html)
         self.assertIn("Will oil prices keep rising over the next few weeks?", html)
         self.assertIn("What to Watch", html)
         self.assertIn("Supply disruptions stayed in focus for oil traders.", html)

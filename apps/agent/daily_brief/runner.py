@@ -9,7 +9,9 @@ from pathlib import Path
 from smtplib import SMTP
 from typing import Any, cast
 
+from apps.agent.daily_brief.editorial_planner import LocalBriefPlanner, build_corpus_summary
 from apps.agent.daily_brief.model_interfaces import (
+    BriefPlannerProvider,
     ClaimComposerInput,
     ClaimComposerProvider,
     CriticInput,
@@ -42,6 +44,7 @@ from apps.agent.pipeline.identifiers import build_document_id, build_synthesis_i
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
 from apps.agent.pipeline.types import (
+    BriefPlan,
     BulletCitationRow,
     CitationStoreEntry,
     CitationValidationResult,
@@ -385,6 +388,7 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "documents.json", corpus_data.documents)
     _write_json(artifact_dir / "chunks.json", corpus_data.chunks)
     _write_json(artifact_dir / "fts_rows.json", corpus_data.fts_rows)
+    _write_json(artifact_dir / "brief_plan.json", synthesis_data.brief_plan)
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
     _write_json(artifact_dir / "issue_map.json", synthesis_data.issue_map)
     _write_json(artifact_dir / "claim_objects.json", synthesis_data.structured_claims)
@@ -410,6 +414,7 @@ def _execute_daily_brief_slice(
             "issue_count": len(synthesis_data.issue_map),
             "claim_count": len(synthesis_data.structured_claims),
             "critic_status": None if synthesis_data.critic_report is None else synthesis_data.critic_report["status"],
+            "render_mode": synthesis_data.brief_plan["render_mode"],
             "docs_fetched": context.counters.docs_fetched,
             "docs_ingested": context.counters.docs_ingested,
             "chunks_indexed": context.counters.chunks_indexed,
@@ -542,6 +547,7 @@ def build_daily_brief_synthesis(
     run_id: str,
     generated_at_utc: str | None = None,
     previous_synthesis: Mapping[str, Any] | None = None,
+    brief_planner: BriefPlannerProvider | None = None,
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
@@ -573,11 +579,21 @@ def build_daily_brief_synthesis(
         previous_synthesis=previous_synthesis,
         previous_generated_at_utc=None,
     )
+    brief_plan = _build_brief_plan(
+        evidence_pack_items=evidence_pack_items,
+        documents_by_id=documents_by_id,
+        evidence_pack_report=evidence_pack_report,
+        prior_brief_context=prior_brief_context,
+        brief_planner=brief_planner,
+        run_id=run_id,
+        generated_at_utc=synthesis_generated_at_utc,
+    )
     use_structured_orchestration = issue_planner is not None and claim_composer is not None
     issue_map: list[IssueMap] = []
     structured_claims: list[StructuredClaim] = []
     if use_structured_orchestration:
         issue_map = _build_issue_map(
+            brief_plan=brief_plan,
             query_text=query_text,
             evidence_pack_items=evidence_pack_items,
             issue_planner=issue_planner,
@@ -605,6 +621,7 @@ def build_daily_brief_synthesis(
                 generated_at_utc=synthesis_generated_at_utc,
             )
             synthesis = build_synthesis_from_structured_claims(
+                brief_plan=brief_plan,
                 issue_map=issue_map,
                 structured_claims=structured_claims,
                 citation_store=citation_store,
@@ -617,6 +634,7 @@ def build_daily_brief_synthesis(
                 retry_plan=retry_plan,
             )
             issue_map = _build_issue_map(
+                brief_plan=brief_plan,
                 query_text=query_text,
                 evidence_pack_items=evidence_pack_items,
                 issue_planner=None,
@@ -629,6 +647,7 @@ def build_daily_brief_synthesis(
                 synthesis=flat_synthesis,
             )
             synthesis = build_synthesis_from_structured_claims(
+                brief_plan=brief_plan,
                 issue_map=issue_map,
                 structured_claims=structured_claims,
                 citation_store=citation_store,
@@ -687,6 +706,7 @@ def build_daily_brief_synthesis(
     synthesis_id = build_synthesis_id(run_id=run_id)
     return DailyBriefSynthesisStageData(
         query_text=query_text,
+        brief_plan=brief_plan,
         evidence_pack_items=evidence_pack_items,
         evidence_pack_report=evidence_pack_report,
         issue_map=issue_map,
@@ -704,6 +724,32 @@ def build_daily_brief_synthesis(
             synthesis=final_result["synthesis"],
             synthesis_id=synthesis_id,
         ),
+    )
+
+
+def _build_brief_plan(
+    *,
+    evidence_pack_items: list[EvidencePackItem],
+    documents_by_id: Mapping[str, RuntimeDocumentRecord],
+    evidence_pack_report: Mapping[str, Any],
+    prior_brief_context: Mapping[str, Any] | None,
+    brief_planner: BriefPlannerProvider | None,
+    run_id: str,
+    generated_at_utc: str,
+) -> BriefPlan:
+    corpus_summary = build_corpus_summary(
+        corpus_items=evidence_pack_items,
+        documents_by_id=documents_by_id,
+    )
+    planner = brief_planner or LocalBriefPlanner()
+    return planner.plan_brief(
+        brief_input={
+            "run_id": run_id,
+            "generated_at_utc": generated_at_utc,
+            "corpus_summary": corpus_summary,
+            "source_diversity_stats": dict(evidence_pack_report.get("diversity_stats", {})),
+            "prior_brief_context": None if prior_brief_context is None else dict(prior_brief_context),
+        }
     )
 
 
@@ -766,6 +812,7 @@ def _build_retry_plan(
 
 def _build_issue_map(
     *,
+    brief_plan: BriefPlan,
     query_text: str,
     evidence_pack_items: list[EvidencePackItem],
     issue_planner: IssuePlannerProvider | None,
@@ -778,6 +825,7 @@ def _build_issue_map(
             brief_input=IssuePlannerInput(
                 run_id=run_id,
                 generated_at_utc=generated_at_utc,
+                brief_plan=brief_plan,
                 evidence_pack=[dict(item) for item in evidence_pack_items],
                 prior_brief_context=prior_brief_context,
             )

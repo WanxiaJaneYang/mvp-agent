@@ -607,6 +607,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertTrue(decision_record_path.exists())
             self.assertTrue((artifact_dir / "documents.json").exists())
             self.assertTrue((artifact_dir / "chunks.json").exists())
+            self.assertTrue((artifact_dir / "brief_plan.json").exists())
             self.assertTrue((artifact_dir / "evidence_pack_items.json").exists())
             self.assertTrue((artifact_dir / "synthesis_bullets.json").exists())
             self.assertTrue((artifact_dir / "bullet_citations.json").exists())
@@ -618,8 +619,11 @@ class DailyBriefRunnerTests(unittest.TestCase):
             synthesis_bullets = json.loads((artifact_dir / "synthesis_bullets.json").read_text(encoding="utf-8"))
             bullet_citations = json.loads((artifact_dir / "bullet_citations.json").read_text(encoding="utf-8"))
             run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
+            brief_plan = json.loads((artifact_dir / "brief_plan.json").read_text(encoding="utf-8"))
             self.assertIsInstance(citation_rows, list)
             self.assertEqual(citation_rows[0]["citation_id"], "cite_001")
+            self.assertIn("brief_thesis", brief_plan)
+            self.assertIn("render_mode", brief_plan)
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
             self.assertEqual(
                 bullet_citations[0]["citation_id"],
@@ -627,6 +631,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             )
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
+            self.assertIn(run_summary["render_mode"], {"full", "compressed"})
 
     def test_run_fixture_daily_brief_persists_modeled_rows_to_sqlite(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1138,6 +1143,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
             def plan_issues(self, *, brief_input):
                 call_order.append("planner")
                 test_case.assertEqual(brief_input["generated_at_utc"], "2026-03-10T16:00:00Z")
+                test_case.assertIn("brief_plan", brief_input)
+                test_case.assertEqual(brief_input["brief_plan"]["render_mode"], "full")
                 return [
                     IssueMap(
                         issue_id="issue_001",
@@ -1338,6 +1345,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
 
         self.assertEqual(call_order[:2], ["planner", "composer"])
         self.assertGreaterEqual(call_order.count("composer"), 1)
+        self.assertEqual(synthesis.brief_plan["render_mode"], "full")
         self.assertEqual(synthesis.issue_map[0]["issue_id"], "issue_001")
         self.assertEqual(synthesis.structured_claims[0]["claim_id"], "claim_prevailing")
         self.assertEqual(synthesis.structured_claims[0]["supporting_citation_ids"], ["cite_003"])

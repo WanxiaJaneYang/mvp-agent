@@ -4,6 +4,7 @@ import unittest
 from typing import get_args
 
 from apps.agent.pipeline.types import (
+    BriefPlan,
     DailyBriefClaimKind,
     DailyBriefIssue,
     DailyBriefNoveltyLabel,
@@ -14,6 +15,23 @@ from apps.agent.pipeline.types import (
 
 
 class DailyBriefTypeContractsTests(unittest.TestCase):
+    def test_brief_plan_contract_exposes_required_fields(self) -> None:
+        self.assertEqual(
+            set(BriefPlan.__annotations__),
+            {
+                "brief_id",
+                "brief_thesis",
+                "top_takeaways",
+                "issue_budget",
+                "render_mode",
+                "source_scarcity_mode",
+                "candidate_issue_seeds",
+                "issue_order",
+                "watchlist",
+                "reason_codes",
+            },
+        )
+
     def test_issue_map_contract_exposes_required_fields(self) -> None:
         self.assertEqual(
             set(IssueMap.__annotations__),
@@ -58,7 +76,7 @@ class DailyBriefTypeContractsTests(unittest.TestCase):
                 "watch",
             },
         )
-        self.assertEqual(set(DailyBriefSynthesisV2.__annotations__), {"issues", "meta", "changed"})
+        self.assertEqual(set(DailyBriefSynthesisV2.__annotations__), {"brief", "issues", "meta", "changed"})
 
     def test_literal_vocabularies_match_redesign(self) -> None:
         self.assertEqual(

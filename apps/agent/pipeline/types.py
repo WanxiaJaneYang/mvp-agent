@@ -24,6 +24,8 @@ class RunStatus(str, Enum):
 DailyBriefOutputSection = Literal["prevailing", "counter", "minority", "watch", "changed"]
 DailyBriefClaimKind = Literal["prevailing", "counter", "minority", "watch"]
 DailyBriefNoveltyLabel = Literal["new", "continued", "reframed", "weakened", "strengthened", "reversed", "unknown"]
+DailyBriefRenderMode = Literal["full", "compressed"]
+SourceScarcityMode = Literal["normal", "scarce"]
 CitationValidationStatus = Literal["ok", "partial", "retry"]
 FinalSynthesisStatus = Literal["ok", "partial", "abstained"]
 CriticStatus = Literal["pass", "warn", "fail"]
@@ -142,6 +144,19 @@ class EvidencePackItem(TypedDict):
     doc_id: str
 
 
+class BriefPlan(TypedDict):
+    brief_id: str
+    brief_thesis: str
+    top_takeaways: list[str]
+    issue_budget: int
+    render_mode: DailyBriefRenderMode
+    source_scarcity_mode: SourceScarcityMode
+    candidate_issue_seeds: list[str]
+    issue_order: list[str]
+    watchlist: list[str]
+    reason_codes: list[str]
+
+
 class CitationStoreEntry(TypedDict):
     citation_id: str
     source_id: str
@@ -199,6 +214,15 @@ class StructuredClaim(TypedDict):
     why_it_matters: str
 
 
+class DailyBriefOverview(TypedDict, total=False):
+    bottom_line: str
+    top_takeaways: list[str]
+    watchlist: list[str]
+    render_mode: DailyBriefRenderMode
+    source_scarcity_mode: SourceScarcityMode
+    issue_budget: int
+
+
 class DailyBriefIssue(TypedDict, total=False):
     issue_id: str
     issue_question: str
@@ -211,6 +235,7 @@ class DailyBriefIssue(TypedDict, total=False):
 
 
 class DailyBriefSynthesisV2(TypedDict, total=False):
+    brief: DailyBriefOverview
     issues: list[DailyBriefIssue]
     meta: DailyBriefMeta
     changed: list[DailyBriefBullet]
@@ -355,6 +380,7 @@ class DailyBriefCorpusStageData:
 @dataclass
 class DailyBriefSynthesisStageData:
     query_text: str
+    brief_plan: BriefPlan
     evidence_pack_items: list[EvidencePackItem]
     evidence_pack_report: dict[str, Any]
     issue_map: list[IssueMap]
