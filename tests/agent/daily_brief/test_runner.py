@@ -599,11 +599,18 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertNotIn("slower", query)
 
     def test_run_fixture_daily_brief_writes_expected_artifacts(self):
+        provider_resolution = {
+            "requested_provider": "deterministic",
+            "resolved_provider": "deterministic",
+            "provider_mode": "deterministic",
+            "provider_fallback_used": False,
+        }
         with tempfile.TemporaryDirectory() as tmpdir:
             result = run_fixture_daily_brief(
                 base_dir=Path(tmpdir),
                 run_id="run_fixture_ok",
                 generated_at_utc="2026-03-10T16:00:00Z",
+                provider_resolution=provider_resolution,
             )
 
             html_path = Path(result["html_path"])
@@ -643,6 +650,14 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
             self.assertIn(run_summary["render_mode"], {"full", "compressed"})
+            self.assertEqual(run_summary["requested_provider"], "deterministic")
+            self.assertEqual(run_summary["resolved_provider"], "deterministic")
+            self.assertEqual(run_summary["provider_mode"], "deterministic")
+            self.assertFalse(run_summary["provider_fallback_used"])
+            self.assertEqual(result["requested_provider"], "deterministic")
+            self.assertEqual(result["resolved_provider"], "deterministic")
+            self.assertEqual(result["provider_mode"], "deterministic")
+            self.assertFalse(result["provider_fallback_used"])
 
     def test_run_fixture_daily_brief_persists_modeled_rows_to_sqlite(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1786,6 +1801,12 @@ class DailyBriefRunnerTests(unittest.TestCase):
         planner = _Planner()
         composer = _Composer()
         critic = _Critic()
+        provider_resolution = {
+            "requested_provider": "deterministic",
+            "resolved_provider": "deterministic",
+            "provider_mode": "deterministic",
+            "provider_fallback_used": False,
+        }
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch("apps.agent.daily_brief.runner._execute_daily_brief_slice") as execute_mock:
                 execute_mock.return_value = {
@@ -1806,11 +1827,13 @@ class DailyBriefRunnerTests(unittest.TestCase):
                     issue_planner=planner,
                     claim_composer=composer,
                     critic=critic,
+                    provider_resolution=provider_resolution,
                 )
 
         self.assertIs(execute_mock.call_args.kwargs["issue_planner"], planner)
         self.assertIs(execute_mock.call_args.kwargs["claim_composer"], composer)
         self.assertIs(execute_mock.call_args.kwargs["critic"], critic)
+        self.assertEqual(execute_mock.call_args.kwargs["provider_resolution"], provider_resolution)
 
     def test_run_daily_brief_forwards_opaque_provider_objects_to_execute_slice(self):
         class _Planner(IssuePlannerProvider):
@@ -1828,6 +1851,12 @@ class DailyBriefRunnerTests(unittest.TestCase):
         planner = _Planner()
         composer = _Composer()
         critic = _Critic()
+        provider_resolution = {
+            "requested_provider": "auto",
+            "resolved_provider": "openai",
+            "provider_mode": "model-assisted",
+            "provider_fallback_used": True,
+        }
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch("apps.agent.daily_brief.runner._execute_daily_brief_slice") as execute_mock:
                 execute_mock.return_value = {
@@ -1848,11 +1877,13 @@ class DailyBriefRunnerTests(unittest.TestCase):
                     issue_planner=planner,
                     claim_composer=composer,
                     critic=critic,
+                    provider_resolution=provider_resolution,
                 )
 
         self.assertIs(execute_mock.call_args.kwargs["issue_planner"], planner)
         self.assertIs(execute_mock.call_args.kwargs["claim_composer"], composer)
         self.assertIs(execute_mock.call_args.kwargs["critic"], critic)
+        self.assertEqual(execute_mock.call_args.kwargs["provider_resolution"], provider_resolution)
 
     def test_build_daily_brief_synthesis_calls_critic_after_validation(self):
         class _Critic(CriticProvider):
