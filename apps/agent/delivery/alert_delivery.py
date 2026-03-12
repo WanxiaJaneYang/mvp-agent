@@ -221,9 +221,10 @@ def deliver_runtime_alert(
         channels=channels,
     )
 
-    runtime_status = _runtime_delivery_status(result)
-    delivered_email_at = created_at if "email" in result.delivered_channels else None
-    delivered_local_page_at = created_at if "local_page" in result.delivered_channels else None
+    delivered_email_at = created_at if result.delivery_status == "delivered" and "email" in result.delivered_channels else None
+    delivered_local_page_at = (
+        created_at if result.delivery_status == "delivered" and "local_page" in result.delivered_channels else None
+    )
     db_path = persist_alert_record(
         base_dir=base_dir,
         row={
@@ -233,7 +234,7 @@ def deliver_runtime_alert(
             "title": title,
             "summary": summary,
             "action": policy_decision.action,
-            "delivery_status": runtime_status,
+            "delivery_status": result.delivery_status,
             "score_total": policy_decision.score.total_score,
             "score_importance": policy_decision.score.inputs.importance,
             "score_evidence": policy_decision.score.inputs.evidence_strength,
@@ -255,10 +256,10 @@ def deliver_runtime_alert(
     return AlertDeliveryResult(
         alert_id=result.alert_id,
         action=result.action,
-        delivery_status=runtime_status,
+        delivery_status=result.delivery_status,
         delivery_mode=result.delivery_mode,
         delivered_channels=result.delivered_channels,
-        retry_eligible=runtime_status == "failed",
+        retry_eligible=result.delivery_status in {"partial", "failed"},
         failure_reason=result.failure_reason,
         suppression_reason=result.suppression_reason,
         bundle_item=result.bundle_item,
@@ -286,7 +287,7 @@ def load_alert_policy_context(
             cooldown_minutes=cooldown_minutes,
         )
 
-    delivered_statuses = ("delivered_html_only", "delivered_email_and_html")
+    delivered_statuses = ("delivered", "delivered_html_only", "delivered_email_and_html")
     placeholders = ", ".join("?" for _ in delivered_statuses)
     day_partition = triggered_at[:10]
     connection = sqlite3.connect(db_path)
@@ -392,18 +393,6 @@ def _delivery_mode_for_channels(channels: tuple[str, ...]) -> str:
     if channels == ("local_page",):
         return "local_only"
     return "none"
-
-
-def _runtime_delivery_status(result: AlertDeliveryResult) -> str:
-    if result.delivery_status == "bundled":
-        return "bundled"
-    if result.delivery_status == "suppressed":
-        return "suppressed"
-    if result.delivery_status in {"partial", "failed"}:
-        return "failed"
-    if "email" in result.delivered_channels:
-        return "delivered_email_and_html"
-    return "delivered_html_only"
 
 
 def _render_alert_plain_text(content: AlertDeliveryContent) -> str:

@@ -255,7 +255,8 @@ class AlertDeliveryTests(unittest.TestCase):
             smtp_class=_FakeSMTP,
         )
 
-        self.assertEqual(result.delivery_status, "delivered_email_and_html")
+        self.assertEqual(result.delivery_status, "delivered")
+        self.assertEqual(result.delivery_mode, "email_and_local")
         self.assertFalse(result.retry_eligible)
         self.assertIsNotNone(result.html_path)
         self.assertTrue(Path(result.html_path or "").exists())
@@ -270,7 +271,7 @@ class AlertDeliveryTests(unittest.TestCase):
         finally:
             connection.close()
 
-        self.assertEqual(persisted, ("send", "delivered_email_and_html", None, None))
+        self.assertEqual(persisted, ("send", "delivered", None, None))
 
     def test_deliver_runtime_alert_marks_email_failures_retryable_and_context_ignores_them(self):
         content = _content()
@@ -341,8 +342,9 @@ class AlertDeliveryTests(unittest.TestCase):
                 budget_allowed=True,
             )
 
-        self.assertEqual(ok_result.delivery_status, "delivered_html_only")
-        self.assertEqual(failed_result.delivery_status, "failed")
+        self.assertEqual(ok_result.delivery_status, "delivered")
+        self.assertEqual(ok_result.delivery_mode, "local_only")
+        self.assertEqual(failed_result.delivery_status, "partial")
         self.assertTrue(failed_result.retry_eligible)
         self.assertEqual(context.daily_alerts_sent, 1)
         self.assertEqual(context.last_alert_sent_at, "2026-03-12T08:05:00Z")
