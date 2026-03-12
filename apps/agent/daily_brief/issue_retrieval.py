@@ -7,7 +7,12 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from typing import Any, cast
 
-from apps.agent.pipeline.types import BriefPlan, EvidencePackItem, FtsRow, IssueEvidenceScope
+from apps.agent.pipeline.types import (
+    BriefPlan,
+    EvidencePackItem,
+    IssueEvidenceCoverageSummary,
+    IssueEvidenceScope,
+)
 
 OPPOSING_TERMS = ("against", "challenge", "despite", "however", "question", "push back")
 MINORITY_TERMS = ("contrarian", "dissent", "few", "minority", "outlier")
@@ -37,7 +42,10 @@ def build_brief_corpus_report(
     )
     selected = _select_diverse_rows(rows=rows, pack_size=pack_size)
     items = [_public_item(row=row, rank=index) for index, row in enumerate(selected, start=1)]
-    stats = _coverage_summary([item["chunk_id"] for item in items], rows_by_chunk_id={row["chunk_id"]: row for row in rows})
+    stats = _coverage_summary(
+        [item["chunk_id"] for item in items],
+        rows_by_chunk_id={row["chunk_id"]: row for row in rows},
+    )
     notes: list[str] = []
     if int(stats["unique_publishers"]) < 3:
         notes.append("Corpus diversity is thin; brief may need compressed render mode.")
@@ -93,6 +101,7 @@ def build_issue_evidence_scopes(
         scopes.append(
             IssueEvidenceScope(
                 issue_id=f"issue_{index:03d}",
+                issue_seed=str(seed),
                 primary_chunk_ids=primary_chunk_ids,
                 opposing_chunk_ids=opposing_chunk_ids,
                 minority_chunk_ids=minority_chunk_ids,
@@ -213,7 +222,7 @@ def _issue_coverage_summary(
     chunk_ids: Iterable[str],
     rows_by_chunk_id: Mapping[str, Mapping[str, Any]],
     registry: Mapping[str, Mapping[str, Any]],
-) -> dict[str, Any]:
+) -> IssueEvidenceCoverageSummary:
     rows = [rows_by_chunk_id[chunk_id] for chunk_id in chunk_ids if chunk_id in rows_by_chunk_id]
     source_roles: set[str] = set()
     publishers: set[str] = set()
@@ -255,7 +264,10 @@ def _coverage_summary(
         "tier_3_pct": round((tier_counts[3] / total) * 100, 2) if total else 0.0,
         "tier_4_pct": round((tier_counts[4] / total) * 100, 2) if total else 0.0,
         "tier_1_2_pct": round(((tier_counts[1] + tier_counts[2]) / total) * 100, 2) if total else 0.0,
-        "max_publisher_pct": round((max(Counter(str(row.get("publisher") or "") for row in rows).values()) / total) * 100, 2)
+        "max_publisher_pct": round(
+            (max(Counter(str(row.get("publisher") or "") for row in rows).values()) / total) * 100,
+            2,
+        )
         if total
         else 0.0,
     }

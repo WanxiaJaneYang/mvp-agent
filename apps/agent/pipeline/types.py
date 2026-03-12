@@ -454,7 +454,7 @@ class DailyBriefCorpusStageData:
     documents: list[RuntimeDocumentRecord]
     chunks: list[RuntimeChunkRow]
     fts_rows: list[FtsRow]
-    corpus_items: list[BriefCorpusItem] = field(default_factory=list)
+    corpus_items: list[EvidencePackItem] = field(default_factory=list)
     diversity_stats: dict[str, Any] = field(default_factory=dict)
 
 
@@ -462,7 +462,7 @@ class DailyBriefCorpusStageData:
 class DailyBriefSynthesisStageData:
     query_text: str
     brief_plan: BriefPlan
-    brief_corpus_items: list[BriefCorpusItem]
+    brief_corpus_items: list[EvidencePackItem]
     evidence_pack_items: list[EvidencePackItem]
     evidence_pack_report: dict[str, Any]
     issue_evidence_scopes: list[IssueEvidenceScope]

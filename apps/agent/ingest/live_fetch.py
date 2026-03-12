@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from html.parser import HTMLParser
-from io import StringIO
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
+from io import StringIO
 from typing import Any
 from urllib.request import Request, urlopen
 
@@ -189,7 +189,7 @@ class _HtmlPayloadParser(HTMLParser):
             self._body_depth += 1
         elif tag == "meta":
             self._capture_meta(attributes)
-        elif tag == "link" and attributes.get("rel", "").lower() == "canonical":
+        elif tag == "link" and str(attributes.get("rel") or "").lower() == "canonical":
             self.canonical_url = attributes.get("href")
 
     def handle_endtag(self, tag: str) -> None:

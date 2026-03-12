@@ -4,7 +4,12 @@ import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from apps.agent.pipeline.types import ClaimDelta, DailyBriefBullet, StructuredClaim
+from apps.agent.pipeline.types import (
+    ClaimDelta,
+    DailyBriefBullet,
+    DailyBriefNoveltyLabel,
+    StructuredClaim,
+)
 
 CHANGED_LABELS = {"new", "reframed", "weakened", "strengthened", "reversed"}
 
@@ -16,7 +21,11 @@ def build_claim_deltas(
 ) -> list[ClaimDelta]:
     prior_claims = []
     if isinstance(prior_brief_context, Mapping):
-        prior_claims = [str(value) for value in prior_brief_context.get("claim_summaries", []) if isinstance(value, str)]
+        prior_claims = [
+            str(value)
+            for value in prior_brief_context.get("claim_summaries", [])
+            if isinstance(value, str)
+        ]
 
     deltas: list[ClaimDelta] = []
     for claim in structured_claims:
@@ -24,7 +33,7 @@ def build_claim_deltas(
             claim_text=str(claim["claim_text"]),
             prior_claims=prior_claims,
         )
-        novelty = str(claim.get("novelty_vs_prior_brief") or "unknown")
+        novelty: DailyBriefNoveltyLabel = claim.get("novelty_vs_prior_brief", "unknown")
         if novelty == "unknown":
             novelty = "continued" if overlap >= 0.55 else "new"
         deltas.append(
@@ -55,7 +64,7 @@ def build_changed_section_from_deltas(
     claims_by_id = {str(claim["claim_id"]): claim for claim in structured_claims}
     changed: list[DailyBriefBullet] = []
     for delta in claim_deltas:
-        novelty_label = str(delta["novelty_label"])
+        novelty_label = delta["novelty_label"]
         if novelty_label not in CHANGED_LABELS:
             continue
         claim = claims_by_id.get(str(delta["claim_id"]))
@@ -64,7 +73,7 @@ def build_changed_section_from_deltas(
         changed.append(
             DailyBriefBullet(
                 claim_id=str(claim["claim_id"]),
-                claim_kind=str(claim["claim_kind"]),
+                claim_kind=claim["claim_kind"],
                 text=f"{novelty_label.capitalize()}: {claim['claim_text']}",
                 citation_ids=[str(citation_id) for citation_id in claim.get("supporting_citation_ids", [])],
                 confidence_label=str(claim.get("confidence", "medium")),

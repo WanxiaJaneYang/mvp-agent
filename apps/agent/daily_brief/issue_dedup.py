@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
-from typing import Any
+from typing import Any, cast
 
 from apps.agent.pipeline.types import (
     BriefPlan,
     IssueInformationGain,
+    IssueInformationGainDecision,
     IssueMap,
+    IssueOverlapDecision,
     IssueOverlapReport,
 )
 
@@ -20,7 +22,7 @@ def dedupe_issues(
     issue_map: Iterable[IssueMap],
     brief_plan: BriefPlan,
 ) -> tuple[list[IssueMap], list[IssueOverlapReport], list[IssueInformationGain]]:
-    ordered_issues = [dict(issue) for issue in issue_map]
+    ordered_issues = [cast(IssueMap, dict(issue)) for issue in issue_map]
     kept: list[IssueMap] = []
     overlap_reports: list[IssueOverlapReport] = []
     information_gain_reports: list[IssueInformationGain] = []
@@ -63,7 +65,7 @@ def dedupe_issues(
             continue
 
         info_gain_score = round(1.0 - max_overlap_score, 2)
-        decision = "keep"
+        decision: IssueInformationGainDecision = "keep"
         reason_codes = ["distinct_issue"]
         if kept and info_gain_score < MIN_INFORMATION_GAIN_SCORE:
             decision = "drop"
@@ -93,7 +95,7 @@ def _overlap_report(*, left_issue: Mapping[str, Any], right_issue: Mapping[str, 
         _tokens(str(left_issue.get("thesis_hint") or "")),
         _tokens(str(right_issue.get("thesis_hint") or "")),
     )
-    decision = "keep"
+    decision: IssueOverlapDecision = "keep"
     reason_codes: list[str] = []
     if max(question_overlap, citation_overlap, source_overlap, thesis_overlap_score) >= HIGH_OVERLAP_THRESHOLD:
         decision = "merge"
@@ -128,7 +130,11 @@ def _merge_into(*, target: IssueMap, issue: Mapping[str, Any]) -> None:
         "watch_evidence_ids",
     ):
         merged: list[str] = []
-        for value in list(target.get(field, [])) + list(issue.get(field, [])):
+        target_values = target.get(field, [])
+        issue_values = issue.get(field, [])
+        if not isinstance(target_values, list) or not isinstance(issue_values, list):
+            continue
+        for value in target_values + issue_values:
             if value not in merged:
                 merged.append(str(value))
         target[field] = merged

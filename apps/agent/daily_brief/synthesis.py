@@ -2,20 +2,23 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from apps.agent.pipeline.types import (
-    BriefPlan,
     DAILY_BRIEF_CORE_OUTPUT_SECTIONS,
+    BriefPlan,
     CitationStoreEntry,
     ClaimEvidenceItem,
     DailyBriefBullet,
+    DailyBriefClaimKind,
     DailyBriefIssue,
-    DailyBriefOverview,
+    DailyBriefNoveltyLabel,
     DailyBriefOutputSection,
+    DailyBriefOverview,
     DailyBriefSynthesis,
     DailyBriefSynthesisV2,
     EvidencePackItem,
+    IssueEvidenceCoverageSummary,
     IssueEvidenceScope,
     IssueMap,
     RuntimeChunkRow,
@@ -221,7 +224,15 @@ def build_synthesis_from_structured_claims(
     for issue in issue_map:
         issue_id = str(issue["issue_id"])
         issue_claims = claims_by_issue_id.get(issue_id, [])
-        coverage_summary = scopes_by_issue_id.get(issue_id, {}).get("coverage_summary", {})
+        scope = scopes_by_issue_id.get(issue_id)
+        coverage_summary = (
+            scope["coverage_summary"]
+            if scope is not None
+            else cast(
+                IssueEvidenceCoverageSummary,
+                {"unique_publishers": 0, "source_roles": [], "time_span_hours": 0.0},
+            )
+        )
         issues.append(
             DailyBriefIssue(
                 issue_id=issue_id,
@@ -232,7 +243,7 @@ def build_synthesis_from_structured_claims(
                 counter=_bullets_for_issue(issue_claims, "counter", citation_store),
                 minority=_bullets_for_issue(issue_claims, "minority", citation_store),
                 watch=_bullets_for_issue(issue_claims, "watch", citation_store),
-                coverage_summary=dict(coverage_summary) if isinstance(coverage_summary, Mapping) else {},
+                coverage_summary=coverage_summary,
             )
         )
 
@@ -241,8 +252,8 @@ def build_synthesis_from_structured_claims(
             bottom_line=str(brief_plan.get("brief_thesis") or ""),
             top_takeaways=list(brief_plan.get("top_takeaways", [])),
             watchlist=list(brief_plan.get("watchlist", [])),
-            render_mode=str(brief_plan.get("render_mode", "full")),
-            source_scarcity_mode=str(brief_plan.get("source_scarcity_mode", "normal")),
+            render_mode=brief_plan.get("render_mode", "full"),
+            source_scarcity_mode=brief_plan.get("source_scarcity_mode", "normal"),
         ),
         issues=issues,
         meta={"status": "validated"},
@@ -261,12 +272,15 @@ def _bullets_for_issue(
         supporting_citation_ids = list(claim["supporting_citation_ids"])
         bullet: DailyBriefBullet = {
             "claim_id": str(claim["claim_id"]),
-            "claim_kind": str(claim["claim_kind"]),
+            "claim_kind": cast(DailyBriefClaimKind, str(claim["claim_kind"])),
             "text": str(claim["claim_text"]),
             "citation_ids": supporting_citation_ids,
             "confidence_label": str(claim["confidence"]),
             "why_it_matters": str(claim.get("why_it_matters") or ""),
-            "novelty_vs_prior_brief": str(claim.get("novelty_vs_prior_brief") or "unknown"),
+            "novelty_vs_prior_brief": cast(
+                DailyBriefNoveltyLabel,
+                str(claim.get("novelty_vs_prior_brief") or "unknown"),
+            ),
         }
         evidence = _build_evidence_items(
             citation_ids=supporting_citation_ids,

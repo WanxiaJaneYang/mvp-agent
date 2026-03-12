@@ -6,7 +6,13 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from apps.agent.daily_brief.model_interfaces import BriefPlannerInput, BriefPlannerProvider
-from apps.agent.pipeline.types import BriefPlan, EvidencePackItem, RuntimeDocumentRecord
+from apps.agent.pipeline.types import (
+    BriefPlan,
+    DailyBriefRenderMode,
+    EvidencePackItem,
+    RuntimeDocumentRecord,
+    SourceScarcityMode,
+)
 
 STOPWORDS = {
     "a",
@@ -80,8 +86,8 @@ def plan_brief_locally(
     unique_publishers = int(source_diversity_stats.get("unique_publishers", 0) or 0)
     sparse_corpus = unique_publishers < 3 or len(candidate_issue_seeds) < 2
     issue_budget = 1 if sparse_corpus else 2
-    render_mode = "compressed" if sparse_corpus else "full"
-    scarcity_mode = "scarce" if sparse_corpus else "normal"
+    render_mode: DailyBriefRenderMode = "compressed" if sparse_corpus else "full"
+    scarcity_mode: SourceScarcityMode = "scarce" if sparse_corpus else "normal"
     watchlist = _watchlist(corpus_summary=corpus_summary)
 
     brief_thesis = _brief_thesis(

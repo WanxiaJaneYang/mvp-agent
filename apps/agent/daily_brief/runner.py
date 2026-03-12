@@ -52,8 +52,8 @@ from apps.agent.pipeline.identifiers import build_document_id, build_synthesis_i
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.pipeline.stage10_decision_record import build_and_persist_decision_record
 from apps.agent.pipeline.types import (
-    BulletCitationRow,
     BriefPlan,
+    BulletCitationRow,
     CitationStoreEntry,
     CitationValidationResult,
     ClaimDelta,
@@ -64,13 +64,15 @@ from apps.agent.pipeline.types import (
     DailyBriefSectionBulletRow,
     DailyBriefSynthesis,
     DailyBriefSynthesisStageData,
+    DeliveryMode,
     EvidencePackItem,
+    FtsRow,
     IssueEvidenceScope,
     IssueInformationGain,
-    FtsRow,
     IssueMap,
     IssueOverlapReport,
     PublishDecision,
+    PublishDecisionStatus,
     RunStatus,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
@@ -658,8 +660,8 @@ def build_daily_brief_synthesis(
             pack_size=30,
         )
         evidence_pack_items = _attach_doc_ids(
-            evidence_pack_items=evidence_pack_report["items"],
-            fts_rows=retrieval_rows,
+            evidence_pack_items=cast(list[Mapping[str, Any]], evidence_pack_report["items"]),
+            fts_rows=cast(list[FtsRow], retrieval_rows),
         )
 
     documents_by_id = {str(document["doc_id"]): document for document in stage_data.documents}
@@ -950,8 +952,8 @@ def _build_issue_map(
             brief_input=IssuePlannerInput(
                 run_id=run_id,
                 generated_at_utc=generated_at_utc,
-                brief_plan=dict(brief_plan),
-                issue_evidence_scopes=[dict(scope) for scope in issue_evidence_scopes],
+                brief_plan=brief_plan,
+                issue_evidence_scopes=issue_evidence_scopes,
                 prior_brief_context=prior_brief_context,
             )
         )
@@ -1180,8 +1182,8 @@ def _build_publish_decision(
         analytical_status = str(critic_report["status"])
         reason_codes.extend(str(code) for code in critic_report.get("reason_codes", []))
 
-    publish_decision = "publish"
-    delivery_mode = "email_and_html"
+    publish_decision: PublishDecisionStatus = "publish"
+    delivery_mode: DeliveryMode = "email_and_html"
     if citation_status == "abstained" or analytical_status == "fail":
         publish_decision = "hold"
         delivery_mode = "html_only"

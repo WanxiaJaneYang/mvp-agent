@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from json import JSONDecodeError
 from typing import Any, cast
 
@@ -107,7 +107,7 @@ def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
     }
 
 
-def _normalize_issue_scope(item: dict[str, Any]) -> dict[str, Any]:
+def _normalize_issue_scope(item: Mapping[str, Any]) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     for field in (
         "issue_id",
@@ -122,7 +122,9 @@ def _normalize_issue_scope(item: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _normalize_prior_brief_context(prior_brief_context: dict[str, Any] | None) -> dict[str, Any] | None:
+def _normalize_prior_brief_context(
+    prior_brief_context: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
     if prior_brief_context is None:
         return None
 
@@ -178,7 +180,10 @@ def _extract_evidence_ids(brief_input: IssuePlannerInput) -> set[str]:
             "minority_chunk_ids",
             "watch_chunk_ids",
         ):
-            for chunk_id in scope.get(field, []):
+            values = scope.get(field)
+            if not isinstance(values, list):
+                continue
+            for chunk_id in values:
                 if isinstance(chunk_id, str) and chunk_id:
                     evidence_ids.add(chunk_id)
     return evidence_ids
