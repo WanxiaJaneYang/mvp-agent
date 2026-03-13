@@ -1,6 +1,14 @@
+import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
-from apps.agent.retrieval.evidence_pack import build_evidence_pack, build_evidence_pack_report
+from apps.agent.retrieval.evidence_pack import (
+    build_evidence_pack,
+    build_evidence_pack_report,
+    build_persistent_hybrid_evidence_pack_report,
+)
+from apps.agent.retrieval.fts_index import persist_fts_rows
 
 
 class EvidencePackTests(unittest.TestCase):
@@ -306,6 +314,173 @@ class EvidencePackTests(unittest.TestCase):
         self.assertEqual(pack[1]["chunk_id"], "chunk_002")
         self.assertEqual(pack[0]["recency_score"], 0.0)
         self.assertEqual(pack[1]["recency_score"], 1.0)
+
+    def test_persistent_hybrid_report_combines_lexical_and_semantic_scores(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "hybrid.sqlite3"
+            connection = sqlite3.connect(db_path)
+            try:
+                persist_fts_rows(
+                    connection=connection,
+                    fts_rows=[
+                        {
+                            "chunk_id": "chunk_001",
+                            "doc_id": "doc_001",
+                            "text": "inflation inflation inflation outlook",
+                            "source_id": "src_a",
+                            "publisher": "Reuters",
+                            "published_at": "2026-03-09T10:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.05,
+                        },
+                        {
+                            "chunk_id": "chunk_002",
+                            "doc_id": "doc_002",
+                            "text": "inflation outlook turns more durable",
+                            "source_id": "src_b",
+                            "publisher": "Federal Reserve",
+                            "published_at": "2026-03-10T10:00:00Z",
+                            "credibility_tier": 1,
+                            "semantic_score": 0.95,
+                        },
+                    ],
+                )
+
+                report = build_persistent_hybrid_evidence_pack_report(
+                    connection=connection,
+                    query_text="inflation outlook",
+                    pack_size=2,
+                )
+            finally:
+                connection.close()
+
+        self.assertEqual([item["chunk_id"] for item in report["items"]], ["chunk_002", "chunk_001"])
+        self.assertGreater(report["items"][0]["retrieval_score"], report["items"][1]["retrieval_score"])
+        self.assertEqual(report["items"][0]["semantic_score"], 0.95)
+
+    def test_persistent_hybrid_report_is_deterministic_and_bounded(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "hybrid-bounded.sqlite3"
+            connection = sqlite3.connect(db_path)
+            try:
+                persist_fts_rows(
+                    connection=connection,
+                    fts_rows=[
+                        {
+                            "chunk_id": "chunk_003",
+                            "doc_id": "doc_003",
+                            "text": "inflation path",
+                            "source_id": "src_c",
+                            "publisher": "C",
+                            "published_at": "2026-03-10T09:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.4,
+                        },
+                        {
+                            "chunk_id": "chunk_001",
+                            "doc_id": "doc_001",
+                            "text": "inflation path",
+                            "source_id": "src_a",
+                            "publisher": "A",
+                            "published_at": "2026-03-10T09:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.4,
+                        },
+                        {
+                            "chunk_id": "chunk_002",
+                            "doc_id": "doc_002",
+                            "text": "inflation path",
+                            "source_id": "src_b",
+                            "publisher": "B",
+                            "published_at": "2026-03-10T09:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.4,
+                        },
+                    ],
+                )
+
+                report = build_persistent_hybrid_evidence_pack_report(
+                    connection=connection,
+                    query_text="inflation",
+                    pack_size=2,
+                )
+            finally:
+                connection.close()
+
+        self.assertEqual(len(report["items"]), 2)
+        self.assertEqual([item["chunk_id"] for item in report["items"]], ["chunk_001", "chunk_002"])
+
+    def test_persistent_hybrid_report_considers_all_lexical_matches_before_bounding(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "hybrid-all-matches.sqlite3"
+            connection = sqlite3.connect(db_path)
+            try:
+                persist_fts_rows(
+                    connection=connection,
+                    fts_rows=[
+                        {
+                            "chunk_id": "chunk_001",
+                            "doc_id": "doc_001",
+                            "text": "inflation inflation outlook base case",
+                            "source_id": "src_a",
+                            "publisher": "A",
+                            "published_at": "2026-03-08T10:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.10,
+                        },
+                        {
+                            "chunk_id": "chunk_002",
+                            "doc_id": "doc_002",
+                            "text": "inflation inflation outlook policy view",
+                            "source_id": "src_b",
+                            "publisher": "B",
+                            "published_at": "2026-03-08T09:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.10,
+                        },
+                        {
+                            "chunk_id": "chunk_003",
+                            "doc_id": "doc_003",
+                            "text": "inflation inflation outlook market view",
+                            "source_id": "src_c",
+                            "publisher": "C",
+                            "published_at": "2026-03-08T08:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.10,
+                        },
+                        {
+                            "chunk_id": "chunk_004",
+                            "doc_id": "doc_004",
+                            "text": "inflation inflation outlook risk view",
+                            "source_id": "src_d",
+                            "publisher": "D",
+                            "published_at": "2026-03-08T07:00:00Z",
+                            "credibility_tier": 2,
+                            "semantic_score": 0.10,
+                        },
+                        {
+                            "chunk_id": "chunk_005",
+                            "doc_id": "doc_005",
+                            "text": "inflation outlook structural turn",
+                            "source_id": "src_e",
+                            "publisher": "Federal Reserve",
+                            "published_at": "2026-03-10T10:00:00Z",
+                            "credibility_tier": 1,
+                            "semantic_score": 0.99,
+                        },
+                    ],
+                )
+
+                report = build_persistent_hybrid_evidence_pack_report(
+                    connection=connection,
+                    query_text="inflation outlook",
+                    pack_size=1,
+                    search_limit=4,
+                )
+            finally:
+                connection.close()
+
+        self.assertEqual([item["chunk_id"] for item in report["items"]], ["chunk_005"])
 
 
 if __name__ == "__main__":
