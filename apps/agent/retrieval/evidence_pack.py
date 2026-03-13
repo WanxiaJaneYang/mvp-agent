@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import math
 import re
+import sqlite3
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from typing import Any
+
+from apps.agent.retrieval.fts_index import FTS_TABLE_NAME, search_persisted_fts_rows
 
 
 def build_evidence_pack(
@@ -81,6 +84,34 @@ def build_evidence_pack_report(
     }
 
 
+def build_persistent_hybrid_evidence_pack_report(
+    *,
+    connection: sqlite3.Connection,
+    query_text: str,
+    pack_size: int = 30,
+    search_limit: int | None = None,
+) -> dict[str, Any]:
+    effective_search_limit = search_limit or max(pack_size * 4, pack_size)
+    lexical_rows = search_persisted_fts_rows(
+        connection=connection,
+        query_text=query_text,
+        limit=effective_search_limit,
+    )
+    semantic_rows = _load_top_semantic_rows(
+        connection=connection,
+        limit=effective_search_limit,
+    )
+    persisted_rows = _merge_hybrid_candidate_rows(
+        lexical_rows=lexical_rows,
+        semantic_rows=semantic_rows,
+    )
+    return build_evidence_pack_report(
+        fts_rows=persisted_rows,
+        query_text=query_text,
+        pack_size=pack_size,
+    )
+
+
 def _tokenize(value: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", value.lower())
 
@@ -96,8 +127,14 @@ def _matching_rows(
     matching_rows: list[dict[str, Any]] = []
     for row in fts_rows:
         _validate_row(row)
-        keyword_score = _keyword_score(text=str(row["text"]), query_terms=query_terms)
-        if keyword_score <= 0:
+        lexical_score = row.get("lexical_score")
+        uses_precomputed_lexical = lexical_score not in (None, "")
+        keyword_score = (
+            float(lexical_score)
+            if uses_precomputed_lexical
+            else _keyword_score(text=str(row["text"]), query_terms=query_terms)
+        )
+        if not uses_precomputed_lexical and keyword_score <= 0:
             continue
         matching_rows.append(
             {
@@ -124,9 +161,22 @@ def _score_rows(
             newest_timestamp=newest_timestamp,
         )
         credibility_score = _credibility_score(int(row["credibility_tier"]))
-        retrieval_score = round(
-            float(match["keyword_score"]) * 0.5 + recency_score * 0.3 + credibility_score * 0.2, 6
-        )
+        semantic_score = _normalized_optional_score(row.get("semantic_score"))
+        if row.get("lexical_score") not in (None, ""):
+            retrieval_score = round(
+                float(match["keyword_score"]) * 0.35
+                + semantic_score * 0.45
+                + recency_score * 0.10
+                + credibility_score * 0.10,
+                6,
+            )
+            public_semantic_score: float | None = semantic_score
+        else:
+            retrieval_score = round(
+                float(match["keyword_score"]) * 0.5 + recency_score * 0.3 + credibility_score * 0.2,
+                6,
+            )
+            public_semantic_score = None
         scored_rows.append(
             {
                 "chunk_id": row["chunk_id"],
@@ -134,7 +184,7 @@ def _score_rows(
                 "publisher": row["publisher"],
                 "credibility_tier": row["credibility_tier"],
                 "retrieval_score": retrieval_score,
-                "semantic_score": None,
+                "semantic_score": public_semantic_score,
                 "recency_score": recency_score,
                 "credibility_score": credibility_score,
                 "_published_timestamp": match["published_timestamp"],
@@ -331,3 +381,73 @@ def _validate_row(row: Mapping[str, Any]) -> None:
     missing_fields = [field for field in required_fields if row.get(field) in (None, "")]
     if missing_fields:
         raise ValueError(f"Invalid evidence-pack row: missing {', '.join(missing_fields)}")
+
+
+def _normalized_optional_score(value: Any) -> float:
+    if value in (None, ""):
+        return 0.0
+    score = float(value)
+    return min(1.0, max(0.0, score))
+
+
+def _load_top_semantic_rows(
+    *,
+    connection: sqlite3.Connection,
+    limit: int,
+) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
+    cursor = connection.execute(
+        f"""
+        SELECT
+          chunk_id,
+          doc_id,
+          publisher,
+          source_id,
+          published_at,
+          credibility_tier,
+          semantic_score,
+          text
+        FROM {FTS_TABLE_NAME}
+        WHERE COALESCE(semantic_score, 0.0) > 0.0
+        ORDER BY COALESCE(semantic_score, 0.0) DESC, chunk_id ASC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    columns = [column[0] for column in cursor.description or []]
+    rows = [dict(zip(columns, row, strict=False)) for row in cursor.fetchall()]
+    return [
+        {
+            "chunk_id": row["chunk_id"],
+            "doc_id": row["doc_id"],
+            "publisher": row["publisher"],
+            "source_id": row["source_id"],
+            "published_at": row["published_at"],
+            "credibility_tier": int(row["credibility_tier"]),
+            "semantic_score": _normalized_optional_score(row["semantic_score"]),
+            "lexical_score": 0.0,
+            "text": row["text"],
+        }
+        for row in rows
+    ]
+
+
+def _merge_hybrid_candidate_rows(
+    *,
+    lexical_rows: Iterable[Mapping[str, Any]],
+    semantic_rows: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for row in lexical_rows:
+        chunk_id = str(row["chunk_id"])
+        merged[chunk_id] = dict(row)
+    for row in semantic_rows:
+        chunk_id = str(row["chunk_id"])
+        if chunk_id not in merged:
+            merged[chunk_id] = dict(row)
+            continue
+        merged[chunk_id]["semantic_score"] = _normalized_optional_score(
+            row.get("semantic_score", merged[chunk_id].get("semantic_score"))
+        )
+    return list(merged.values())
