@@ -103,6 +103,21 @@ def persist_daily_brief_runtime(
     return db_path
 
 
+def persist_alert_record(
+    *,
+    base_dir: Path,
+    row: Mapping[str, Any],
+) -> Path:
+    db_path = ensure_runtime_db(base_dir=base_dir)
+    connection = sqlite3.connect(db_path)
+    try:
+        _persist_alerts(connection, rows=[dict(row)])
+        connection.commit()
+    finally:
+        connection.close()
+    return db_path
+
+
 def _initialize_schema(connection: sqlite3.Connection) -> None:
     connection.execute("PRAGMA foreign_keys = ON")
     statements = (
@@ -302,6 +317,32 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           risk_flag TEXT NOT NULL,
           rationale TEXT,
           created_at TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS alerts (
+          alert_id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          category TEXT NOT NULL,
+          title TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          action TEXT NOT NULL,
+          delivery_status TEXT NOT NULL,
+          score_total REAL NOT NULL,
+          score_importance REAL NOT NULL,
+          score_evidence REAL NOT NULL,
+          score_confidence REAL NOT NULL,
+          score_relevance REAL NOT NULL,
+          score_noise_risk REAL NOT NULL,
+          triggered_at TEXT NOT NULL,
+          delivered_email_at TEXT,
+          delivered_local_page_at TEXT,
+          bundle_for_daily_brief INTEGER NOT NULL DEFAULT 0,
+          suppression_reason TEXT,
+          failure_reason TEXT,
+          html_path TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
         )
         """,
     )
@@ -676,6 +717,48 @@ def _persist_relevance_flags(
           risk_flag=excluded.risk_flag,
           rationale=excluded.rationale,
           created_at=excluded.created_at
+        """,
+        rows,
+    )
+
+
+def _persist_alerts(connection: sqlite3.Connection, *, rows: list[dict[str, Any]]) -> None:
+    connection.executemany(
+        """
+        INSERT INTO alerts (
+          alert_id, run_id, category, title, summary, action, delivery_status,
+          score_total, score_importance, score_evidence, score_confidence,
+          score_relevance, score_noise_risk, triggered_at, delivered_email_at,
+          delivered_local_page_at, bundle_for_daily_brief, suppression_reason,
+          failure_reason, html_path, created_at, updated_at
+        ) VALUES (
+          :alert_id, :run_id, :category, :title, :summary, :action, :delivery_status,
+          :score_total, :score_importance, :score_evidence, :score_confidence,
+          :score_relevance, :score_noise_risk, :triggered_at, :delivered_email_at,
+          :delivered_local_page_at, :bundle_for_daily_brief, :suppression_reason,
+          :failure_reason, :html_path, :created_at, :updated_at
+        )
+        ON CONFLICT(alert_id) DO UPDATE SET
+          run_id=excluded.run_id,
+          category=excluded.category,
+          title=excluded.title,
+          summary=excluded.summary,
+          action=excluded.action,
+          delivery_status=excluded.delivery_status,
+          score_total=excluded.score_total,
+          score_importance=excluded.score_importance,
+          score_evidence=excluded.score_evidence,
+          score_confidence=excluded.score_confidence,
+          score_relevance=excluded.score_relevance,
+          score_noise_risk=excluded.score_noise_risk,
+          triggered_at=excluded.triggered_at,
+          delivered_email_at=excluded.delivered_email_at,
+          delivered_local_page_at=excluded.delivered_local_page_at,
+          bundle_for_daily_brief=excluded.bundle_for_daily_brief,
+          suppression_reason=excluded.suppression_reason,
+          failure_reason=excluded.failure_reason,
+          html_path=excluded.html_path,
+          updated_at=excluded.updated_at
         """,
         rows,
     )
