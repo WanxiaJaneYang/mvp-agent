@@ -33,15 +33,15 @@ def dedupe_issues(
         duplicate_target: IssueMap | None = None
         max_overlap_score = 0.0
         for kept_issue in kept:
-            report = _overlap_report(left_issue=kept_issue, right_issue=issue)
-            overlap_reports.append(report)
+            overlap_report = _overlap_report(left_issue=kept_issue, right_issue=issue)
+            overlap_reports.append(overlap_report)
             report_score = max(
-                float(report["question_token_overlap"]),
-                float(report["citation_overlap"]),
-                float(report["source_overlap"]),
+                float(overlap_report["question_token_overlap"]),
+                float(overlap_report["citation_overlap"]),
+                float(overlap_report["source_overlap"]),
             )
             max_overlap_score = max(max_overlap_score, report_score)
-            if report["decision"] == "merge":
+            if overlap_report["decision"] == "merge":
                 duplicate_target = kept_issue
                 break
 
@@ -63,14 +63,14 @@ def dedupe_issues(
         if kept and info_gain_score < MIN_INFORMATION_GAIN_SCORE:
             decision = "drop"
             reason_codes = ["low_incremental_value", "restates_existing_issue"]
-        report = IssueInformationGain(
+        info_report = IssueInformationGain(
             issue_id=str(issue["issue_id"]),
             information_gain_score=info_gain_score,
             decision=decision,
             reason_codes=reason_codes,
         )
-        information_gain_reports.append(report)
-        information_gain_by_issue_id[str(issue["issue_id"])] = report
+        information_gain_reports.append(info_report)
+        information_gain_by_issue_id[str(issue["issue_id"])] = info_report
         if decision == "keep":
             kept.append(issue)
             kept_scores[str(issue["issue_id"])] = (
@@ -87,11 +87,11 @@ def dedupe_issues(
         )
         kept_issue_ids = {str(issue["issue_id"]) for issue in kept[:issue_budget]}
         for issue in kept[issue_budget:]:
-            report = information_gain_by_issue_id.get(str(issue["issue_id"]))
-            if report is None:
+            budget_report = information_gain_by_issue_id.get(str(issue["issue_id"]))
+            if budget_report is None:
                 continue
-            report["decision"] = "drop"
-            report["reason_codes"] = ["issue_budget_exceeded"]
+            budget_report["decision"] = "drop"
+            budget_report["reason_codes"] = ["issue_budget_exceeded"]
         kept = [issue for issue in kept if str(issue["issue_id"]) in kept_issue_ids]
 
     return kept, overlap_reports, information_gain_reports
