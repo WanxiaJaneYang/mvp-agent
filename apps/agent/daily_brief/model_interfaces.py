@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, TypedDict
 
-from apps.agent.pipeline.types import BriefPlan, CriticReport, IssueMap, StructuredClaim
+from apps.agent.pipeline.types import BriefPlan, CriticReport, IssueEvidenceScope, IssueMap, StructuredClaim
 
 
 class BriefPlannerInput(TypedDict):
@@ -17,7 +17,7 @@ class IssuePlannerInput(TypedDict):
     run_id: str
     generated_at_utc: str
     brief_plan: BriefPlan
-    evidence_pack: list[dict[str, Any]]
+    issue_evidence_scopes: list[IssueEvidenceScope]
     prior_brief_context: dict[str, Any] | None
 
 

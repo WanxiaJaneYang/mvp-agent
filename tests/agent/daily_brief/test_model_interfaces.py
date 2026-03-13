@@ -52,7 +52,7 @@ class DailyBriefModelInterfaceTests(unittest.TestCase):
         )
         self.assertEqual(
             set(IssuePlannerInput.__annotations__),
-            {"run_id", "generated_at_utc", "brief_plan", "evidence_pack", "prior_brief_context"},
+            {"run_id", "generated_at_utc", "brief_plan", "issue_evidence_scopes", "prior_brief_context"},
         )
         self.assertEqual(
             set(ClaimComposerInput.__annotations__),

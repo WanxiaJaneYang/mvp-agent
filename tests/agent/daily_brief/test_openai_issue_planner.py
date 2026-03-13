@@ -46,39 +46,19 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                     "watchlist": ["Watch inventories next week."],
                     "reason_codes": ["two_distinct_debates_supported"],
                 },
-                evidence_pack=[
+                issue_evidence_scopes=[
                     {
-                        "chunk_id": "chunk_1",
-                        "doc_id": "doc_1",
-                        "publisher": "Reuters",
-                        "title": "Oil rises on supply concerns",
-                        "text": "Supply concerns kept oil prices supported as traders watched shipping disruptions.",
-                        "retrieval_score": 0.91,
-                    },
-                    {
-                        "chunk_id": "chunk_2",
-                        "doc_id": "doc_2",
-                        "publisher": "WSJ",
-                        "text": "Refiners are watching inventory pressure.",
-                    },
-                    {
-                        "chunk_id": "chunk_3",
-                        "doc_id": "doc_3",
-                        "publisher": "BLS",
-                        "text": "Demand indicators softened.",
-                    },
-                    {
-                        "chunk_id": "chunk_4",
-                        "doc_id": "doc_4",
-                        "publisher": "BEA",
-                        "text": "Long-term consumption remains firm.",
-                    },
-                    {
-                        "chunk_id": "chunk_5",
-                        "doc_id": "doc_5",
-                        "publisher": "EIA",
-                        "text": "Watch inventory data next week.",
-                    },
+                        "issue_id": "issue_oil",
+                        "primary_chunk_ids": ["chunk_1", "chunk_2"],
+                        "opposing_chunk_ids": ["chunk_3"],
+                        "minority_chunk_ids": ["chunk_4"],
+                        "watch_chunk_ids": ["chunk_5"],
+                        "coverage_summary": {
+                            "unique_publishers": 5,
+                            "source_roles": ["official", "market_media"],
+                            "time_span_hours": 18,
+                        },
+                    }
                 ],
                 prior_brief_context={
                     "prior_issue_questions": ["Will oil prices keep rising?"],
@@ -98,10 +78,17 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
         self.assertIn("up to 2 issue-centered", captured_request["messages"][1]["content"])
         self.assertEqual(captured_request["response_format"]["json_schema"]["schema"]["maxItems"], 2)
         self.assertIn("brief_plan", captured_request["input"])
-        self.assertEqual(len(captured_request["input"]["evidence_pack"]), 5)
+        self.assertEqual(len(captured_request["input"]["issue_evidence_scopes"]), 1)
         self.assertEqual(
-            set(captured_request["input"]["evidence_pack"][0]),
-            {"chunk_id", "doc_id", "publisher", "title", "text", "retrieval_score"},
+            set(captured_request["input"]["issue_evidence_scopes"][0]),
+            {
+                "issue_id",
+                "primary_chunk_ids",
+                "opposing_chunk_ids",
+                "minority_chunk_ids",
+                "watch_chunk_ids",
+                "coverage_summary",
+            },
         )
         self.assertLessEqual(len(captured_request["input"]["prior_brief_context"]["oversized"]), 240)
 
@@ -139,7 +126,20 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                     "watchlist": [],
                     "reason_codes": ["source_scarcity_detected"],
                 },
-                evidence_pack=[{"chunk_id": "chunk_1"}],
+                issue_evidence_scopes=[
+                    {
+                        "issue_id": "issue_oil",
+                        "primary_chunk_ids": ["chunk_1"],
+                        "opposing_chunk_ids": [],
+                        "minority_chunk_ids": [],
+                        "watch_chunk_ids": [],
+                        "coverage_summary": {
+                            "unique_publishers": 1,
+                            "source_roles": ["market_media"],
+                            "time_span_hours": 0,
+                        },
+                    }
+                ],
                 prior_brief_context=None,
             )
         )
@@ -180,12 +180,19 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                     "watchlist": ["Watch inventories next week."],
                     "reason_codes": ["two_distinct_debates_supported"],
                 },
-                evidence_pack=[
-                    {"chunk_id": "chunk_1"},
-                    {"chunk_id": "chunk_2"},
-                    {"chunk_id": "chunk_3"},
-                    {"chunk_id": "chunk_4"},
-                    {"chunk_id": "chunk_5"},
+                issue_evidence_scopes=[
+                    {
+                        "issue_id": "issue_oil",
+                        "primary_chunk_ids": ["chunk_1", "chunk_2"],
+                        "opposing_chunk_ids": ["chunk_3"],
+                        "minority_chunk_ids": ["chunk_4"],
+                        "watch_chunk_ids": ["chunk_5"],
+                        "coverage_summary": {
+                            "unique_publishers": 5,
+                            "source_roles": ["official", "market_media"],
+                            "time_span_hours": 18,
+                        },
+                    }
                 ],
                 prior_brief_context=None,
             )
@@ -214,7 +221,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                         "watchlist": [],
                         "reason_codes": ["source_scarcity_detected"],
                     },
-                    evidence_pack=[],
+                    issue_evidence_scopes=[],
                     prior_brief_context=None,
                 )
             )
@@ -253,7 +260,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                         "watchlist": [],
                         "reason_codes": ["source_scarcity_detected"],
                     },
-                    evidence_pack=[],
+                    issue_evidence_scopes=[],
                     prior_brief_context=None,
                 )
             )
@@ -278,7 +285,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                         "watchlist": [],
                         "reason_codes": ["source_scarcity_detected"],
                     },
-                    evidence_pack=[],
+                    issue_evidence_scopes=[],
                     prior_brief_context=None,
                 )
             )
@@ -317,7 +324,20 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                         "watchlist": [],
                         "reason_codes": ["source_scarcity_detected"],
                     },
-                    evidence_pack=[{"chunk_id": "chunk_1"}],
+                    issue_evidence_scopes=[
+                        {
+                            "issue_id": "issue_oil",
+                            "primary_chunk_ids": ["chunk_1"],
+                            "opposing_chunk_ids": [],
+                            "minority_chunk_ids": [],
+                            "watch_chunk_ids": [],
+                            "coverage_summary": {
+                                "unique_publishers": 1,
+                                "source_roles": ["market_media"],
+                                "time_span_hours": 0,
+                            },
+                        }
+                    ],
                     prior_brief_context=None,
                 )
             )
