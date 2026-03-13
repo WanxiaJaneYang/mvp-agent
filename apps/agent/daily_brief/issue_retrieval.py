@@ -4,7 +4,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, cast
 
 from apps.agent.pipeline.types import (
@@ -73,7 +73,11 @@ def build_issue_evidence_scopes(
         scored_chunk_ids = _rank_chunks_for_seed(seed=seed, corpus_items=corpus_list, rows_by_chunk_id=rows_by_chunk_id)
         primary_chunk_ids = [chunk_id for chunk_id in scored_chunk_ids if chunk_id not in used_chunk_ids][:3]
         if not primary_chunk_ids:
-            primary_chunk_ids = [chunk_id for chunk_id in scored_chunk_ids[:2]]
+            primary_chunk_ids = _unused_chunk_ids(
+                corpus_items=corpus_list,
+                used_chunk_ids=used_chunk_ids,
+                limit=2,
+            )
         used_chunk_ids.update(primary_chunk_ids)
 
         opposing_chunk_ids = _bucket_chunk_ids(
@@ -113,7 +117,7 @@ def build_issue_evidence_scopes(
                 ),
             )
         )
-    return scopes[: max(1, int(brief_plan["issue_budget"]) + 1)]
+    return scopes[: max(1, int(brief_plan["issue_budget"]))]
 
 
 def _normalized_row(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -217,6 +221,23 @@ def _bucket_chunk_ids(
     return bucket
 
 
+def _unused_chunk_ids(
+    *,
+    corpus_items: Iterable[EvidencePackItem],
+    used_chunk_ids: set[str],
+    limit: int,
+) -> list[str]:
+    unused: list[str] = []
+    for item in corpus_items:
+        chunk_id = str(item["chunk_id"])
+        if chunk_id in used_chunk_ids or chunk_id in unused:
+            continue
+        unused.append(chunk_id)
+        if len(unused) >= limit:
+            break
+    return unused
+
+
 def _issue_coverage_summary(
     *,
     chunk_ids: Iterable[str],
@@ -291,4 +312,4 @@ def _published_timestamp(value: Any) -> float:
     try:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
     except ValueError:
-        return datetime.now(timezone.utc).timestamp()
+        return 0.0
