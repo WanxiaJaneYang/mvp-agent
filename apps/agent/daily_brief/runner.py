@@ -1508,6 +1508,8 @@ def _persist_run_state(
                 chunks=[],
                 evidence_pack_items=[],
                 evidence_pack_report={"diversity_stats": {}},
+                issue_map_rows=[],
+                structured_claim_rows=[],
                 citation_rows=[],
                 synthesis_rows=[],
                 bullet_citation_rows=[],
@@ -1519,6 +1521,10 @@ def _persist_run_state(
         chunks = json.loads((artifact_dir / "chunks.json").read_text(encoding="utf-8"))
         evidence_pack_items = json.loads(
             (artifact_dir / "evidence_pack_items.json").read_text(encoding="utf-8")
+        )
+        issue_map = json.loads((artifact_dir / "issue_map.json").read_text(encoding="utf-8"))
+        structured_claims = json.loads(
+            (artifact_dir / "claim_objects.json").read_text(encoding="utf-8")
         )
         citations = json.loads((artifact_dir / "citations.json").read_text(encoding="utf-8"))
         synthesis_bullets = json.loads(
@@ -1541,6 +1547,8 @@ def _persist_run_state(
             chunks=chunks,
             evidence_pack_items=evidence_pack_items,
             evidence_pack_report={"diversity_stats": run_summary.get("diversity_stats", {})},
+            issue_map_rows=issue_map,
+            structured_claim_rows=structured_claims,
             citation_rows=citations,
             synthesis_rows=synthesis_bullets,
             bullet_citation_rows=bullet_citations,
@@ -1559,6 +1567,8 @@ def _persist_run_state(
         chunks=[],
         evidence_pack_items=[],
         evidence_pack_report={"diversity_stats": {}},
+        issue_map_rows=[],
+        structured_claim_rows=[],
         citation_rows=[],
         synthesis_rows=[],
         bullet_citation_rows=[],

@@ -666,6 +666,19 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 syntheses = connection.execute(
                     "SELECT synthesis_id, kind, status FROM syntheses"
                 ).fetchall()
+                issue_maps = connection.execute(
+                    "SELECT issue_id, issue_question FROM issue_maps WHERE run_id = ? ORDER BY issue_id",
+                    ("run_fixture_sqlite",),
+                ).fetchall()
+                structured_claims = connection.execute(
+                    """
+                    SELECT claim_id, novelty_vs_prior_brief, why_it_matters
+                    FROM structured_claims
+                    WHERE run_id = ?
+                    ORDER BY claim_id
+                    """,
+                    ("run_fixture_sqlite",),
+                ).fetchall()
                 runs = connection.execute(
                     "SELECT run_id, run_type, status FROM runs"
                 ).fetchall()
@@ -680,6 +693,10 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(len(syntheses), 1)
         self.assertTrue(syntheses[0][0].startswith("syn_"))
         self.assertEqual(syntheses[0][1:], ("daily_brief", "ok"))
+        self.assertGreater(len(issue_maps), 0)
+        self.assertTrue(all(issue_id.startswith("issue_") for issue_id, _question in issue_maps))
+        self.assertGreater(len(structured_claims), 0)
+        self.assertTrue(all(claim_id for claim_id, _novelty, _why in structured_claims))
         self.assertEqual(runs, [("run_fixture_sqlite", "daily_brief", "ok")])
 
     def test_run_fixture_daily_brief_reuses_stable_document_ids_across_runs(self):
