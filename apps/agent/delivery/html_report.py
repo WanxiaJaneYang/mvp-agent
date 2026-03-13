@@ -26,7 +26,9 @@ def render_daily_brief_html(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     abstained = _is_abstained(synthesis)
     status_title = "Abstained" if abstained else "Validated"
+    brief = synthesis.get("brief", {}) if isinstance(synthesis.get("brief"), Mapping) else {}
     issues = _normalized_issues(synthesis)
+    overview_html = _render_overview(brief)
 
     issues_html = "".join(_render_issue(issue) for issue in issues if isinstance(issue, Mapping))
     changed_html = _render_changed_section(synthesis.get("changed"))
@@ -161,6 +163,7 @@ def render_daily_brief_html(
         <span>Status: {escape(status_title)}</span>
       </div>
     </header>
+    {overview_html}
     <section class="issues">
       {issues_html}
     </section>
@@ -175,6 +178,33 @@ def render_daily_brief_html(
 </html>"""
     output_path.write_text(html, encoding="utf-8")
     return output_path
+
+
+def _render_overview(brief: Mapping[str, Any]) -> str:
+    bottom_line = str(brief.get("bottom_line") or "").strip()
+    takeaways = brief.get("top_takeaways")
+    watchlist = brief.get("watchlist")
+    if not bottom_line and not isinstance(takeaways, list) and not isinstance(watchlist, list):
+        return ""
+
+    takeaways_html = ""
+    if isinstance(takeaways, list) and takeaways:
+        items = "".join(f"<li>{escape(str(item))}</li>" for item in takeaways if str(item).strip())
+        takeaways_html = f"<h2>Key Takeaways</h2><ul>{items}</ul>"
+
+    watchlist_html = ""
+    if isinstance(watchlist, list) and watchlist:
+        items = "".join(f"<li>{escape(str(item))}</li>" for item in watchlist if str(item).strip())
+        watchlist_html = f"<h2>Watchlist</h2><ul>{items}</ul>"
+
+    return (
+        '<section class="issues">'
+        "<h2>Bottom Line</h2>"
+        f"<p>{escape(bottom_line)}</p>"
+        f"{takeaways_html}"
+        f"{watchlist_html}"
+        "</section>"
+    )
 
 
 def _render_issue(issue: Mapping[str, Any]) -> str:

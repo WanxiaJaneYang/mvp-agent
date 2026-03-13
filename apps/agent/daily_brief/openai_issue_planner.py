@@ -12,40 +12,11 @@ MAX_EVIDENCE_PACK_ITEMS = 12
 MAX_EVIDENCE_TEXT_CHARS = 280
 MAX_PRIOR_CONTEXT_TEXT_CHARS = 240
 REQUEST_TASK = "daily_brief_issue_planner"
-ISSUE_PLANNER_SYSTEM_PROMPT = (
-    "You are planning 2-3 issue-centered literature review topics for a daily brief. "
-    "Use only the provided evidence pack. Return strict JSON matching the issue map schema."
+ISSUE_PLAN_PROMPT_TEMPLATE = (
+    "You are planning up to {issue_budget} issue-centered literature review topic(s) "
+    "for a daily brief. Use only the provided evidence pack. Return strict JSON matching "
+    "the issue map schema."
 )
-ISSUE_MAP_JSON_SCHEMA: dict[str, Any] = {
-    "name": "issue_map_list",
-    "strict": True,
-    "schema": {
-        "type": "array",
-        "minItems": 1,
-        "items": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "issue_id",
-                "issue_question",
-                "thesis_hint",
-                "supporting_evidence_ids",
-                "opposing_evidence_ids",
-                "minority_evidence_ids",
-                "watch_evidence_ids",
-            ],
-            "properties": {
-                "issue_id": {"type": "string"},
-                "issue_question": {"type": "string"},
-                "thesis_hint": {"type": "string"},
-                "supporting_evidence_ids": {"type": "array", "items": {"type": "string"}},
-                "opposing_evidence_ids": {"type": "array", "items": {"type": "string"}},
-                "minority_evidence_ids": {"type": "array", "items": {"type": "string"}},
-                "watch_evidence_ids": {"type": "array", "items": {"type": "string"}},
-            },
-        },
-    },
-}
 
 
 class OpenAIIssuePlanner(IssuePlannerProvider):
@@ -77,9 +48,11 @@ class OpenAIIssuePlanner(IssuePlannerProvider):
 
 
 def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
+    issue_budget = _issue_budget(brief_input)
     bounded_input = {
         "run_id": brief_input["run_id"],
         "generated_at_utc": brief_input["generated_at_utc"],
+        "brief_plan": dict(brief_input["brief_plan"]),
         "evidence_pack": [
             _normalize_evidence_item(item)
             for item in brief_input["evidence_pack"][:MAX_EVIDENCE_PACK_ITEMS]
@@ -90,19 +63,67 @@ def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
         "task": REQUEST_TASK,
         "run_id": brief_input["run_id"],
         "generated_at_utc": brief_input["generated_at_utc"],
-        "response_format": {"type": "json_schema", "json_schema": ISSUE_MAP_JSON_SCHEMA},
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": _issue_map_json_schema(issue_budget=issue_budget),
+        },
         "messages": [
-            {"role": "system", "content": ISSUE_PLANNER_SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": ISSUE_PLAN_PROMPT_TEMPLATE.format(issue_budget=issue_budget),
+            },
             {
                 "role": "user",
                 "content": (
-                    "Plan 2-3 issue-centered daily brief topics from the bounded evidence pack. "
-                    "Return only strict JSON matching the provided schema."
+                    f"Plan up to {issue_budget} issue-centered daily brief topic(s) from the bounded "
+                    "evidence pack. Return only strict JSON matching the provided schema."
                 ),
             },
         ],
         "input": bounded_input,
     }
+
+
+def _issue_map_json_schema(*, issue_budget: int) -> dict[str, Any]:
+    return {
+        "name": "issue_map_list",
+        "strict": True,
+        "schema": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": issue_budget,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "issue_id",
+                    "issue_question",
+                    "thesis_hint",
+                    "supporting_evidence_ids",
+                    "opposing_evidence_ids",
+                    "minority_evidence_ids",
+                    "watch_evidence_ids",
+                ],
+                "properties": {
+                    "issue_id": {"type": "string"},
+                    "issue_question": {"type": "string"},
+                    "thesis_hint": {"type": "string"},
+                    "supporting_evidence_ids": {"type": "array", "items": {"type": "string"}},
+                    "opposing_evidence_ids": {"type": "array", "items": {"type": "string"}},
+                    "minority_evidence_ids": {"type": "array", "items": {"type": "string"}},
+                    "watch_evidence_ids": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+    }
+
+
+def _issue_budget(brief_input: IssuePlannerInput) -> int:
+    raw_budget = brief_input["brief_plan"].get("issue_budget", 1)
+    try:
+        return max(1, int(raw_budget))
+    except (TypeError, ValueError):
+        return 1
 
 
 def _normalize_evidence_item(item: dict[str, Any]) -> dict[str, Any]:

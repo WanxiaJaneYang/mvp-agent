@@ -9,6 +9,7 @@ from typing import get_args, get_type_hints
 from unittest.mock import patch
 
 from apps.agent.daily_brief.model_interfaces import (
+    BriefPlannerProvider,
     ClaimComposerProvider,
     CriticProvider,
     IssuePlannerProvider,
@@ -26,6 +27,7 @@ from apps.agent.daily_brief.runner import (
 from apps.agent.delivery.email_sender import EmailDeliveryConfig
 from apps.agent.delivery.scheduler import DailyBriefSchedule
 from apps.agent.pipeline.types import (
+    BriefPlan,
     BulletCitationRow,
     CitationStoreEntry,
     CitationValidationResult,
@@ -607,6 +609,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertTrue(decision_record_path.exists())
             self.assertTrue((artifact_dir / "documents.json").exists())
             self.assertTrue((artifact_dir / "chunks.json").exists())
+            self.assertTrue((artifact_dir / "brief_plan.json").exists())
             self.assertTrue((artifact_dir / "evidence_pack_items.json").exists())
             self.assertTrue((artifact_dir / "synthesis_bullets.json").exists())
             self.assertTrue((artifact_dir / "bullet_citations.json").exists())
@@ -618,8 +621,11 @@ class DailyBriefRunnerTests(unittest.TestCase):
             synthesis_bullets = json.loads((artifact_dir / "synthesis_bullets.json").read_text(encoding="utf-8"))
             bullet_citations = json.loads((artifact_dir / "bullet_citations.json").read_text(encoding="utf-8"))
             run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
+            brief_plan = json.loads((artifact_dir / "brief_plan.json").read_text(encoding="utf-8"))
             self.assertIsInstance(citation_rows, list)
             self.assertEqual(citation_rows[0]["citation_id"], "cite_001")
+            self.assertIn("brief_thesis", brief_plan)
+            self.assertIn("render_mode", brief_plan)
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
             self.assertEqual(
                 bullet_citations[0]["citation_id"],
@@ -627,6 +633,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             )
             self.assertEqual(run_summary["guardrail_checks"]["budget_check"], "pass")
             self.assertIn(run_summary["guardrail_checks"]["diversity_check"], {"pass", "fail"})
+            self.assertIn(run_summary["render_mode"], {"full", "compressed"})
 
     def test_run_fixture_daily_brief_persists_modeled_rows_to_sqlite(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1138,6 +1145,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
             def plan_issues(self, *, brief_input):
                 call_order.append("planner")
                 test_case.assertEqual(brief_input["generated_at_utc"], "2026-03-10T16:00:00Z")
+                test_case.assertIn("brief_plan", brief_input)
+                test_case.assertEqual(brief_input["brief_plan"]["render_mode"], "full")
                 return [
                     IssueMap(
                         issue_id="issue_001",
@@ -1338,9 +1347,156 @@ class DailyBriefRunnerTests(unittest.TestCase):
 
         self.assertEqual(call_order[:2], ["planner", "composer"])
         self.assertGreaterEqual(call_order.count("composer"), 1)
+        self.assertEqual(synthesis.brief_plan["render_mode"], "full")
         self.assertEqual(synthesis.issue_map[0]["issue_id"], "issue_001")
         self.assertEqual(synthesis.structured_claims[0]["claim_id"], "claim_prevailing")
         self.assertEqual(synthesis.structured_claims[0]["supporting_citation_ids"], ["cite_003"])
+
+    def test_build_daily_brief_synthesis_caps_issue_map_to_brief_budget(self):
+        test_case = self
+
+        class _BriefPlanner(BriefPlannerProvider):
+            def plan_brief(self, *, brief_input):
+                return BriefPlan(
+                    brief_id="brief_2026-03-10_run_issue_flow",
+                    brief_thesis="One issue is enough today.",
+                    top_takeaways=["One issue has enough support."],
+                    issue_budget=1,
+                    render_mode="compressed",
+                    source_scarcity_mode="scarce",
+                    candidate_issue_seeds=["growth cooling"],
+                    issue_order=["seed_001"],
+                    watchlist=[],
+                    reason_codes=["source_scarcity_detected"],
+                )
+
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                return [
+                    IssueMap(
+                        issue_id="issue_001",
+                        issue_question="Will softer growth change near-term Fed expectations?",
+                        thesis_hint="Growth is cooling, but inflation remains sticky.",
+                        supporting_evidence_ids=["chunk_001"],
+                        opposing_evidence_ids=[],
+                        minority_evidence_ids=[],
+                        watch_evidence_ids=[],
+                    ),
+                    IssueMap(
+                        issue_id="issue_002",
+                        issue_question="Will policy language stay cautious?",
+                        thesis_hint="Policy language remains cautious.",
+                        supporting_evidence_ids=["chunk_002"],
+                        opposing_evidence_ids=[],
+                        minority_evidence_ids=[],
+                        watch_evidence_ids=[],
+                    ),
+                ]
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                test_case.assertEqual(len(brief_input["issue_map"]), 1)
+                test_case.assertEqual(brief_input["issue_map"][0]["issue_id"], "issue_001")
+                return [
+                    StructuredClaim(
+                        claim_id="claim_prevailing",
+                        issue_id="issue_001",
+                        claim_kind="prevailing",
+                        claim_text="Softer growth is raising later-cut expectations.",
+                        supporting_citation_ids=["cite_001"],
+                        opposing_citation_ids=[],
+                        confidence="medium",
+                        novelty_vs_prior_brief="new",
+                        why_it_matters="Rate-sensitive assets remain exposed to data surprises.",
+                    )
+                ]
+
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "fed_press_releases",
+                    "publisher": "Federal Reserve",
+                    "canonical_url": "https://example.test/prevailing",
+                    "title": "Fed keeps policy steady",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "statement",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "fetched_at": "2026-03-10T14:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "body_text": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "content_hash": "hash_prevailing",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:05:00Z",
+                    "updated_at": "2026-03-10T14:05:00Z",
+                    "doc_id": "doc_001",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_issue_budget",
+                },
+                {
+                    "source_id": "wsj_markets",
+                    "publisher": "Wall Street Journal",
+                    "canonical_url": "https://example.test/counter",
+                    "title": "Investors question the soft-landing narrative",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T14:20:00Z",
+                    "fetched_at": "2026-03-10T14:25:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Investors question the soft-landing narrative as growth data weakens.",
+                    "body_text": "Investors question the soft-landing narrative as growth data weakens.",
+                    "content_hash": "hash_counter",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:25:00Z",
+                    "updated_at": "2026-03-10T14:25:00Z",
+                    "doc_id": "doc_002",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_issue_budget",
+                },
+            ],
+            chunks=[
+                {"chunk_id": "chunk_001", "doc_id": "doc_001", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},
+                {"chunk_id": "chunk_002", "doc_id": "doc_002", "chunk_index": 0, "text": "Investors question the soft-landing narrative as growth data weakens.", "token_count": 9, "char_start": 0, "char_end": 68, "created_at": "2026-03-10T14:25:00Z"},
+            ],
+            fts_rows=[
+                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_001", "chunk_id": "chunk_001", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
+                {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_002", "chunk_id": "chunk_002", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
+            ],
+        )
+        registry = {
+            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/prevailing", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},
+            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/counter", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_evidence_pack_report") as evidence_pack_report_mock:
+            evidence_pack_report_mock.return_value = {
+                "items": [
+                    {"chunk_id": "chunk_001", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.88, "semantic_score": 0.88, "recency_score": 0.70, "credibility_score": 1.0, "rank_in_pack": 1},
+                    {"chunk_id": "chunk_002", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.84, "semantic_score": 0.84, "recency_score": 0.66, "credibility_score": 0.8, "rank_in_pack": 2},
+                ],
+                "diversity_stats": {"unique_publishers": 2},
+                "diversity_check": "warn",
+                "notes": [],
+            }
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=stage_data,
+                registry=registry,
+                run_id="run_issue_budget",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                brief_planner=_BriefPlanner(),
+                issue_planner=_Planner(),
+                claim_composer=_Composer(),
+            )
+
+        self.assertEqual(synthesis.brief_plan["issue_budget"], 1)
+        self.assertEqual([issue["issue_id"] for issue in synthesis.issue_map], ["issue_001"])
+        self.assertEqual([issue["issue_id"] for issue in synthesis.final_result["synthesis"]["issues"]], ["issue_001"])
 
     def test_build_daily_brief_synthesis_rejects_partial_provider_injection(self):
         stage_data = DailyBriefCorpusStageData(

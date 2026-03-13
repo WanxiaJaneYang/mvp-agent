@@ -5,6 +5,8 @@ import unittest
 from typing import get_type_hints
 
 from apps.agent.daily_brief.model_interfaces import (
+    BriefPlannerInput,
+    BriefPlannerProvider,
     ClaimComposerInput,
     ClaimComposerProvider,
     CriticInput,
@@ -16,6 +18,12 @@ from apps.agent.pipeline.types import CriticReport, IssueMap, StructuredClaim
 
 
 class DailyBriefModelInterfaceTests(unittest.TestCase):
+    def test_brief_planner_provider_is_task_specific(self) -> None:
+        signature = inspect.signature(BriefPlannerProvider.plan_brief)
+        self.assertIn("brief_input", signature.parameters)
+        hints = get_type_hints(BriefPlannerProvider.plan_brief)
+        self.assertEqual(hints["brief_input"], BriefPlannerInput)
+
     def test_issue_planner_provider_is_task_specific(self) -> None:
         signature = inspect.signature(IssuePlannerProvider.plan_issues)
         self.assertIn("brief_input", signature.parameters)
@@ -39,8 +47,12 @@ class DailyBriefModelInterfaceTests(unittest.TestCase):
 
     def test_interface_inputs_use_structured_context(self) -> None:
         self.assertEqual(
+            set(BriefPlannerInput.__annotations__),
+            {"run_id", "generated_at_utc", "corpus_summary", "source_diversity_stats", "prior_brief_context"},
+        )
+        self.assertEqual(
             set(IssuePlannerInput.__annotations__),
-            {"run_id", "generated_at_utc", "evidence_pack", "prior_brief_context"},
+            {"run_id", "generated_at_utc", "brief_plan", "evidence_pack", "prior_brief_context"},
         )
         self.assertEqual(
             set(ClaimComposerInput.__annotations__),

@@ -45,6 +45,18 @@ class OpenAIRuntimeSchemaTests(unittest.TestCase):
             brief_input=IssuePlannerInput(
                 run_id="run_demo",
                 generated_at_utc="2026-03-12T10:00:00Z",
+                brief_plan={
+                    "brief_id": "brief_2026-03-12_run_demo",
+                    "brief_thesis": "Growth and policy are the main debates today.",
+                    "top_takeaways": ["Growth is cooling."],
+                    "issue_budget": 2,
+                    "render_mode": "full",
+                    "source_scarcity_mode": "normal",
+                    "candidate_issue_seeds": ["growth cooling", "policy caution"],
+                    "issue_order": ["seed_001", "seed_002"],
+                    "watchlist": ["Watch CPI."],
+                    "reason_codes": ["two_distinct_debates_supported"],
+                },
                 evidence_pack=[
                     {"chunk_id": "chunk_001", "doc_id": "doc_001", "publisher": "Reuters", "text": "Growth cools."},
                     {"chunk_id": "chunk_002", "doc_id": "doc_002", "publisher": "Fed", "text": "Policy steady."},

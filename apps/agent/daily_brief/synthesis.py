@@ -6,6 +6,7 @@ from typing import Any
 
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_CORE_OUTPUT_SECTIONS,
+    BriefPlan,
     CitationStoreEntry,
     ClaimEvidenceItem,
     DailyBriefBullet,
@@ -200,6 +201,7 @@ def build_changed_section(
 
 def build_synthesis_from_structured_claims(
     *,
+    brief_plan: BriefPlan | None = None,
     issue_map: Iterable[IssueMap],
     structured_claims: Iterable[StructuredClaim],
     citation_store: Mapping[str, CitationStoreEntry],
@@ -225,10 +227,20 @@ def build_synthesis_from_structured_claims(
             )
         )
 
-    return DailyBriefSynthesisV2(
+    synthesis = DailyBriefSynthesisV2(
         issues=issues,
         meta={"status": "validated"},
     )
+    if brief_plan is not None:
+        synthesis["brief"] = {
+            "bottom_line": brief_plan["brief_thesis"],
+            "top_takeaways": list(brief_plan["top_takeaways"]),
+            "watchlist": list(brief_plan["watchlist"]),
+            "render_mode": brief_plan["render_mode"],
+            "source_scarcity_mode": brief_plan["source_scarcity_mode"],
+            "issue_budget": brief_plan["issue_budget"],
+        }
+    return synthesis
 
 
 def _bullets_for_issue(
