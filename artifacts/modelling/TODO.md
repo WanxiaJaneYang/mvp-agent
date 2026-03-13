@@ -1,6 +1,6 @@
 # Modelling TODO (Prophet-Inspired, Project-Scoped)
 
-Last updated: 2026-03-12
+Last updated: 2026-03-13
 
 ## Priority Queue
 
@@ -9,6 +9,9 @@ Last updated: 2026-03-12
 
 - [ ] P0: Define provider selection and registry contract for daily brief runner scripts
   - Acceptance: one spec covers `deterministic`, `openai`, and `codex-oauth` selection plus provider-specific config validation.
+
+- [ ] P0: Record the daily-brief integrity execution order across open issues
+  - Acceptance: the repo docs point to `#135 -> #128 -> #129 -> #130 -> #131 -> #138 -> #134 -> #132 -> #133 -> #136 -> #69 -> #137 -> #74` and treat daily-brief stabilization as the lead stream.
 
 - [x] P0: Define `decision_record` artifact schema and storage location
   - Acceptance: markdown spec + JSON example + field-level validation rules.
@@ -42,4 +45,5 @@ Last updated: 2026-03-12
 - Keep all work aligned with PRD v1.2 constraints: local-first, citation-grounded, issue-centered, no trading instructions.
 - Do not relax paywall, budget hard-stop, or evidence requirements.
 - Treat alert delivery as post-daily-brief scope until the daily-brief path is stable.
+- Treat retrieval expansion as follow-on work after the daily-brief stabilization stream lands.
 - Use `docs/status-matrix.md` as the canonical modelled/coded/verified status view.
