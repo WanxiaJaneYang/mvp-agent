@@ -38,6 +38,12 @@ Current runtime validation narrows the full catalogue to an active source subset
   - `reuters_business`
   - `wsj_markets`
 
+Open-issue execution order for the remaining backlog/program sequencing:
+- daily-brief stabilization leads: `#135 -> #128 -> #129 -> #130 -> #131 -> #138 -> #134 -> #132 -> #133 -> #136`
+- retrieval expansion follows with `#69`
+- non-RSS live fetch then alert delivery follow with `#137 -> #74`
+- the umbrella tracking docs live in `issue_139.md` and `docs/plans/2026-03-13-daily-brief-integrity-issue-mapping.md`
+
 ## Core Non-Negotiables
 
 1. No uncited factual claims in generated analysis.
@@ -171,7 +177,7 @@ python -m compileall -q apps tests scripts
 
 - This project is not a trading signal engine and should not produce buy/sell instructions.
 - Outputs are intended to provide evidence-grounded scenarios and risk flags.
-- Major-event alerts remain planned until alert delivery runtime is implemented.
+- Alert policy/runtime work stays downstream of daily-brief stabilization in the open-issue program order, even though local alert delivery runtime support already exists in-tree.
 - Portfolio relevance remains a local-first risk-flag surface, not buy/sell guidance.
 - The live daily-brief slice starts with the current RSS-backed active subset and skips sources that are temporarily blocked or unavailable.
 - Daily-brief scheduling defaults to `07:05 Asia/Singapore`, with timezone overrides available from the runner scripts.
