@@ -241,10 +241,14 @@ def _render_bullet(bullet: Mapping[str, Any]) -> str:
         f' <a class="citation-link" href="#{escape(citation_id)}">[{escape(citation_id)}]</a>'
         for citation_id in citation_ids
     )
+    novelty = str(bullet.get("novelty_vs_prior_brief") or "").strip()
+    novelty_html = f' <strong>({escape(_label(novelty))})</strong>' if novelty and novelty != "unknown" else ""
+    why_it_matters = str(bullet.get("why_it_matters") or "").strip()
     evidence_html = _render_evidence_block(bullet.get("evidence"))
     return (
         "<li>"
-        f"{escape(str(bullet.get('text', '')))}{citation_links}"
+        f"{escape(str(bullet.get('text', '')))}{novelty_html}{citation_links}"
+        f"{_render_callout('Why it matters', why_it_matters)}"
         f"{evidence_html}"
         "</li>"
     )
@@ -314,6 +318,12 @@ def _render_guardrails(guardrail_checks: Mapping[str, Any] | None) -> str:
 
 def _label(value: str) -> str:
     return value[:1].upper() + value[1:].lower()
+
+
+def _render_callout(title: str, value: str) -> str:
+    if not value:
+        return ""
+    return f'<p><strong>{escape(title)}:</strong> {escape(value)}</p>'
 
 
 def _is_abstained(synthesis: Mapping[str, Any]) -> bool:

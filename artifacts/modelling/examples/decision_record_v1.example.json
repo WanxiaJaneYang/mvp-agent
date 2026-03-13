@@ -9,19 +9,25 @@
     {
       "claim_id": "c_prev_001",
       "section": "prevailing",
+      "claim_kind": "prevailing",
       "text": "Policy-sensitive sectors remain volatile after the latest central bank hold.",
       "citation_ids": [
         "cite_001",
         "cite_014"
       ],
-      "coverage_status": "supported"
+      "coverage_status": "supported",
+      "why_it_matters": "Rate-sensitive sectors can reprice quickly after policy meetings.",
+      "novelty_vs_prior_brief": "continued"
     },
     {
       "claim_id": "c_watch_002",
       "section": "watch",
+      "claim_kind": "watch",
       "text": "[Insufficient evidence to support this claim]",
       "citation_ids": [],
-      "coverage_status": "insufficient_evidence"
+      "coverage_status": "insufficient_evidence",
+      "why_it_matters": "This remains a watch item rather than a validated main claim.",
+      "novelty_vs_prior_brief": "unknown"
     }
   ],
   "rejected_alternatives": [

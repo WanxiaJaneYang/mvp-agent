@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from apps.agent.pipeline.types import (
     DAILY_BRIEF_CORE_OUTPUT_SECTIONS,
@@ -10,7 +10,9 @@ from apps.agent.pipeline.types import (
     CitationStoreEntry,
     ClaimEvidenceItem,
     DailyBriefBullet,
+    DailyBriefClaimKind,
     DailyBriefIssue,
+    DailyBriefNoveltyLabel,
     DailyBriefOutputSection,
     DailyBriefSynthesis,
     DailyBriefSynthesisV2,
@@ -254,9 +256,16 @@ def _bullets_for_issue(
             continue
         supporting_citation_ids = list(claim["supporting_citation_ids"])
         bullet: DailyBriefBullet = {
+            "claim_id": str(claim["claim_id"]),
+            "claim_kind": cast(DailyBriefClaimKind, str(claim["claim_kind"])),
             "text": str(claim["claim_text"]),
             "citation_ids": supporting_citation_ids,
             "confidence_label": str(claim["confidence"]),
+            "why_it_matters": str(claim.get("why_it_matters") or ""),
+            "novelty_vs_prior_brief": cast(
+                DailyBriefNoveltyLabel,
+                str(claim.get("novelty_vs_prior_brief") or "unknown"),
+            ),
         }
         evidence = _build_evidence_items(
             citation_ids=supporting_citation_ids,

@@ -209,12 +209,16 @@ class CitationStoreEntry(TypedDict):
 
 
 class DailyBriefBullet(TypedDict, total=False):
+    claim_id: str
+    claim_kind: DailyBriefClaimKind
     text: str
     citation_ids: list[str]
     confidence_label: str
     validator_action: str
     claim_span_citations: list[list[str]]
     evidence: list["ClaimEvidenceItem"]
+    why_it_matters: str
+    novelty_vs_prior_brief: DailyBriefNoveltyLabel
 
 class DailyBriefMeta(TypedDict, total=False):
     status: str
