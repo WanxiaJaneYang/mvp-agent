@@ -26,19 +26,10 @@ def dedupe_issues(
     kept: list[IssueMap] = []
     overlap_reports: list[IssueOverlapReport] = []
     information_gain_reports: list[IssueInformationGain] = []
+    information_gain_by_issue_id: dict[str, IssueInformationGain] = {}
+    kept_scores: dict[str, tuple[int, float, int]] = {}
 
-    for issue in ordered_issues:
-        if len(kept) >= int(brief_plan["issue_budget"]):
-            information_gain_reports.append(
-                IssueInformationGain(
-                    issue_id=str(issue["issue_id"]),
-                    information_gain_score=0.0,
-                    decision="drop",
-                    reason_codes=["issue_budget_exceeded"],
-                )
-            )
-            continue
-
+    for issue_index, issue in enumerate(ordered_issues):
         duplicate_target: IssueMap | None = None
         max_overlap_score = 0.0
         for kept_issue in kept:
@@ -72,16 +63,36 @@ def dedupe_issues(
         if kept and info_gain_score < MIN_INFORMATION_GAIN_SCORE:
             decision = "drop"
             reason_codes = ["low_incremental_value", "restates_existing_issue"]
-        information_gain_reports.append(
-            IssueInformationGain(
-                issue_id=str(issue["issue_id"]),
-                information_gain_score=info_gain_score,
-                decision=decision,
-                reason_codes=reason_codes,
-            )
+        report = IssueInformationGain(
+            issue_id=str(issue["issue_id"]),
+            information_gain_score=info_gain_score,
+            decision=decision,
+            reason_codes=reason_codes,
         )
+        information_gain_reports.append(report)
+        information_gain_by_issue_id[str(issue["issue_id"])] = report
         if decision == "keep":
             kept.append(issue)
+            kept_scores[str(issue["issue_id"])] = (
+                _issue_evidence_count(issue),
+                info_gain_score,
+                -issue_index,
+            )
+
+    issue_budget = max(1, int(brief_plan["issue_budget"]))
+    if len(kept) > issue_budget:
+        kept.sort(
+            key=lambda issue: kept_scores.get(str(issue["issue_id"]), (0.0, 0, 0)),
+            reverse=True,
+        )
+        kept_issue_ids = {str(issue["issue_id"]) for issue in kept[:issue_budget]}
+        for issue in kept[issue_budget:]:
+            report = information_gain_by_issue_id.get(str(issue["issue_id"]))
+            if report is None:
+                continue
+            report["decision"] = "drop"
+            report["reason_codes"] = ["issue_budget_exceeded"]
+        kept = [issue for issue in kept if str(issue["issue_id"]) in kept_issue_ids]
 
     return kept, overlap_reports, information_gain_reports
 
@@ -171,6 +182,10 @@ def _issue_evidence_ids(issue: Mapping[str, Any]) -> set[str]:
             continue
         evidence_ids.update(str(value) for value in values if isinstance(value, str))
     return evidence_ids
+
+
+def _issue_evidence_count(issue: Mapping[str, Any]) -> int:
+    return len(_issue_evidence_ids(issue))
 
 
 def _tokens(value: str) -> set[str]:
