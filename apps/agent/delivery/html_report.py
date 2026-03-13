@@ -241,14 +241,16 @@ def _render_bullet(bullet: Mapping[str, Any]) -> str:
         f' <a class="citation-link" href="#{escape(citation_id)}">[{escape(citation_id)}]</a>'
         for citation_id in citation_ids
     )
-    novelty = str(bullet.get("novelty_vs_prior_brief") or "").strip()
+    novelty = str(bullet.get("novelty_vs_prior_brief") or bullet.get("delta_label") or "").strip()
     novelty_html = f' <strong>({escape(_label(novelty))})</strong>' if novelty and novelty != "unknown" else ""
     why_it_matters = str(bullet.get("why_it_matters") or "").strip()
+    delta_explanation = str(bullet.get("delta_explanation") or "").strip()
     evidence_html = _render_evidence_block(bullet.get("evidence"))
     return (
         "<li>"
         f"{escape(str(bullet.get('text', '')))}{novelty_html}{citation_links}"
         f"{_render_callout('Why it matters', why_it_matters)}"
+        f"{_render_callout('Delta', delta_explanation)}"
         f"{evidence_html}"
         "</li>"
     )
@@ -283,7 +285,7 @@ def _render_changed_section(changed_bullets: Any) -> str:
     items = "".join(_render_bullet(bullet) for bullet in changed_bullets if isinstance(bullet, Mapping))
     return (
         '<section class="changed">'
-        "<h2>Changed Since Yesterday</h2>"
+        "<h2>What Changed</h2>"
         f"<ul>{items}</ul>"
         "</section>"
     )

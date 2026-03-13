@@ -20,7 +20,10 @@ class PriorBriefContextTests(unittest.TestCase):
 
         self.assertEqual(context["previous_generated_at_utc"], "2026-03-11T00:00:00Z")
         self.assertEqual(context["claim_summaries"], ["Prevailing claim.", "Counter claim."])
+        self.assertEqual(context["claim_texts"], ["Prevailing claim.", "Counter claim."])
         self.assertEqual(context["citation_ids"], ["cite_001", "cite_002"])
+        self.assertEqual(context["issue_questions"], ["Previous daily brief"])
+        self.assertEqual(context["source_refs"], [])
         self.assertEqual(context["issues"][0]["issue_question"], "Previous daily brief")
         self.assertEqual(context["issues"][0]["claim_summaries"], ["Prevailing claim.", "Counter claim."])
 
@@ -86,7 +89,25 @@ class PriorBriefContextTests(unittest.TestCase):
         )
         self.assertEqual(context["issues"][0]["citation_ids"], ["cite_001", "cite_002"])
         self.assertEqual(
+            context["issue_questions"],
+            ["Will oil prices keep rising over the next few weeks?"],
+        )
+        self.assertEqual(
+            context["claim_texts"],
+            [
+                "Supply risks kept the short-term bias upward.",
+                "Demand concerns could cap the move.",
+            ],
+        )
+        self.assertEqual(
             context["issues"][0]["source_refs"],
+            [
+                "Reuters @ 2026-03-11T01:00:00Z",
+                "WSJ @ 2026-03-11T02:00:00Z",
+            ],
+        )
+        self.assertEqual(
+            context["source_refs"],
             [
                 "Reuters @ 2026-03-11T01:00:00Z",
                 "WSJ @ 2026-03-11T02:00:00Z",

@@ -9,6 +9,7 @@ from pathlib import Path
 from smtplib import SMTP
 from typing import Any, cast
 
+from apps.agent.daily_brief.delta import build_changed_section_from_deltas, build_claim_deltas
 from apps.agent.daily_brief.editorial_planner import LocalBriefPlanner, build_corpus_summary
 from apps.agent.daily_brief.issue_dedup import dedupe_issues
 from apps.agent.daily_brief.issue_retrieval import build_brief_corpus_report, build_issue_evidence_scopes
@@ -24,7 +25,6 @@ from apps.agent.daily_brief.model_interfaces import (
 from apps.agent.daily_brief.prior_brief_context import build_prior_brief_context
 from apps.agent.daily_brief.synthesis import (
     SynthesisRetryPlan,
-    build_changed_section,
     build_citation_store,
     build_synthesis,
     build_synthesis_from_structured_claims,
@@ -50,6 +50,7 @@ from apps.agent.pipeline.types import (
     BulletCitationRow,
     CitationStoreEntry,
     CitationValidationResult,
+    ClaimDelta,
     CriticReport,
     DailyBriefCorpusStageData,
     DailyBriefInputStageData,
@@ -401,6 +402,7 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "issue_overlap_reports.json", synthesis_data.issue_overlap_reports)
     _write_json(artifact_dir / "information_gain_reports.json", synthesis_data.information_gain_reports)
     _write_json(artifact_dir / "claim_objects.json", synthesis_data.structured_claims)
+    _write_json(artifact_dir / "claim_deltas.json", synthesis_data.claim_deltas)
     _write_json(artifact_dir / "critic_report.json", synthesis_data.critic_report)
     _write_json(artifact_dir / "citations.json", synthesis_data.citation_rows)
     _write_json(artifact_dir / "synthesis.json", synthesis_data.final_result["synthesis"])
@@ -623,6 +625,7 @@ def build_daily_brief_synthesis(
     issue_overlap_reports: list[IssueOverlapReport] = []
     information_gain_reports: list[IssueInformationGain] = []
     structured_claims: list[StructuredClaim] = []
+    claim_deltas: list[ClaimDelta] = []
     if use_structured_orchestration:
         issue_evidence_scopes = build_issue_evidence_scopes(
             brief_plan=brief_plan,
@@ -724,10 +727,21 @@ def build_daily_brief_synthesis(
     if stage8_result is None:
         raise ValueError("Daily brief synthesis did not produce a validation result.")
 
+    if prior_brief_context is not None:
+        claim_deltas = build_claim_deltas(
+            structured_claims=structured_claims,
+            prior_brief_context=prior_brief_context,
+        )
+
     final_result = finalize_validation_outcome(validation_result=stage8_result)
-    changed_section = build_changed_section(
-        current_synthesis=final_result["synthesis"],
-        previous_synthesis=previous_synthesis,
+    validated_claim_ids = _claim_ids_in_synthesis(synthesis=final_result["synthesis"])
+    changed_section = build_changed_section_from_deltas(
+        structured_claims=[
+            claim for claim in structured_claims if str(claim["claim_id"]) in validated_claim_ids
+        ],
+        claim_deltas=[
+            delta for delta in claim_deltas if str(delta["claim_id"]) in validated_claim_ids
+        ],
     )
     if changed_section:
         final_synthesis = dict(final_result["synthesis"])
@@ -758,6 +772,7 @@ def build_daily_brief_synthesis(
         issue_overlap_reports=issue_overlap_reports,
         information_gain_reports=information_gain_reports,
         structured_claims=structured_claims,
+        claim_deltas=claim_deltas,
         citation_store=stage8_result["citation_store"],
         stage8_result=stage8_result,
         final_result=final_result,
@@ -1143,6 +1158,38 @@ def _iter_synthesis_bullets(
         for bullet_index, bullet in enumerate(changed_bullets):
             if isinstance(bullet, Mapping):
                 yield "changed", bullet_index, bullet
+
+
+def _claim_ids_in_synthesis(*, synthesis: Mapping[str, Any]) -> set[str]:
+    claim_ids: set[str] = set()
+    issues = synthesis.get("issues")
+    if isinstance(issues, list):
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            for section in ("prevailing", "counter", "minority", "watch"):
+                bullets = issue.get(section, [])
+                if not isinstance(bullets, list):
+                    continue
+                for bullet in bullets:
+                    if not isinstance(bullet, Mapping):
+                        continue
+                    claim_id = bullet.get("claim_id")
+                    if claim_id is not None:
+                        claim_ids.add(str(claim_id))
+        return claim_ids
+
+    for section in ("prevailing", "counter", "minority", "watch"):
+        bullets = synthesis.get(section, [])
+        if not isinstance(bullets, list):
+            continue
+        for bullet in bullets:
+            if not isinstance(bullet, Mapping):
+                continue
+            claim_id = bullet.get("claim_id")
+            if claim_id is not None:
+                claim_ids.add(str(claim_id))
+    return claim_ids
 
 
 def _write_json(path: Path, payload: Any) -> None:
