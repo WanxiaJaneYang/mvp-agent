@@ -1326,6 +1326,8 @@ def _publish_summary(
             for code in critic_report.get("reason_codes", [])
             if isinstance(code, str)
         ]
+    if citation_status == "abstained" and "citation_validation_abstained" not in reason_codes:
+        reason_codes.append("citation_validation_abstained")
 
     publish_decision: PublishDecisionStatus = "publish"
     if citation_status == "abstained" or analytical_status == "fail":

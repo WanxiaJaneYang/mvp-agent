@@ -1270,6 +1270,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(result["status"], "abstained")
         self.assertIn("Abstained", html)
         self.assertEqual(result["lifecycle"][-1]["status"], "partial")
+        self.assertEqual(result["publish_decision"], "hold")
+        self.assertIn("citation_validation_abstained", result["reason_codes"])
 
     def test_script_entrypoint_runs_fixture_slice(self):
         repo_root = Path(__file__).resolve().parents[3]
