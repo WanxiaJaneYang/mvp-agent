@@ -126,7 +126,20 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                     "watchlist": [],
                     "reason_codes": ["source_scarcity_detected"],
                 },
-                evidence_pack=[{"chunk_id": "chunk_1"}],
+                issue_evidence_scopes=[
+                    {
+                        "issue_id": "issue_oil",
+                        "primary_chunk_ids": ["chunk_1"],
+                        "opposing_chunk_ids": [],
+                        "minority_chunk_ids": [],
+                        "watch_chunk_ids": [],
+                        "coverage_summary": {
+                            "unique_publishers": 1,
+                            "source_roles": ["market_media"],
+                            "time_span_hours": 0,
+                        },
+                    }
+                ],
                 prior_brief_context=None,
             )
         )
