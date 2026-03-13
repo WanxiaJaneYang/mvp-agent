@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
 import sqlite3
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from apps.agent.pipeline.types import FtsRow
