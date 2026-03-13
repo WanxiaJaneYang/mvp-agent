@@ -1270,6 +1270,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(result["status"], "abstained")
         self.assertIn("Abstained", html)
         self.assertEqual(result["lifecycle"][-1]["status"], "partial")
+        self.assertEqual(result["publish_decision"], "hold")
+        self.assertIn("citation_validation_abstained", result["reason_codes"])
 
     def test_script_entrypoint_runs_fixture_slice(self):
         repo_root = Path(__file__).resolve().parents[3]
@@ -1325,6 +1327,42 @@ class DailyBriefRunnerTests(unittest.TestCase):
             DailyBriefRunnerTests._FakeSMTP.last_instance.sent_messages[0]["Subject"],
             "Daily Brief: 2026-03-11",
         )
+
+    def test_run_fixture_daily_brief_holds_email_when_critic_fails(self):
+        class _FailingCritic(CriticProvider):
+            def review_brief(self, *, brief_input):
+                return {
+                    "status": "fail",
+                    "reason_codes": ["empty_why_it_matters"],
+                    "flagged_claim_ids": ["claim_001"],
+                }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_critic_hold",
+                generated_at_utc="2026-03-10T23:30:00Z",
+                email_config=EmailDeliveryConfig(
+                    smtp_host="smtp.example.test",
+                    smtp_port=2525,
+                    sender_email="briefs@example.test",
+                    recipient_emails=("pm@example.test",),
+                ),
+                smtp_class=self._FakeSMTP,
+                critic=_FailingCritic(),
+            )
+
+            run_summary = json.loads((Path(result["artifact_dir"]) / "run_summary.json").read_text(encoding="utf-8"))
+            decision_record = json.loads(Path(result["decision_record_path"]).read_text(encoding="utf-8"))
+
+        self.assertIsNone(result["email_delivery"])
+        self.assertEqual(result["publish_decision"], "hold")
+        self.assertEqual(result["analytical_status"], "fail")
+        self.assertEqual(run_summary["publish_decision"], "hold")
+        self.assertEqual(run_summary["analytical_status"], "fail")
+        self.assertEqual(decision_record["publish_decision"], "hold")
+        self.assertEqual(decision_record["analytical_status"], "fail")
+        self.assertEqual(decision_record["reason_codes"], ["empty_why_it_matters"])
 
     def test_build_daily_brief_synthesis_calls_issue_planner_before_claim_composer(self):
         call_order: list[str] = []

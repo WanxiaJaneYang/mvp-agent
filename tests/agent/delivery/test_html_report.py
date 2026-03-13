@@ -89,11 +89,24 @@ class HtmlReportTests(unittest.TestCase):
                     "cite_003": {"title": "Fed oil item", "url": "https://example.test/fed"},
                     "cite_004": {"title": "BEA oil item", "url": "https://example.test/bea"},
                 },
+                guardrail_checks={
+                    "citation_status": "partial",
+                    "analytical_status": "warn",
+                    "publish_decision": "publish",
+                    "citation_check": "warn",
+                    "paywall_check": "pass",
+                    "diversity_check": "pass",
+                    "budget_check": "pass",
+                    "notes": [],
+                },
             )
 
             html = output_path.read_text(encoding="utf-8")
 
         self.assertEqual(result, output_path)
+        self.assertIn("Citation status", html)
+        self.assertIn("Analytical quality", html)
+        self.assertIn("Publish decision", html)
         self.assertIn("Bottom Line", html)
         self.assertIn("Key Takeaways", html)
         self.assertIn("Will oil prices keep rising over the next few weeks?", html)
@@ -101,6 +114,8 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("Strengthened", html)
         self.assertIn("Why it matters", html)
         self.assertIn("Energy inflation risk stays elevated", html)
+        self.assertIn("Partial", html)
+        self.assertIn("Warn", html)
         self.assertIn("Supply disruptions stayed in focus for oil traders.", html)
         self.assertIn("https://example.test/reuters", html)
 

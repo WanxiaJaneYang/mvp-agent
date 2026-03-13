@@ -31,6 +31,8 @@ FinalSynthesisStatus = Literal["ok", "partial", "abstained"]
 CriticStatus = Literal["pass", "warn", "fail"]
 IssueOverlapDecision = Literal["keep", "merge", "drop"]
 IssueInformationGainDecision = Literal["keep", "drop"]
+PublishDecisionStatus = Literal["publish", "hold"]
+DeliveryMode = Literal["email_and_html", "html_only", "none"]
 
 
 DAILY_BRIEF_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = (
@@ -225,6 +227,10 @@ class DailyBriefBullet(TypedDict, total=False):
 class DailyBriefMeta(TypedDict, total=False):
     status: str
     reason: str
+    citation_status: str
+    analytical_status: str
+    publish_decision: PublishDecisionStatus
+    reason_codes: list[str]
 
 
 class ClaimEvidenceItem(TypedDict, total=False):
@@ -282,6 +288,14 @@ class DailyBriefIssue(TypedDict, total=False):
     counter: list[DailyBriefBullet]
     minority: list[DailyBriefBullet]
     watch: list[DailyBriefBullet]
+
+
+class PublishDecision(TypedDict):
+    citation_status: str
+    analytical_status: str
+    publish_decision: PublishDecisionStatus
+    reason_codes: list[str]
+    delivery_mode: DeliveryMode
 
 
 class DailyBriefSynthesisV2(TypedDict, total=False):
@@ -441,6 +455,7 @@ class DailyBriefSynthesisStageData:
     information_gain_reports: list[IssueInformationGain]
     structured_claims: list[StructuredClaim]
     claim_deltas: list[ClaimDelta]
+    publish_decision: PublishDecision
     citation_store: dict[str, CitationStoreEntry]
     stage8_result: CitationValidationResult
     final_result: FinalSynthesisResult

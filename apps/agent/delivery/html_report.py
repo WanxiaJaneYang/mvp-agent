@@ -25,8 +25,10 @@ def render_daily_brief_html(
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     abstained = _is_abstained(synthesis)
-    status_title = "Abstained" if abstained else "Validated"
     brief = synthesis.get("brief", {}) if isinstance(synthesis.get("brief"), Mapping) else {}
+    citation_status = str((guardrail_checks or {}).get("citation_status") or ("abstained" if abstained else "ok"))
+    analytical_status = str((guardrail_checks or {}).get("analytical_status") or "pass")
+    publish_decision = str((guardrail_checks or {}).get("publish_decision") or ("hold" if abstained else "publish"))
     issues = _normalized_issues(synthesis)
     overview_html = _render_overview(brief)
 
@@ -160,7 +162,9 @@ def render_daily_brief_html(
       <div class="meta">
         <span>Date: {escape(report_date)}</span>
         <span>Run: {escape(run_id)}</span>
-        <span>Status: {escape(status_title)}</span>
+        <span>Citation status: {escape(_label(citation_status))}</span>
+        <span>Analytical quality: {escape(_label(analytical_status))}</span>
+        <span>Publish decision: {escape(_label(publish_decision))}</span>
       </div>
     </header>
     {overview_html}
@@ -312,6 +316,7 @@ def _render_guardrails(guardrail_checks: Mapping[str, Any] | None) -> str:
         f"<li>Budget: {escape(_label(str(guardrail_checks.get('budget_check', 'warn'))))}</li>"
         f"<li>Diversity: {escape(_label(str(guardrail_checks.get('diversity_check', 'warn'))))}</li>"
         f"<li>Citations: {escape(_label(str(guardrail_checks.get('citation_check', 'warn'))))}</li>"
+        f"<li>Analytical quality: {escape(_label(str(guardrail_checks.get('analytical_status', 'pass'))))}</li>"
         f"{notes}"
         "</ul>"
         "</section>"

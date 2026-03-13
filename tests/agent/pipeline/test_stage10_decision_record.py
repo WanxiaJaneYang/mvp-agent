@@ -68,6 +68,10 @@ class Stage10DecisionRecordTests(unittest.TestCase):
                     "budget_check": "pass",
                     "notes": [],
                 },
+                citation_status="ok",
+                analytical_status="warn",
+                publish_decision="publish",
+                reason_codes=["source_by_source_paraphrase"],
                 output_path=output_path,
                 generated_at_utc="2026-02-19T08:00:00Z",
             )
@@ -81,6 +85,10 @@ class Stage10DecisionRecordTests(unittest.TestCase):
             self.assertEqual(claims[0]["citation_ids"], ["c1"])
             self.assertEqual(claims[0]["why_it_matters"], "Energy inflation can stay sticky.")
             self.assertEqual(claims[0]["novelty_vs_prior_brief"], "strengthened")
+            self.assertEqual(result["decision_record"]["citation_status"], "ok")
+            self.assertEqual(result["decision_record"]["analytical_status"], "warn")
+            self.assertEqual(result["decision_record"]["publish_decision"], "publish")
+            self.assertEqual(result["decision_record"]["reason_codes"], ["source_by_source_paraphrase"])
             self.assertEqual(validate_decision_record(result["decision_record"]), [])
 
     def test_decision_record_validator_rejects_invalid_editorial_claim_fields(self):
