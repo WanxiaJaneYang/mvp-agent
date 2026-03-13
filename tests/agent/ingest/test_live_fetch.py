@@ -42,6 +42,24 @@ HTML_PAGE = """<!doctype html>
 </html>
 """
 
+HTML_PAGE_WITH_NOISE = """<!doctype html>
+<html lang="en">
+  <head>
+    <title>ECB speech</title>
+    <style>.banner { display: none; }</style>
+    <script>window.__BOOTSTRAP__ = { noisy: true };</script>
+  </head>
+  <body>
+    <nav>Cookie banner links</nav>
+    <main>
+      <h1>ECB speech</h1>
+      <p>Officials emphasized patience.</p>
+    </main>
+    <script>console.log("tracking")</script>
+  </body>
+</html>
+"""
+
 
 def _build_pdf_bytes(text: str) -> bytes:
     escaped_text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
@@ -167,6 +185,45 @@ class LiveFetchTests(unittest.TestCase):
         self.assertEqual(payloads[0]["fetched_at"], "2026-03-10T16:00:00Z")
         self.assertEqual(payloads[0]["doc_type"], "pdf")
         self.assertIsInstance(payloads[0]["pdf_bytes"], bytes)
+
+    def test_fetch_live_payloads_for_source_ignores_script_and_style_body_noise(self):
+        source = {
+            "id": "ecb_speech",
+            "url": "https://example.test/ecb/speech",
+            "type": "html",
+        }
+
+        with patch(
+            "apps.agent.ingest.live_fetch.urlopen",
+            return_value=_FakeResponse(HTML_PAGE_WITH_NOISE.encode("utf-8")),
+        ):
+            payloads = fetch_live_payloads_for_source(
+                source=source,
+                fetched_at_utc="2026-03-10T16:00:00Z",
+            )
+
+        self.assertEqual(len(payloads), 1)
+        self.assertIn("Officials emphasized patience.", payloads[0]["text"])
+        self.assertNotIn("window.__BOOTSTRAP__", payloads[0]["text"])
+        self.assertNotIn("display: none", payloads[0]["text"])
+        self.assertNotIn("console.log", payloads[0]["text"])
+
+    def test_fetch_live_payloads_for_source_rejects_non_pdf_bytes_for_pdf_source(self):
+        source = {
+            "id": "fed_minutes_pdf",
+            "url": "https://example.test/fed/minutes.pdf",
+            "type": "pdf",
+        }
+
+        with patch(
+            "apps.agent.ingest.live_fetch.urlopen",
+            return_value=_FakeResponse(b"<html>not actually a pdf</html>"),
+        ):
+            with self.assertRaisesRegex(ValueError, "Expected PDF content"):
+                fetch_live_payloads_for_source(
+                    source=source,
+                    fetched_at_utc="2026-03-10T16:00:00Z",
+                )
 
     def test_fetch_live_payloads_rejects_unknown_source_type(self):
         with self.assertRaises(ValueError):

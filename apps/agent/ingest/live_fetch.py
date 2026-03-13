@@ -119,6 +119,8 @@ def _pdf_payload_from_bytes(
     pdf_bytes: bytes,
     fetched_at_utc: str,
 ) -> dict[str, Any]:
+    if not pdf_bytes.startswith(b"%PDF-"):
+        raise ValueError("Expected PDF content for pdf source")
     url = str(source["url"])
     return {
         "url": url,
@@ -178,6 +180,7 @@ class _HtmlPayloadParser(HTMLParser):
         self._current_tag: str | None = None
         self._title_buffer = StringIO()
         self._body_depth = 0
+        self._ignored_body_tag_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = {name.lower(): value for name, value in attrs}
@@ -187,6 +190,8 @@ class _HtmlPayloadParser(HTMLParser):
             self._current_tag = "title"
         elif tag == "body":
             self._body_depth += 1
+        elif tag in {"script", "style", "noscript", "template"} and self._body_depth > 0:
+            self._ignored_body_tag_depth += 1
         elif tag == "meta":
             self._capture_meta(attributes)
         elif tag == "link" and str(attributes.get("rel") or "").lower() == "canonical":
@@ -198,13 +203,15 @@ class _HtmlPayloadParser(HTMLParser):
             if title:
                 self.title = title
             self._current_tag = None
+        elif tag in {"script", "style", "noscript", "template"} and self._ignored_body_tag_depth > 0:
+            self._ignored_body_tag_depth -= 1
         elif tag == "body" and self._body_depth > 0:
             self._body_depth -= 1
 
     def handle_data(self, data: str) -> None:
         if self._current_tag == "title":
             self._title_buffer.write(data)
-        if self._body_depth > 0:
+        if self._body_depth > 0 and self._ignored_body_tag_depth == 0:
             normalized = " ".join(data.split())
             if normalized:
                 if self.body_text is None:
