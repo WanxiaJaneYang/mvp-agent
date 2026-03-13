@@ -38,7 +38,9 @@ from apps.agent.pipeline.types import (
     EvidencePackItem,
     FinalSynthesisResult,
     FtsRow,
+    IssueInformationGain,
     IssueMap,
+    IssueOverlapReport,
     PlannedFetchItem,
     RunContext,
     RunStatus,
@@ -421,6 +423,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(get_args(corpus_hints["fts_rows"])[0], FtsRow)
 
         self.assertEqual(get_args(synthesis_hints["evidence_pack_items"])[0], EvidencePackItem)
+        self.assertEqual(get_args(synthesis_hints["issue_overlap_reports"])[0], IssueOverlapReport)
+        self.assertEqual(get_args(synthesis_hints["information_gain_reports"])[0], IssueInformationGain)
         self.assertEqual(get_args(synthesis_hints["citation_store"])[1], CitationStoreEntry)
         self.assertIs(synthesis_hints["stage8_result"], CitationValidationResult)
         self.assertIs(synthesis_hints["final_result"], FinalSynthesisResult)
@@ -611,6 +615,8 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertTrue((artifact_dir / "chunks.json").exists())
             self.assertTrue((artifact_dir / "brief_plan.json").exists())
             self.assertTrue((artifact_dir / "evidence_pack_items.json").exists())
+            self.assertTrue((artifact_dir / "issue_overlap_reports.json").exists())
+            self.assertTrue((artifact_dir / "information_gain_reports.json").exists())
             self.assertTrue((artifact_dir / "synthesis_bullets.json").exists())
             self.assertTrue((artifact_dir / "bullet_citations.json").exists())
             self.assertEqual(result["lifecycle"][0]["status"], "running")

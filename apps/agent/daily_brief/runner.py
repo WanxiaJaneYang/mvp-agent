@@ -10,6 +10,7 @@ from smtplib import SMTP
 from typing import Any, cast
 
 from apps.agent.daily_brief.editorial_planner import LocalBriefPlanner, build_corpus_summary
+from apps.agent.daily_brief.issue_dedup import dedupe_issues
 from apps.agent.daily_brief.issue_retrieval import build_brief_corpus_report, build_issue_evidence_scopes
 from apps.agent.daily_brief.model_interfaces import (
     BriefPlannerProvider,
@@ -59,7 +60,9 @@ from apps.agent.pipeline.types import (
     EvidencePackItem,
     FtsRow,
     IssueEvidenceScope,
+    IssueInformationGain,
     IssueMap,
+    IssueOverlapReport,
     RunStatus,
     RuntimeChunkRow,
     RuntimeDocumentRecord,
@@ -394,6 +397,8 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
     _write_json(artifact_dir / "issue_evidence_scopes.json", synthesis_data.issue_evidence_scopes)
     _write_json(artifact_dir / "issue_map.json", synthesis_data.issue_map)
+    _write_json(artifact_dir / "issue_overlap_reports.json", synthesis_data.issue_overlap_reports)
+    _write_json(artifact_dir / "information_gain_reports.json", synthesis_data.information_gain_reports)
     _write_json(artifact_dir / "claim_objects.json", synthesis_data.structured_claims)
     _write_json(artifact_dir / "critic_report.json", synthesis_data.critic_report)
     _write_json(artifact_dir / "citations.json", synthesis_data.citation_rows)
@@ -614,6 +619,8 @@ def build_daily_brief_synthesis(
     )
     issue_map: list[IssueMap] = []
     issue_evidence_scopes: list[IssueEvidenceScope] = []
+    issue_overlap_reports: list[IssueOverlapReport] = []
+    information_gain_reports: list[IssueInformationGain] = []
     structured_claims: list[StructuredClaim] = []
     if use_structured_orchestration:
         issue_evidence_scopes = build_issue_evidence_scopes(
@@ -631,6 +638,10 @@ def build_daily_brief_synthesis(
             prior_brief_context=prior_brief_context,
             run_id=run_id,
             generated_at_utc=synthesis_generated_at_utc,
+        )
+        issue_map, issue_overlap_reports, information_gain_reports = dedupe_issues(
+            issue_map=issue_map,
+            brief_plan=brief_plan,
         )
     validation_registry = _build_validation_registry(
         registry=registry,
@@ -743,6 +754,8 @@ def build_daily_brief_synthesis(
         evidence_pack_report=evidence_pack_report,
         issue_evidence_scopes=issue_evidence_scopes,
         issue_map=issue_map,
+        issue_overlap_reports=issue_overlap_reports,
+        information_gain_reports=information_gain_reports,
         structured_claims=structured_claims,
         citation_store=stage8_result["citation_store"],
         stage8_result=stage8_result,

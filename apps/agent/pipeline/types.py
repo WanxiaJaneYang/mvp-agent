@@ -29,6 +29,8 @@ SourceScarcityMode = Literal["normal", "scarce"]
 CitationValidationStatus = Literal["ok", "partial", "retry"]
 FinalSynthesisStatus = Literal["ok", "partial", "abstained"]
 CriticStatus = Literal["pass", "warn", "fail"]
+IssueOverlapDecision = Literal["keep", "merge", "drop"]
+IssueInformationGainDecision = Literal["keep", "drop"]
 
 
 DAILY_BRIEF_OUTPUT_SECTIONS: tuple[DailyBriefOutputSection, ...] = (
@@ -171,6 +173,24 @@ class IssueEvidenceScope(TypedDict):
     minority_chunk_ids: list[str]
     watch_chunk_ids: list[str]
     coverage_summary: IssueEvidenceCoverageSummary
+
+
+class IssueOverlapReport(TypedDict):
+    left_issue_id: str
+    right_issue_id: str
+    question_token_overlap: float
+    citation_overlap: float
+    source_overlap: float
+    thesis_overlap: str
+    decision: IssueOverlapDecision
+    reason_codes: list[str]
+
+
+class IssueInformationGain(TypedDict):
+    issue_id: str
+    information_gain_score: float
+    decision: IssueInformationGainDecision
+    reason_codes: list[str]
 
 
 class CitationStoreEntry(TypedDict):
@@ -403,6 +423,8 @@ class DailyBriefSynthesisStageData:
     evidence_pack_report: dict[str, Any]
     issue_evidence_scopes: list[IssueEvidenceScope]
     issue_map: list[IssueMap]
+    issue_overlap_reports: list[IssueOverlapReport]
+    information_gain_reports: list[IssueInformationGain]
     structured_claims: list[StructuredClaim]
     citation_store: dict[str, CitationStoreEntry]
     stage8_result: CitationValidationResult
