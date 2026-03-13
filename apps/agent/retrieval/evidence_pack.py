@@ -130,7 +130,7 @@ def _matching_rows(
         lexical_score = row.get("lexical_score")
         uses_precomputed_lexical = lexical_score not in (None, "")
         keyword_score = (
-            float(lexical_score)
+            _normalized_optional_score(lexical_score)
             if uses_precomputed_lexical
             else _keyword_score(text=str(row["text"]), query_terms=query_terms)
         )

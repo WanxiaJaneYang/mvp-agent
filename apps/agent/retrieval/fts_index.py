@@ -92,10 +92,12 @@ def persist_fts_rows(
             (chunk_id,),
         ).fetchone()
         if existing_row is not None:
-            connection.execute(
-                f"DELETE FROM {FTS_TABLE_NAME} WHERE rowid = ?",
-                (int(existing_row[0]),),
-            )
+            stored_rowid = existing_row[0]
+            if stored_rowid is not None:
+                connection.execute(
+                    f"DELETE FROM {FTS_TABLE_NAME} WHERE rowid = ?",
+                    (int(stored_rowid),),
+                )
         cursor = connection.execute(
             f"""
             INSERT INTO {FTS_TABLE_NAME} (
@@ -114,13 +116,16 @@ def persist_fts_rows(
                 str(row["text"]),
             ),
         )
+        inserted_rowid = cursor.lastrowid
+        if inserted_rowid is None:
+            raise RuntimeError("SQLite FTS insert did not return a rowid for persisted retrieval state.")
         connection.execute(
             f"""
             INSERT INTO {FTS_LOOKUP_TABLE_NAME} (chunk_id, fts_rowid)
             VALUES (?, ?)
             ON CONFLICT(chunk_id) DO UPDATE SET fts_rowid = excluded.fts_rowid
             """,
-            (chunk_id, int(cursor.lastrowid)),
+            (chunk_id, int(inserted_rowid)),
         )
     connection.commit()
 
