@@ -821,7 +821,7 @@ def _build_issue_map(
     generated_at_utc: str,
 ) -> list[IssueMap]:
     if issue_planner is not None:
-        return issue_planner.plan_issues(
+        issue_map = issue_planner.plan_issues(
             brief_input=IssuePlannerInput(
                 run_id=run_id,
                 generated_at_utc=generated_at_utc,
@@ -830,6 +830,7 @@ def _build_issue_map(
                 prior_brief_context=prior_brief_context,
             )
         )
+        return issue_map[: max(1, int(brief_plan["issue_budget"]))]
 
     fallback_topic = query_text or "today's dominant narrative"
     issue_question = (

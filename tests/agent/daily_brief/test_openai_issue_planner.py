@@ -94,6 +94,9 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
         self.assertEqual(captured_request["generated_at_utc"], "2026-03-12T00:00:00Z")
         self.assertEqual(captured_request["response_format"]["type"], "json_schema")
         self.assertEqual(captured_request["messages"][0]["role"], "system")
+        self.assertIn("up to 2 issue-centered", captured_request["messages"][0]["content"])
+        self.assertIn("up to 2 issue-centered", captured_request["messages"][1]["content"])
+        self.assertEqual(captured_request["response_format"]["json_schema"]["schema"]["maxItems"], 2)
         self.assertIn("brief_plan", captured_request["input"])
         self.assertEqual(len(captured_request["input"]["evidence_pack"]), 5)
         self.assertEqual(
@@ -101,6 +104,48 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
             {"chunk_id", "doc_id", "publisher", "title", "text", "retrieval_score"},
         )
         self.assertLessEqual(len(captured_request["input"]["prior_brief_context"]["oversized"]), 240)
+
+    def test_request_payload_tracks_single_issue_budget(self) -> None:
+        captured_request: dict[str, object] = {}
+
+        def loader(request_payload):
+            captured_request.update(request_payload)
+            return [
+                {
+                    "issue_id": "issue_oil",
+                    "issue_question": "Will oil prices keep rising over the next few weeks?",
+                    "thesis_hint": "Supply concerns are keeping near-term pressure skewed upward.",
+                    "supporting_evidence_ids": ["chunk_1"],
+                    "opposing_evidence_ids": [],
+                    "minority_evidence_ids": [],
+                    "watch_evidence_ids": [],
+                }
+            ]
+
+        planner = OpenAIIssuePlanner(response_loader=loader)
+        planner.plan_issues(
+            brief_input=IssuePlannerInput(
+                run_id="run_001",
+                generated_at_utc="2026-03-12T00:00:00Z",
+                brief_plan={
+                    "brief_id": "brief_2026-03-12_run_001",
+                    "brief_thesis": "Supply pressure is the main debate.",
+                    "top_takeaways": [],
+                    "issue_budget": 1,
+                    "render_mode": "compressed",
+                    "source_scarcity_mode": "scarce",
+                    "candidate_issue_seeds": ["supply pressure"],
+                    "issue_order": ["seed_001"],
+                    "watchlist": [],
+                    "reason_codes": ["source_scarcity_detected"],
+                },
+                evidence_pack=[{"chunk_id": "chunk_1"}],
+                prior_brief_context=None,
+            )
+        )
+
+        self.assertEqual(captured_request["response_format"]["json_schema"]["schema"]["maxItems"], 1)
+        self.assertIn("up to 1 issue-centered", captured_request["messages"][0]["content"])
 
     def test_plans_issues_from_schema_valid_json(self) -> None:
         planner = OpenAIIssuePlanner(
