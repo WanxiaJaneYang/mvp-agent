@@ -221,6 +221,24 @@ class AlertDeliveryTests(unittest.TestCase):
                 channels=AlertDeliveryChannels(),
             )
 
+    def test_deliver_alert_fails_when_send_action_has_no_delivery_channels(self):
+        result = deliver_alert(
+            content=_content(),
+            policy_decision=AlertPolicyDecision(
+                action="send",
+                score=_score(),
+                suppression_reason=None,
+                bundle_for_daily_brief=False,
+            ),
+            channels=AlertDeliveryChannels(),
+        )
+
+        self.assertEqual(result.delivery_status, "failed")
+        self.assertEqual(result.delivery_mode, "none")
+        self.assertEqual(result.delivered_channels, ())
+        self.assertTrue(result.retry_eligible)
+        self.assertIn("no delivery channels configured", result.failure_reason or "")
+
     def test_deliver_runtime_alert_writes_html_sends_email_and_persists_delivery_row(self):
         content = _content()
         result = deliver_runtime_alert(
@@ -276,7 +294,7 @@ class AlertDeliveryTests(unittest.TestCase):
 
         self.assertEqual(persisted, ("send", "delivered", None, None))
 
-    def test_deliver_runtime_alert_marks_email_failures_retryable_and_context_ignores_them(self):
+    def test_deliver_runtime_alert_counts_partial_sends_in_policy_context(self):
         content = _content()
         with tempfile.TemporaryDirectory() as tmpdir:
             ok_result = deliver_runtime_alert(
@@ -349,8 +367,8 @@ class AlertDeliveryTests(unittest.TestCase):
         self.assertEqual(ok_result.delivery_mode, "local_only")
         self.assertEqual(failed_result.delivery_status, "partial")
         self.assertTrue(failed_result.retry_eligible)
-        self.assertEqual(context.daily_alerts_sent, 1)
-        self.assertEqual(context.last_alert_sent_at, "2026-03-12T08:05:00Z")
+        self.assertEqual(context.daily_alerts_sent, 2)
+        self.assertEqual(context.last_alert_sent_at, "2026-03-12T09:05:00Z")
 
 
 if __name__ == "__main__":

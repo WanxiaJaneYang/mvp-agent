@@ -119,6 +119,19 @@ def deliver_alert(
     email_delivery: Any = None
     html_path: str | None = None
 
+    if channels.send_email is None and channels.write_local_page is None:
+        return AlertDeliveryResult(
+            alert_id=content.alert_id,
+            action="send",
+            delivery_status="failed",
+            delivery_mode="none",
+            delivered_channels=(),
+            retry_eligible=True,
+            failure_reason="no delivery channels configured",
+            suppression_reason=None,
+            bundle_item=None,
+        )
+
     if channels.send_email is not None:
         try:
             email_delivery = channels.send_email(
@@ -222,12 +235,10 @@ def deliver_runtime_alert(
     )
 
     delivered_email_at = (
-        created_at
-        if result.delivery_status == "delivered" and "email" in result.delivered_channels
-        else None
+        created_at if "email" in result.delivered_channels else None
     )
     delivered_local_page_at = (
-        created_at if result.delivery_status == "delivered" and "local_page" in result.delivered_channels else None
+        created_at if "local_page" in result.delivered_channels else None
     )
     db_path = persist_alert_record(
         base_dir=base_dir,
@@ -291,32 +302,36 @@ def load_alert_policy_context(
             cooldown_minutes=cooldown_minutes,
         )
 
-    delivered_statuses = ("delivered", "delivered_html_only", "delivered_email_and_html")
-    placeholders = ", ".join("?" for _ in delivered_statuses)
     day_partition = triggered_at[:10]
     connection = sqlite3.connect(db_path)
     try:
         daily_alerts_sent = int(
             connection.execute(
-                f"""
+                """
                 SELECT COUNT(*)
                 FROM alerts
-                WHERE delivery_status IN ({placeholders})
+                WHERE (
+                    delivered_email_at IS NOT NULL
+                    OR delivered_local_page_at IS NOT NULL
+                )
                   AND substr(triggered_at, 1, 10) = ?
                 """,
-                (*delivered_statuses, day_partition),
+                (day_partition,),
             ).fetchone()[0]
         )
         last_alert_sent_at = connection.execute(
-            f"""
+            """
             SELECT triggered_at
             FROM alerts
-            WHERE delivery_status IN ({placeholders})
+            WHERE (
+                delivered_email_at IS NOT NULL
+                OR delivered_local_page_at IS NOT NULL
+            )
               AND triggered_at <= ?
             ORDER BY triggered_at DESC
             LIMIT 1
             """,
-            (*delivered_statuses, triggered_at),
+            (triggered_at,),
         ).fetchone()
     finally:
         connection.close()
