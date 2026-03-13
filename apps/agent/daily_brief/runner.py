@@ -158,6 +158,7 @@ def run_fixture_daily_brief(
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -177,6 +178,7 @@ def run_fixture_daily_brief(
                 issue_planner=issue_planner,
                 claim_composer=claim_composer,
                 critic=critic,
+                provider_resolution=provider_resolution,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -205,6 +207,7 @@ def run_fixture_daily_brief(
                 run_id=run_id,
                 generated_at_utc=timestamp,
                 pipeline_result=pipeline_result,
+                provider_resolution=provider_resolution,
             )
         )
     execution.setdefault("status", pipeline_result["status"])
@@ -234,6 +237,7 @@ def run_daily_brief(
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     lifecycle: list[dict[str, Any]] = []
     execution: dict[str, Any] = {}
@@ -254,6 +258,7 @@ def run_daily_brief(
                 issue_planner=issue_planner,
                 claim_composer=claim_composer,
                 critic=critic,
+                provider_resolution=provider_resolution,
             )
         except Exception as exc:
             execution["status"] = "failed"
@@ -282,6 +287,7 @@ def run_daily_brief(
                 run_id=run_id,
                 generated_at_utc=timestamp,
                 pipeline_result=pipeline_result,
+                provider_resolution=provider_resolution,
             )
         )
     execution.setdefault("status", pipeline_result["status"])
@@ -313,6 +319,7 @@ def _execute_daily_brief_slice(
     issue_planner: IssuePlannerProvider | None = None,
     claim_composer: ClaimComposerProvider | None = None,
     critic: CriticProvider | None = None,
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     report_date = generated_at_utc[:10]
     schedule = delivery_schedule or DailyBriefSchedule()
@@ -465,6 +472,7 @@ def _execute_daily_brief_slice(
             "publish_decision": publish_summary["publish_decision"],
             "reason_codes": publish_summary["reason_codes"],
             "delivery_mode": publish_summary["delivery_mode"],
+            **_provider_summary(provider_resolution=provider_resolution),
         },
     )
 
@@ -483,6 +491,7 @@ def _execute_daily_brief_slice(
         "publish_decision": publish_summary["publish_decision"],
         "reason_codes": publish_summary["reason_codes"],
         "delivery_mode": publish_summary["delivery_mode"],
+        **_provider_summary(provider_resolution=provider_resolution),
     }
 
 
@@ -1435,6 +1444,7 @@ def _persist_budget_stop_outputs(
     run_id: str,
     generated_at_utc: str,
     pipeline_result: Mapping[str, Any],
+    provider_resolution: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     report_date = generated_at_utc[:10]
     artifact_dir = _artifact_dir(base_dir=base_dir, report_date=report_date, run_id=run_id)
@@ -1472,6 +1482,7 @@ def _persist_budget_stop_outputs(
             "budget_ledger_rows": list(pipeline_result.get("budget_ledger_rows", [])),
             "guardrail_checks": guardrail_checks,
             "diversity_stats": {},
+            **_provider_summary(provider_resolution=provider_resolution),
         },
     )
     return {
@@ -1481,6 +1492,7 @@ def _persist_budget_stop_outputs(
         "artifact_dir": str(artifact_dir),
         "query_text": None,
         "abstain_reason": pipeline_result.get("error_summary"),
+        **_provider_summary(provider_resolution=provider_resolution),
     }
 
 
@@ -1575,6 +1587,22 @@ def _persist_run_state(
         run_row=run_row,
         budget_ledger_rows=pipeline_result.get("budget_ledger_rows", []),
     )
+
+
+def _provider_summary(*, provider_resolution: Mapping[str, Any] | None) -> dict[str, Any]:
+    if isinstance(provider_resolution, Mapping):
+        return {
+            "requested_provider": provider_resolution.get("requested_provider"),
+            "resolved_provider": provider_resolution.get("resolved_provider"),
+            "provider_mode": provider_resolution.get("provider_mode"),
+            "provider_fallback_used": bool(provider_resolution.get("provider_fallback_used", False)),
+        }
+    return {
+        "requested_provider": None,
+        "resolved_provider": None,
+        "provider_mode": None,
+        "provider_fallback_used": False,
+    }
 
 
 def _utc_now_iso() -> str:

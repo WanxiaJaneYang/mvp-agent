@@ -30,8 +30,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--provider",
-        choices=("deterministic", "openai", "codex-oauth"),
-        default="deterministic",
+        choices=("auto", "deterministic", "openai", "codex-oauth"),
+        default="auto",
         help="Daily-brief synthesis provider mode.",
     )
     parser.add_argument(
@@ -43,14 +43,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    from apps.agent.daily_brief.provider_registry import build_daily_brief_providers
+    from apps.agent.daily_brief.critic import LocalDailyBriefCritic
+    from apps.agent.daily_brief.provider_registry import resolve_daily_brief_provider
     from apps.agent.daily_brief.runner import run_daily_brief
     from apps.agent.delivery.email_sender import EmailDeliveryConfig
     from apps.agent.delivery.scheduler import DailyBriefSchedule
 
     args = parse_args()
     try:
-        issue_planner, claim_composer = build_daily_brief_providers(
+        provider_resolution = resolve_daily_brief_provider(
             provider=args.provider,
             openai_model=args.openai_model,
         )
@@ -76,8 +77,10 @@ def main() -> None:
             delivery_minute=args.delivery_minute,
         ),
         email_config=email_config,
-        issue_planner=issue_planner,
-        claim_composer=claim_composer,
+        issue_planner=provider_resolution["issue_planner"],
+        claim_composer=provider_resolution["claim_composer"],
+        critic=LocalDailyBriefCritic(),
+        provider_resolution=provider_resolution,
     )
     print(json.dumps(result, indent=2))
     if result["status"] == "failed":

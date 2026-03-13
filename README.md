@@ -110,6 +110,12 @@ Run the active-subset daily brief against live feeds:
 python scripts/run_daily_brief.py
 ```
 
+The live runner now defaults to `--provider auto`, which resolves providers in this order:
+- `codex-oauth`
+- `openai`
+
+If neither provider is available, the live command fails closed instead of silently falling back to the deterministic path.
+
 Run the deterministic fixture-backed daily brief slice:
 
 ```bash
