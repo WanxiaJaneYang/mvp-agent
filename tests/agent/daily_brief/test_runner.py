@@ -842,6 +842,183 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertIn("What Changed", html)
         self.assertIn("Delta", html)
 
+    def test_build_daily_brief_synthesis_does_not_reintroduce_removed_claims_in_changed_section(self):
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                return [
+                    IssueMap(
+                        issue_id="issue_001",
+                        issue_question="Will softer growth change near-term Fed expectations?",
+                        thesis_hint="Growth is cooling, but inflation remains sticky.",
+                        supporting_evidence_ids=["chunk_001", "chunk_002"],
+                        opposing_evidence_ids=[],
+                        minority_evidence_ids=[],
+                        watch_evidence_ids=[],
+                    )
+                ]
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                return [
+                    StructuredClaim(
+                        claim_id="claim_001",
+                        issue_id="issue_001",
+                        claim_kind="prevailing",
+                        claim_text="Softer growth is strengthening later-cut expectations.",
+                        supporting_citation_ids=["cite_001"],
+                        opposing_citation_ids=[],
+                        confidence="medium",
+                        novelty_vs_prior_brief="strengthened",
+                        why_it_matters="Rate-sensitive assets can reprice quickly.",
+                    ),
+                    StructuredClaim(
+                        claim_id="claim_002",
+                        issue_id="issue_001",
+                        claim_kind="counter",
+                        claim_text="Policy language remains cautious.",
+                        supporting_citation_ids=["cite_002"],
+                        opposing_citation_ids=[],
+                        confidence="medium",
+                        novelty_vs_prior_brief="reversed",
+                        why_it_matters="Cuts are not imminent.",
+                    ),
+                ]
+
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "fed_press_releases",
+                    "publisher": "Federal Reserve",
+                    "canonical_url": "https://example.test/1",
+                    "title": "Fed keeps policy steady",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "statement",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "fetched_at": "2026-03-10T14:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "body_text": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "content_hash": "hash_1",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:05:00Z",
+                    "updated_at": "2026-03-10T14:05:00Z",
+                    "doc_id": "doc_001",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_claim_delta",
+                },
+                {
+                    "source_id": "wsj_markets",
+                    "publisher": "Wall Street Journal",
+                    "canonical_url": "https://example.test/2",
+                    "title": "Investors question the soft-landing narrative",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T14:20:00Z",
+                    "fetched_at": "2026-03-10T14:25:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Investors question the soft-landing narrative as growth data weakens.",
+                    "body_text": "Investors question the soft-landing narrative as growth data weakens.",
+                    "content_hash": "hash_2",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:25:00Z",
+                    "updated_at": "2026-03-10T14:25:00Z",
+                    "doc_id": "doc_002",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_claim_delta",
+                },
+            ],
+            chunks=[
+                {"chunk_id": "chunk_001", "doc_id": "doc_001", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},
+                {"chunk_id": "chunk_002", "doc_id": "doc_002", "chunk_index": 0, "text": "Investors question the soft-landing narrative as growth data weakens.", "token_count": 9, "char_start": 0, "char_end": 68, "created_at": "2026-03-10T14:25:00Z"},
+            ],
+            fts_rows=[
+                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_001", "chunk_id": "chunk_001", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
+                {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_002", "chunk_id": "chunk_002", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
+            ],
+        )
+        registry = {
+            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/1", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},
+            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/2", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+        }
+        validated_synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will softer growth change near-term Fed expectations?",
+                    "title": "Will softer growth change near-term Fed expectations?",
+                    "summary": "Growth is cooling, but inflation remains sticky.",
+                    "prevailing": [
+                        {
+                            "claim_id": "claim_001",
+                            "claim_kind": "prevailing",
+                            "text": "Softer growth is strengthening later-cut expectations.",
+                            "citation_ids": ["cite_001"],
+                            "confidence_label": "medium",
+                        }
+                    ],
+                    "counter": [],
+                    "minority": [],
+                    "watch": [],
+                }
+            ],
+            "meta": {"status": "validated"},
+        }
+        citation_store = {
+            "cite_001": {"citation_id": "cite_001", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "doc_id": "doc_001", "chunk_id": "chunk_001", "url": "https://example.test/1", "title": "Fed keeps policy steady", "published_at": "2026-03-10T14:00:00Z", "fetched_at": "2026-03-10T14:05:00Z", "paywall_policy": "full", "quote_text": "Fed officials kept policy steady while inflation progress remained uneven.", "snippet_text": "Fed officials kept policy steady while inflation progress remained uneven."},
+            "cite_002": {"citation_id": "cite_002", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "doc_id": "doc_002", "chunk_id": "chunk_002", "url": "https://example.test/2", "title": "Investors question the soft-landing narrative", "published_at": "2026-03-10T14:20:00Z", "fetched_at": "2026-03-10T14:25:00Z", "paywall_policy": "full", "quote_text": "Investors question the soft-landing narrative as growth data weakens.", "snippet_text": "Investors question the soft-landing narrative as growth data weakens."},
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_evidence_pack_report") as evidence_pack_report_mock, patch(
+            "apps.agent.daily_brief.runner.run_stage8_citation_validation"
+        ) as validation_mock:
+            evidence_pack_report_mock.return_value = {
+                "items": [
+                    {"chunk_id": "chunk_001", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.88, "semantic_score": 0.88, "recency_score": 0.70, "credibility_score": 1.0, "rank_in_pack": 1},
+                    {"chunk_id": "chunk_002", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.84, "semantic_score": 0.84, "recency_score": 0.66, "credibility_score": 0.8, "rank_in_pack": 2},
+                ],
+                "diversity_stats": {"unique_publishers": 2},
+                "diversity_check": "warn",
+                "notes": [],
+            }
+            validation_mock.return_value = {
+                "status": "partial",
+                "synthesis": validated_synthesis,
+                "citation_store": citation_store,
+                "report": {
+                    "removed_bullets": 1,
+                    "empty_core_sections": ["counter", "minority", "watch"],
+                    "total_bullets": 2,
+                    "cited_bullets": 1,
+                    "validation_passed": False,
+                    "should_retry": False,
+                    "synthesis": validated_synthesis,
+                    "citation_store": citation_store,
+                },
+            }
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=stage_data,
+                registry=registry,
+                run_id="run_claim_delta",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                previous_synthesis={
+                    "prevailing": [{"text": "Prior prevailing claim.", "citation_ids": ["cite_old_001"]}],
+                    "counter": [{"text": "Prior counter claim.", "citation_ids": ["cite_old_002"]}],
+                },
+                issue_planner=_Planner(),
+                claim_composer=_Composer(),
+            )
+
+        changed = synthesis.final_result["synthesis"]["changed"]
+        self.assertEqual(len(changed), 1)
+        self.assertEqual(changed[0]["claim_id"], "claim_001")
+        self.assertNotIn("claim_002", {bullet.get("claim_id") for bullet in changed})
+
     def test_run_fixture_daily_brief_persists_budget_preflight_truthfully(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = run_fixture_daily_brief(
