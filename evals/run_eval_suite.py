@@ -13,6 +13,15 @@ from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.retrieval.evidence_pack import build_evidence_pack  # noqa: E402
 from apps.agent.synthesis.postprocess import CORE_SECTIONS, finalize_validation_outcome  # noqa: E402
 
+SUPPORTED_NOVELTY_LABELS = {
+    "new",
+    "continued",
+    "reframed",
+    "weakened",
+    "strengthened",
+    "reversed",
+}
+
 
 def _load_cases(golden_dir: Path) -> List[Dict[str, Any]]:
     case_files = sorted(golden_dir.glob("case*.json"))
@@ -93,9 +102,8 @@ def _run_literature_review_case(case: Dict[str, Any]) -> List[str]:
 
     expected_reason_codes = expected.get("reason_codes")
     if isinstance(expected_reason_codes, list):
-        for reason_code in expected_reason_codes:
-            if reason_code not in actual_reason_codes:
-                errors.append(f"expected reason_code={reason_code}, got {actual_reason_codes}")
+        if actual_reason_codes != expected_reason_codes:
+            errors.append(f"expected reason_codes={expected_reason_codes}, got {actual_reason_codes}")
     return errors
 
 
@@ -155,7 +163,12 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
     else:
         bottom_line = str(brief.get("bottom_line") or "").strip()
         takeaways = brief.get("top_takeaways")
-        if not bottom_line or not isinstance(takeaways, list) or len([item for item in takeaways if str(item).strip()]) == 0:
+        takeaway_items = (
+            [item for item in takeaways if str(item).strip()]
+            if isinstance(takeaways, list)
+            else []
+        )
+        if not bottom_line or not takeaway_items:
             reason_codes.append("missing_top_summary")
 
     issues = synthesis.get("issues", [])
@@ -166,8 +179,8 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
         issue_question = str(issue.get("issue_question") or issue.get("title") or "").strip().lower()
         if issue_question in normalized_questions:
             reason_codes.append("duplicate_issue")
-            break
-        normalized_questions.add(issue_question)
+        else:
+            normalized_questions.add(issue_question)
         for section in ("prevailing", "counter", "minority", "watch"):
             bullets = issue.get(section, [])
             if not isinstance(bullets, list):
@@ -180,7 +193,7 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
                 text = str(bullet.get("text") or "").lower()
                 if not why_it_matters:
                     reason_codes.append("empty_why_it_matters")
-                if novelty in {"", "unknown"}:
+                if novelty not in SUPPORTED_NOVELTY_LABELS:
                     reason_codes.append("unsupported_novelty")
                 if any(verb in text for verb in (" says ", " said ", " reported ", " reports ")) and any(
                     publisher in text for publisher in ("reuters", "federal reserve", "wsj", "bloomberg")

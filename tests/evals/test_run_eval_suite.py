@@ -121,6 +121,119 @@ class EvalRunnerTests(unittest.TestCase):
         self.assertIn("TODO", readme_text)
         self.assertIn("retrieval -> validation -> abstain", readme_text)
 
+    def test_literature_review_case_fails_on_unexpected_extra_reason_codes(self):
+        case = {
+            "type": "literature_review",
+            "synthesis": {
+                "brief": {
+                    "bottom_line": "Macro cooling is widening the market-policy gap.",
+                    "top_takeaways": ["Cooling macro data matters."],
+                },
+                "issues": [
+                    {
+                        "issue_id": "issue_001",
+                        "issue_question": "Will cooling growth change Fed expectations?",
+                        "prevailing": [
+                            {
+                                "text": "Reuters says traders are turning more dovish.",
+                                "novelty_vs_prior_brief": "strengthened",
+                                "why_it_matters": "",
+                            }
+                        ],
+                        "counter": [],
+                        "minority": [],
+                        "watch": [],
+                    }
+                ],
+            },
+            "expected": {
+                "passes": False,
+                "reason_codes": ["pseudo_analysis"],
+            },
+        }
+
+        errors = run_eval_suite._run_literature_review_case(case)
+
+        self.assertTrue(
+            any(
+                "expected reason_codes=['pseudo_analysis'], got" in error
+                for error in errors
+            )
+        )
+
+    def test_literature_review_reason_codes_continue_after_duplicate_issue(self):
+        synthesis = {
+            "brief": {
+                "bottom_line": "Macro cooling is widening the market-policy gap.",
+                "top_takeaways": ["Cooling macro data matters."],
+            },
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will cooling growth change Fed expectations?",
+                    "prevailing": [
+                        {
+                            "text": "Cooling growth is shifting rate expectations.",
+                            "novelty_vs_prior_brief": "strengthened",
+                            "why_it_matters": "Rates can reprice quickly.",
+                        }
+                    ],
+                    "counter": [],
+                    "minority": [],
+                    "watch": [],
+                },
+                {
+                    "issue_id": "issue_002",
+                    "issue_question": "Will cooling growth change Fed expectations?",
+                    "prevailing": [
+                        {
+                            "text": "Reuters says the same cooling-growth story is spreading.",
+                            "novelty_vs_prior_brief": "unknown",
+                            "why_it_matters": "",
+                        }
+                    ],
+                    "counter": [],
+                    "minority": [],
+                    "watch": [],
+                },
+            ],
+        }
+
+        reason_codes = run_eval_suite._literature_review_reason_codes(synthesis)
+
+        self.assertIn("duplicate_issue", reason_codes)
+        self.assertIn("empty_why_it_matters", reason_codes)
+        self.assertIn("unsupported_novelty", reason_codes)
+        self.assertIn("pseudo_analysis", reason_codes)
+
+    def test_literature_review_reason_codes_reject_invalid_novelty_labels(self):
+        synthesis = {
+            "brief": {
+                "bottom_line": "Macro cooling is widening the market-policy gap.",
+                "top_takeaways": ["Cooling macro data matters."],
+            },
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will cooling growth change Fed expectations?",
+                    "prevailing": [
+                        {
+                            "text": "Cooling growth is shifting rate expectations.",
+                            "novelty_vs_prior_brief": "stale",
+                            "why_it_matters": "Rates can reprice quickly.",
+                        }
+                    ],
+                    "counter": [],
+                    "minority": [],
+                    "watch": [],
+                }
+            ],
+        }
+
+        reason_codes = run_eval_suite._literature_review_reason_codes(synthesis)
+
+        self.assertIn("unsupported_novelty", reason_codes)
+
 
 if __name__ == "__main__":
     unittest.main()
