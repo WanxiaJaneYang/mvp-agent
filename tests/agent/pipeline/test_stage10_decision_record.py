@@ -82,6 +82,66 @@ class Stage10DecisionRecordTests(unittest.TestCase):
             self.assertEqual(claims[0]["why_it_matters"], "Energy inflation can stay sticky.")
             self.assertEqual(claims[0]["novelty_vs_prior_brief"], "strengthened")
             self.assertEqual(validate_decision_record(result["decision_record"]), [])
+
+    def test_decision_record_validator_rejects_invalid_editorial_claim_fields(self):
+        record = {
+            "schema_version": "decision_record.v1",
+            "record_id": "record_bad_fields",
+            "run_id": "run_bad_fields",
+            "run_type": "daily_brief",
+            "generated_at_utc": "2026-02-19T08:00:00Z",
+            "status": "ok",
+            "claims": [
+                {
+                    "claim_id": "claim_001",
+                    "section": "prevailing",
+                    "text": "Claim text.",
+                    "citation_ids": ["c1"],
+                    "coverage_status": "supported",
+                    "claim_kind": "invalid_kind",
+                    "why_it_matters": None,
+                    "novelty_vs_prior_brief": "stale",
+                }
+            ],
+            "budget_snapshot": {
+                "hourly_spend_usd": 0.03,
+                "hourly_cap_usd": 0.10,
+                "daily_spend_usd": 0.8,
+                "daily_cap_usd": 3.0,
+                "monthly_spend_usd": 12.4,
+                "monthly_cap_usd": 100.0,
+                "allowed": True,
+            },
+            "guardrail_checks": {
+                "citation_check": "pass",
+                "paywall_check": "pass",
+                "diversity_check": "pass",
+                "budget_check": "pass",
+                "notes": [],
+            },
+            "artifacts": {
+                "output_path": "brief.html",
+                "output_sha256": "0" * 64,
+                "synthesis_id": "syn_run_bad_fields",
+            },
+            "decision_rationale": {
+                "summary": "Summary",
+                "confidence_label": "medium",
+                "key_drivers": ["driver"],
+                "uncertainties": [],
+            },
+            "rejected_alternatives": [],
+            "risk_flags": [],
+        }
+
+        errors = validate_decision_record(record)
+
+        self.assertIn("claim claim_kind must be prevailing|counter|minority|watch|changed", errors)
+        self.assertIn("claim why_it_matters must be a string", errors)
+        self.assertIn(
+            "claim novelty_vs_prior_brief must be new|continued|reframed|weakened|strengthened|reversed|unknown",
+            errors,
+        )
     def test_persists_decision_record_to_date_partitioned_path(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "daily" / "2026-02-19" / "brief.html"

@@ -15,6 +15,8 @@ CLAIM_SECTIONS = DAILY_BRIEF_CLAIM_SECTIONS
 COVERAGE_STATUSES = {"supported", "insufficient_evidence", "removed"}
 GUARDRAIL_LEVELS = {"pass", "warn", "fail"}
 CONFIDENCE_LABELS = {"high", "medium", "low"}
+CLAIM_KINDS = {"prevailing", "counter", "minority", "watch", "changed"}
+NOVELTY_LABELS = {"new", "continued", "reframed", "weakened", "strengthened", "reversed", "unknown"}
 REJECTED_REASON_CODES = {
     "insufficient_evidence",
     "policy_violation",
@@ -87,6 +89,20 @@ def validate_decision_record(record: dict[str, Any]) -> list[str]:
         section = claim.get("section")
         if section not in CLAIM_SECTIONS:
             errors.append("claim section must be prevailing|counter|minority|watch|changed")
+
+        claim_kind = claim.get("claim_kind")
+        if claim_kind not in CLAIM_KINDS:
+            errors.append("claim claim_kind must be prevailing|counter|minority|watch|changed")
+
+        why_it_matters = claim.get("why_it_matters")
+        if not isinstance(why_it_matters, str):
+            errors.append("claim why_it_matters must be a string")
+
+        novelty = claim.get("novelty_vs_prior_brief")
+        if novelty not in NOVELTY_LABELS:
+            errors.append(
+                "claim novelty_vs_prior_brief must be new|continued|reframed|weakened|strengthened|reversed|unknown"
+            )
 
         citation_ids = claim.get("citation_ids")
         if not isinstance(citation_ids, list) or not all(isinstance(v, str) for v in citation_ids):
