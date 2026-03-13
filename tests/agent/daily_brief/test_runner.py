@@ -1656,6 +1656,138 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(critic.last_input["run_id"], "run_daily_fixture")
         self.assertIn("issues", critic.last_input["synthesis"])
 
+    def test_build_daily_brief_synthesis_changed_section_skips_claims_removed_by_validation(self):
+        stage_inputs = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
+        context = RunContext(
+            run_id="run_daily_fixture",
+            run_type=RunType.DAILY_BRIEF,
+            started_at="2026-03-10T16:00:00Z",
+            status=RunStatus.RUNNING,
+        )
+        corpus = build_daily_brief_corpus(
+            stage_data=stage_inputs,
+            run_id="run_daily_fixture",
+            context=context,
+        )
+        flat_synthesis = {
+            "prevailing": [
+                {"text": "Prevailing claim survives validation.", "citation_ids": ["cite_001"]}
+            ],
+            "counter": [
+                {"text": "Counter claim is removed during validation.", "citation_ids": ["cite_002"]}
+            ],
+            "minority": [],
+            "watch": [],
+        }
+        validated_synthesis = {
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "What is the latest market debate?",
+                    "title": "What is the latest market debate?",
+                    "summary": "The latest evidence pack centers on today's dominant narrative.",
+                    "prevailing": [
+                        {
+                            "claim_id": "issue_001_prevailing_001",
+                            "claim_kind": "prevailing",
+                            "text": "Prevailing claim survives validation.",
+                            "citation_ids": ["cite_001"],
+                            "confidence_label": "medium",
+                        }
+                    ],
+                    "counter": [],
+                    "minority": [],
+                    "watch": [],
+                }
+            ],
+            "meta": {"status": "validated"},
+        }
+        citation_store = {
+            "cite_001": {
+                "citation_id": "cite_001",
+                "source_id": "src1",
+                "publisher": "Pub 1",
+                "doc_id": "doc_001",
+                "chunk_id": "chunk_001",
+                "url": "https://example.test/1",
+                "title": "Doc 1",
+                "published_at": "2026-03-10T10:00:00Z",
+                "fetched_at": "2026-03-10T10:05:00Z",
+                "paywall_policy": "full",
+                "quote_text": "Quote 1",
+                "snippet_text": "Snippet 1",
+            },
+            "cite_002": {
+                "citation_id": "cite_002",
+                "source_id": "src2",
+                "publisher": "Pub 2",
+                "doc_id": "doc_002",
+                "chunk_id": "chunk_002",
+                "url": "https://example.test/2",
+                "title": "Doc 2",
+                "published_at": "2026-03-10T11:00:00Z",
+                "fetched_at": "2026-03-10T11:05:00Z",
+                "paywall_policy": "full",
+                "quote_text": "Quote 2",
+                "snippet_text": "Snippet 2",
+            },
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_synthesis") as build_synthesis_mock, patch(
+            "apps.agent.daily_brief.runner.run_stage8_citation_validation"
+        ) as validation_mock, patch(
+            "apps.agent.daily_brief.runner.build_claim_deltas"
+        ) as build_claim_deltas_mock:
+            build_synthesis_mock.return_value = flat_synthesis
+            validation_mock.return_value = {
+                "status": "partial",
+                "synthesis": validated_synthesis,
+                "citation_store": citation_store,
+                "report": {
+                    "removed_bullets": 1,
+                    "empty_core_sections": ["counter"],
+                    "total_bullets": 1,
+                    "cited_bullets": 1,
+                    "validation_passed": False,
+                    "should_retry": False,
+                    "synthesis": validated_synthesis,
+                    "citation_store": citation_store,
+                },
+            }
+            build_claim_deltas_mock.return_value = [
+                {
+                    "claim_id": "issue_001_prevailing_001",
+                    "prior_claim_ref": "prior prevailing claim",
+                    "novelty_label": "strengthened",
+                    "delta_explanation": "Prevailing claim gained support.",
+                    "supporting_prior_overlap": {
+                        "citation_overlap": 0.5,
+                        "thesis_overlap": "medium",
+                    },
+                },
+                {
+                    "claim_id": "issue_001_counter_001",
+                    "prior_claim_ref": "prior counter claim",
+                    "novelty_label": "reversed",
+                    "delta_explanation": "Counter claim lost support.",
+                    "supporting_prior_overlap": {
+                        "citation_overlap": 0.2,
+                        "thesis_overlap": "low",
+                    },
+                },
+            ]
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=corpus,
+                registry=stage_inputs.registry,
+                run_id="run_daily_fixture",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                previous_synthesis={},
+            )
+
+        changed = synthesis.final_result["synthesis"]["changed"]
+        self.assertEqual([bullet["claim_id"] for bullet in changed], ["issue_001_prevailing_001"])
+
 
 if __name__ == "__main__":
     unittest.main()

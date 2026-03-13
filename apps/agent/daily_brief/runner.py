@@ -734,9 +734,14 @@ def build_daily_brief_synthesis(
         )
 
     final_result = finalize_validation_outcome(validation_result=stage8_result)
+    validated_claim_ids = _claim_ids_in_synthesis(synthesis=final_result["synthesis"])
     changed_section = build_changed_section_from_deltas(
-        structured_claims=structured_claims,
-        claim_deltas=claim_deltas,
+        structured_claims=[
+            claim for claim in structured_claims if str(claim["claim_id"]) in validated_claim_ids
+        ],
+        claim_deltas=[
+            delta for delta in claim_deltas if str(delta["claim_id"]) in validated_claim_ids
+        ],
     )
     if changed_section:
         final_synthesis = dict(final_result["synthesis"])
@@ -1153,6 +1158,38 @@ def _iter_synthesis_bullets(
         for bullet_index, bullet in enumerate(changed_bullets):
             if isinstance(bullet, Mapping):
                 yield "changed", bullet_index, bullet
+
+
+def _claim_ids_in_synthesis(*, synthesis: Mapping[str, Any]) -> set[str]:
+    claim_ids: set[str] = set()
+    issues = synthesis.get("issues")
+    if isinstance(issues, list):
+        for issue in issues:
+            if not isinstance(issue, Mapping):
+                continue
+            for section in ("prevailing", "counter", "minority", "watch"):
+                bullets = issue.get(section, [])
+                if not isinstance(bullets, list):
+                    continue
+                for bullet in bullets:
+                    if not isinstance(bullet, Mapping):
+                        continue
+                    claim_id = bullet.get("claim_id")
+                    if claim_id is not None:
+                        claim_ids.add(str(claim_id))
+        return claim_ids
+
+    for section in ("prevailing", "counter", "minority", "watch"):
+        bullets = synthesis.get(section, [])
+        if not isinstance(bullets, list):
+            continue
+        for bullet in bullets:
+            if not isinstance(bullet, Mapping):
+                continue
+            claim_id = bullet.get("claim_id")
+            if claim_id is not None:
+                claim_ids.add(str(claim_id))
+    return claim_ids
 
 
 def _write_json(path: Path, payload: Any) -> None:
