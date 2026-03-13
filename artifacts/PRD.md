@@ -56,6 +56,7 @@ The product goal is not to summarize sources one by one. It should identify the 
 - **Important issues per brief:** target 2; allow 3 only when evidence diversity and information gain support a third distinct issue
 - **Issue budget rule:** never force 3 issues; if the corpus only supports 1-2 distinct issues, the brief must stay at 1-2
 - **Source-scarcity rule:** if the corpus cannot support 2 distinct issues with adequate diversity, render a compressed brief with 1 main issue + 2-3 key takeaways + a short watchlist instead of padding with thin issues
+- **Zero-evidence guard:** compressed mode only applies when at least 1 issue passes evidence thresholds; if no defensible issue can be supported, emit an explicit insufficient-evidence abstention instead
 - **Per issue structure:**
   - issue title or question
   - short synthesis summary
@@ -137,14 +138,18 @@ The daily brief must follow this pipeline:
 2. **Issue planner (model layer)**
    - consumes bounded evidence pack and optional prior-brief context
    - outputs structured `IssueMap[]`
+   - may also return issue-overlap / information-gain decisions used to merge, demote, or drop weak issue candidates
 3. **Claim composer (model layer)**
    - consumes `IssueMap[]` plus citations
    - outputs structured `ClaimObject[]`
+4. **Brief planner / editorial contract**
+   - decides `render_mode`, `brief_thesis`, `top_takeaways`, `issue_budget`, and `watchlist`
+   - owns compressed-brief fields before rendering
 4. **Validator / critic**
    - deterministic citation and evidence checks are mandatory
    - optional critic pass can reject shallow source-by-source paraphrase
 5. **Renderer**
-   - HTML/email consume structured issue and claim objects
+   - HTML/email consume the brief-level contract plus structured issue and claim objects
 
 This replaces the earlier single-query, section-bullet synthesis design.
 
@@ -153,13 +158,19 @@ Each daily brief should read like a short literature review across 2-3 issues wh
 
 Issue-budget and scarcity rules:
 - default to 2 issues when the corpus supports multiple distinct debates
-- allow 3 issues only when the third issue adds clear incremental information and does not materially overlap the first 2
+- allow 3 issues only when the third issue adds at least 1 unique supporting evidence item beyond the first 2 and does not materially overlap them
 - if source scarcity, low diversity, or high overlap prevents 2 distinct issues, render a compressed brief with:
   - `bottom_line` / brief thesis
   - `top_takeaways`
   - 1 main issue block
-  - `watchlist`
+  - `watchlist` (max 3 items)
 - issues that fail distinctness or information-gain thresholds must be merged, demoted to takeaways/watchlist, or dropped rather than forced into the body
+
+Definitions for implementation and evals:
+- **adequate diversity:** at least 3 unique publishers across the candidate corpus and no single publisher contributes more than 40% of the supporting evidence for a retained issue set
+- **clear incremental information:** a candidate issue contributes at least 1 supporting evidence item not already used by a retained issue and changes the brief-level takeaway set
+- **materially overlap:** more than 50% overlap in supporting+opposing evidence IDs or an equivalent same-thesis determination from the issue-dedup layer
+- **compressed brief:** valid only when exactly 1 retained issue remains after scarcity/dedup gates; if 0 issues remain, emit an explicit insufficient-evidence abstention instead
 
 For each issue, the system must produce:
 - `issue_question`
@@ -297,6 +308,9 @@ Outputs:
 ### Issue planning
 - Daily brief generation does not depend on a single top-term query alone.
 - The system produces 2-3 issue candidates when evidence diversity supports it.
+- The system never forces a third issue when no unique supporting evidence remains after overlap / information-gain checks.
+- If no defensible issue survives the evidence gates, the run emits an explicit insufficient-evidence abstention instead of a compressed brief.
+- If exactly 1 issue survives, the run emits compressed mode with `bottom_line`, `top_takeaways`, 1 issue block, and a `watchlist` of at most 3 items.
 - `prevailing`, `counter`, and `minority` claims for an issue all address the same issue question.
 
 ### Claim composition
@@ -312,6 +326,7 @@ Outputs:
 - Stable structured output.
 - Includes Tier 1 sources when topic is policy-related (if available).
 - Renderer displays issue summaries plus evidence-backed arguments.
+- Renderer consumes a brief-level contract that includes `render_mode`, `brief_thesis`, `top_takeaways`, and `watchlist` before issue blocks.
 
 ### Alerts
 - Max alerts/day enforced.
