@@ -1,0 +1,26 @@
+{
+  "id": "literature_review_missing_top_summary",
+  "type": "literature_review",
+  "synthesis": {
+    "issues": [
+      {
+        "issue_id": "issue_001",
+        "issue_question": "Will softer growth change near-term Fed expectations?",
+        "prevailing": [
+          {
+            "text": "Softer growth is raising later-cut expectations.",
+            "novelty_vs_prior_brief": "strengthened",
+            "why_it_matters": "Rates can reprice quickly."
+          }
+        ],
+        "counter": [],
+        "minority": [],
+        "watch": []
+      }
+    ]
+  },
+  "expected": {
+    "passes": false,
+    "reason_codes": ["missing_top_summary"]
+  }
+}

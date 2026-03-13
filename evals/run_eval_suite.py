@@ -13,6 +13,15 @@ from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation
 from apps.agent.retrieval.evidence_pack import build_evidence_pack  # noqa: E402
 from apps.agent.synthesis.postprocess import CORE_SECTIONS, finalize_validation_outcome  # noqa: E402
 
+SUPPORTED_NOVELTY_LABELS = {
+    "new",
+    "continued",
+    "reframed",
+    "weakened",
+    "strengthened",
+    "reversed",
+}
+
 
 def _load_cases(golden_dir: Path) -> List[Dict[str, Any]]:
     case_files = sorted(golden_dir.glob("case*.json"))
@@ -81,6 +90,23 @@ def _run_postprocess_case(case: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _run_literature_review_case(case: Dict[str, Any]) -> List[str]:
+    errors: List[str] = []
+    synthesis = case["synthesis"]
+    expected = case["expected"]
+    actual_reason_codes = _literature_review_reason_codes(synthesis)
+    expected_passes = bool(expected.get("passes", True))
+    actual_passes = len(actual_reason_codes) == 0
+    if actual_passes != expected_passes:
+        errors.append(f"expected passes={expected_passes}, got {actual_passes}")
+
+    expected_reason_codes = expected.get("reason_codes")
+    if isinstance(expected_reason_codes, list):
+        if actual_reason_codes != expected_reason_codes:
+            errors.append(f"expected reason_codes={expected_reason_codes}, got {actual_reason_codes}")
+    return errors
+
+
 def _core_section_view(synthesis: Dict[str, Any]) -> Dict[str, Any]:
     issues = synthesis.get("issues")
     if isinstance(issues, list) and issues:
@@ -100,6 +126,8 @@ def _run_case(case: Dict[str, Any]) -> List[str]:
             return [f"{case_id}: {error}" for error in _run_retrieval_case(case)]
         if case_type == "postprocess":
             return [f"{case_id}: {error}" for error in _run_postprocess_case(case)]
+        if case_type == "literature_review":
+            return [f"{case_id}: {error}" for error in _run_literature_review_case(case)]
         return [f"{case_id}: unknown case type: {case_type}"]
     except Exception as exc:
         return [f"{case_id}: exception: {exc}"]
@@ -125,6 +153,58 @@ def main() -> int:
 
     print(f"PASS: {len(cases)} golden cases")
     return 0
+
+
+def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
+    reason_codes: List[str] = []
+    brief = synthesis.get("brief")
+    if not isinstance(brief, dict):
+        reason_codes.append("missing_top_summary")
+    else:
+        bottom_line = str(brief.get("bottom_line") or "").strip()
+        takeaways = brief.get("top_takeaways")
+        takeaway_items = (
+            [item for item in takeaways if str(item).strip()]
+            if isinstance(takeaways, list)
+            else []
+        )
+        if not bottom_line or not takeaway_items:
+            reason_codes.append("missing_top_summary")
+
+    issues = synthesis.get("issues", [])
+    normalized_questions = set()
+    for issue in issues if isinstance(issues, list) else []:
+        if not isinstance(issue, dict):
+            continue
+        issue_question = str(issue.get("issue_question") or issue.get("title") or "").strip().lower()
+        if issue_question in normalized_questions:
+            reason_codes.append("duplicate_issue")
+        else:
+            normalized_questions.add(issue_question)
+        for section in ("prevailing", "counter", "minority", "watch"):
+            bullets = issue.get(section, [])
+            if not isinstance(bullets, list):
+                continue
+            for bullet in bullets:
+                if not isinstance(bullet, dict):
+                    continue
+                why_it_matters = str(bullet.get("why_it_matters") or "").strip()
+                novelty = str(bullet.get("novelty_vs_prior_brief") or "").strip()
+                text = str(bullet.get("text") or "").lower()
+                if not why_it_matters:
+                    reason_codes.append("empty_why_it_matters")
+                if novelty not in SUPPORTED_NOVELTY_LABELS:
+                    reason_codes.append("unsupported_novelty")
+                if any(verb in text for verb in (" says ", " said ", " reported ", " reports ")) and any(
+                    publisher in text for publisher in ("reuters", "federal reserve", "wsj", "bloomberg")
+                ):
+                    reason_codes.append("pseudo_analysis")
+
+    deduped: List[str] = []
+    for code in reason_codes:
+        if code not in deduped:
+            deduped.append(code)
+    return deduped
 
 
 if __name__ == "__main__":

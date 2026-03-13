@@ -1,0 +1,32 @@
+{
+  "id": "literature_review_pseudo_analysis",
+  "type": "literature_review",
+  "synthesis": {
+    "brief": {
+      "bottom_line": "The brief is doing source-by-source paraphrase.",
+      "top_takeaways": [
+        "The prose is too close to source summaries."
+      ]
+    },
+    "issues": [
+      {
+        "issue_id": "issue_001",
+        "issue_question": "Will softer growth change near-term Fed expectations?",
+        "prevailing": [
+          {
+            "text": "Reuters says growth is slowing.",
+            "novelty_vs_prior_brief": "continued",
+            "why_it_matters": "Rates can reprice quickly."
+          }
+        ],
+        "counter": [],
+        "minority": [],
+        "watch": []
+      }
+    ]
+  },
+  "expected": {
+    "passes": false,
+    "reason_codes": ["pseudo_analysis"]
+  }
+}

@@ -18,7 +18,14 @@ The same golden eval suite now runs in GitHub Actions CI on pull requests to `ma
   - `citation`: validates stage-8 citation behavior (`ok`/`partial`/`retry`)
   - `retrieval`: validates evidence-pack ordering and pack-size enforcement
   - `postprocess`: validates abstain shaping for failed validation outcomes
+  - `literature_review`: validates whether a rendered brief still satisfies the analyst-brief contract
+    - duplicate issue detection
+    - missing `why_it_matters`
+    - unsupported/empty novelty labels
+    - pseudo-analysis / source-by-source paraphrase
+    - missing top summary (`Bottom line` / `Key takeaways`)
 
 ## TODO
 
 - Add chained `retrieval -> validation -> abstain` golden cases once the first integrated path is ready.
+- Expand literature-review cases with issue-budget compression and unsupported-delta examples.
