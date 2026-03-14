@@ -25,15 +25,29 @@ def render_daily_brief_html(
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     abstained = _is_abstained(synthesis)
+    synthesis_meta = _synthesis_meta(synthesis)
     brief = synthesis.get("brief", {}) if isinstance(synthesis.get("brief"), Mapping) else {}
-    citation_status = str((guardrail_checks or {}).get("citation_status") or ("abstained" if abstained else "ok"))
-    analytical_status = str((guardrail_checks or {}).get("analytical_status") or "pass")
-    publish_decision = str((guardrail_checks or {}).get("publish_decision") or ("hold" if abstained else "publish"))
+    citation_status = str(
+        (guardrail_checks or {}).get("citation_status")
+        or synthesis_meta.get("citation_status")
+        or ("abstained" if abstained else "ok")
+    )
+    analytical_status = str(
+        (guardrail_checks or {}).get("analytical_status")
+        or synthesis_meta.get("analytical_status")
+        or "pass"
+    )
+    publish_decision = str(
+        (guardrail_checks or {}).get("publish_decision")
+        or synthesis_meta.get("publish_decision")
+        or ("hold" if abstained else "publish")
+    )
     issues = _normalized_issues(synthesis)
-    overview_html = _render_overview(brief)
-
-    issues_html = "".join(_render_issue(issue) for issue in issues if isinstance(issue, Mapping))
-    changed_html = _render_changed_section(synthesis.get("changed"))
+    content_html = _render_abstain_section(meta=synthesis_meta) if abstained else _render_standard_content(
+        brief=brief,
+        issues=issues,
+        changed_bullets=synthesis.get("changed"),
+    )
     guardrails_html = _render_guardrails(guardrail_checks)
     citations_html = "".join(
         _render_citation(citation_id=citation_id, citation=citation_store[citation_id])
@@ -103,7 +117,7 @@ def render_daily_brief_html(
       color: var(--muted);
       font-size: 0.95rem;
     }}
-    .issues, .changed, .guardrails, .references {{
+    .abstain, .issues, .changed, .guardrails, .references {{
       padding: 20px 32px 8px;
     }}
     .issue {{
@@ -167,12 +181,7 @@ def render_daily_brief_html(
         <span>Publish decision: {escape(_label(publish_decision))}</span>
       </div>
     </header>
-    {overview_html}
-    <section class="issues">
-      <h2>Issues</h2>
-      {issues_html}
-    </section>
-    {changed_html}
+    {content_html}
     {guardrails_html}
     <section class="references">
       <h2>Citations</h2>
@@ -208,6 +217,46 @@ def _render_overview(brief: Mapping[str, Any]) -> str:
         f"<p>{escape(bottom_line)}</p>"
         f"{takeaways_html}"
         f"{watchlist_html}"
+        "</section>"
+    )
+
+
+def _render_standard_content(
+    *,
+    brief: Mapping[str, Any],
+    issues: list[Mapping[str, Any]],
+    changed_bullets: Any,
+) -> str:
+    overview_html = _render_overview(brief)
+    issues_html = "".join(_render_issue(issue) for issue in issues if isinstance(issue, Mapping))
+    changed_html = _render_changed_section(changed_bullets)
+    return (
+        f"{overview_html}"
+        '<section class="issues">'
+        "<h2>Issues</h2>"
+        f"{issues_html}"
+        "</section>"
+        f"{changed_html}"
+    )
+
+
+def _render_abstain_section(*, meta: Mapping[str, Any]) -> str:
+    reason = str(meta.get("reason") or "").strip()
+    reason_codes = ", ".join(
+        str(code)
+        for code in meta.get("reason_codes", [])
+        if isinstance(code, str) and str(code).strip()
+    )
+    reason_html = f"<p><strong>Reason:</strong> {escape(reason)}</p>" if reason else ""
+    reason_codes_html = (
+        f"<p><strong>Reason codes:</strong> {escape(reason_codes)}</p>" if reason_codes else ""
+    )
+    return (
+        '<section class="abstain">'
+        "<h2>Abstained</h2>"
+        "<p>Insufficient evidence to publish a validated daily brief.</p>"
+        f"{reason_html}"
+        f"{reason_codes_html}"
         "</section>"
     )
 
@@ -334,7 +383,18 @@ def _render_callout(title: str, value: str) -> str:
     return f'<p><strong>{escape(title)}:</strong> {escape(value)}</p>'
 
 
+def _synthesis_meta(synthesis: Mapping[str, Any]) -> Mapping[str, Any]:
+    meta = synthesis.get("meta")
+    if isinstance(meta, Mapping):
+        return meta
+    return {}
+
+
 def _is_abstained(synthesis: Mapping[str, Any]) -> bool:
+    status = str(_synthesis_meta(synthesis).get("status") or "").strip().lower()
+    if status:
+        return status == "abstained"
+
     issues = _normalized_issues(synthesis)
     if not issues:
         return True
