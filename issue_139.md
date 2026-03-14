@@ -1,5 +1,8 @@
 # [P0][daily-brief-integrity] Close validation/render state gaps, enforce per-issue evidence binding, and harden brief thesis generation
 
+## Status Note (2026-03-14)
+The execution program tracked here has now landed on `master` through PRs `#143`-`#157`. Treat this document as historical mapping for the completed stream. Remaining work starts with post-open-issue hygiene and fresh repo/GitHub triage, not by continuing the original execution order below.
+
 ## Summary
 The current daily-brief pipeline still allows internally inconsistent output. A brief can reach a held or `abstained` state while looking like a normal full brief, placeholder validator text can leak into delivery, `What Changed` can reference claims that did not survive validation, and issue/citation binding is not yet enforced end to end.
 

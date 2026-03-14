@@ -2,6 +2,8 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+> Historical note (2026-03-14): this plan was executed and landed on `master` through PRs `#143`-`#157`. Keep it as historical execution mapping only. The next batch starts from repo/GitHub status reconciliation rather than continuing this list as active work.
+
 **Goal:** Cover every currently open GitHub issue in one explicit execution order, while keeping the daily-brief correctness stream ahead of lower-priority retrieval expansion and alert delivery work.
 
 **Architecture:** Treat `#128-#138` as the primary serial daily-brief program because they share planner, retrieval, validator, renderer, and artifact contracts. Keep `#69`, `#137`, and `#74` in the same global order but behind the daily-brief stabilization stream, because they either expand substrate capability or depend on the brief path being trustworthy first.

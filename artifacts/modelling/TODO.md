@@ -10,8 +10,8 @@ Last updated: 2026-03-13
 - [ ] P0: Define provider selection and registry contract for daily brief runner scripts
   - Acceptance: one spec covers `deterministic`, `openai`, and `codex-oauth` selection plus provider-specific config validation.
 
-- [ ] P0: Record the daily-brief integrity execution order across open issues
-  - Acceptance: the repo docs point to `#135 -> #128 -> #129 -> #130 -> #131 -> #138 -> #134 -> #132 -> #133 -> #136 -> #69 -> #137 -> #74` and treat daily-brief stabilization as the lead stream.
+- [x] P0: Record the daily-brief integrity execution order across the then-open issues
+  - Acceptance: the repo docs point to `#135 -> #128 -> #129 -> #130 -> #131 -> #138 -> #134 -> #132 -> #133 -> #136 -> #69 -> #137 -> #74` and now preserve it as historical reference material rather than active backlog sequencing.
 
 - [x] P0: Define `decision_record` artifact schema and storage location
   - Acceptance: markdown spec + JSON example + field-level validation rules.

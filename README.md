@@ -38,11 +38,10 @@ Current runtime validation narrows the full catalogue to an active source subset
   - `reuters_business`
   - `wsj_markets`
 
-Open-issue execution order for the remaining backlog/program sequencing:
-- daily-brief stabilization leads: `#135 -> #128 -> #129 -> #130 -> #131 -> #138 -> #134 -> #132 -> #133 -> #136`
-- retrieval expansion follows with `#69`
-- non-RSS live fetch then alert delivery follow with `#137 -> #74`
-- the umbrella tracking docs live in `issue_139.md` and `docs/plans/2026-03-13-daily-brief-integrity-issue-mapping.md`
+Historical open-issue execution order for the now-landed daily-brief program:
+- the sequence `#135 -> #128 -> #129 -> #130 -> #131 -> #138 -> #134 -> #132 -> #133 -> #136 -> #69 -> #137 -> #74` landed on `master` through PRs `#143`-`#157`
+- treat `issue_139.md` and `docs/plans/2026-03-13-daily-brief-integrity-issue-mapping.md` as historical reference material for that completed execution stream
+- re-triage new work from current repo status, `docs/status-matrix.md`, `artifacts/modelling/backlog.json`, and fresh GitHub issue state instead of resuming the old list
 
 ## Core Non-Negotiables
 
