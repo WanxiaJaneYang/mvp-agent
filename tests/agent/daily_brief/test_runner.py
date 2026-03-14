@@ -511,6 +511,169 @@ class DailyBriefRunnerTests(unittest.TestCase):
             synthesis.final_result["synthesis"]["issues"][0]["prevailing"][0],
         )
 
+    def test_build_daily_brief_synthesis_uses_readable_brief_bottom_line(self):
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "fed_press_releases",
+                    "publisher": "Federal Reserve",
+                    "canonical_url": "https://example.test/prevailing",
+                    "title": "Fed keeps policy steady",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "statement",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "fetched_at": "2026-03-10T14:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Growth data softened while payrolls still held up.",
+                    "body_text": "Growth data softened while payrolls still held up.",
+                    "content_hash": "hash_prevailing",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:05:00Z",
+                    "updated_at": "2026-03-10T14:05:00Z",
+                    "doc_id": "doc_001",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_bottom_line",
+                },
+                {
+                    "source_id": "wsj_markets",
+                    "publisher": "Wall Street Journal",
+                    "canonical_url": "https://example.test/counter",
+                    "title": "Investors question the soft-landing narrative",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T14:20:00Z",
+                    "fetched_at": "2026-03-10T14:25:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Policy language remained cautious despite the softer data.",
+                    "body_text": "Policy language remained cautious despite the softer data.",
+                    "content_hash": "hash_counter",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:25:00Z",
+                    "updated_at": "2026-03-10T14:25:00Z",
+                    "doc_id": "doc_002",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_bottom_line",
+                },
+            ],
+            chunks=[
+                {
+                    "chunk_id": "chunk_001",
+                    "doc_id": "doc_001",
+                    "chunk_index": 0,
+                    "text": "Growth data softened while payrolls still held up.",
+                    "token_count": 8,
+                    "char_start": 0,
+                    "char_end": 49,
+                    "created_at": "2026-03-10T14:05:00Z",
+                },
+                {
+                    "chunk_id": "chunk_002",
+                    "doc_id": "doc_002",
+                    "chunk_index": 0,
+                    "text": "Policy language remained cautious despite the softer data.",
+                    "token_count": 9,
+                    "char_start": 0,
+                    "char_end": 59,
+                    "created_at": "2026-03-10T14:25:00Z",
+                },
+            ],
+            fts_rows=[
+                {
+                    "text": "Growth data softened while payrolls still held up.",
+                    "doc_id": "doc_001",
+                    "chunk_id": "chunk_001",
+                    "publisher": "Federal Reserve",
+                    "source_id": "fed_press_releases",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "credibility_tier": 1,
+                },
+                {
+                    "text": "Policy language remained cautious despite the softer data.",
+                    "doc_id": "doc_002",
+                    "chunk_id": "chunk_002",
+                    "publisher": "Wall Street Journal",
+                    "source_id": "wsj_markets",
+                    "published_at": "2026-03-10T14:20:00Z",
+                    "credibility_tier": 2,
+                },
+            ],
+        )
+        registry = {
+            "fed_press_releases": {
+                "id": "fed_press_releases",
+                "name": "Federal Reserve",
+                "url": "https://example.test/prevailing",
+                "type": "rss",
+                "credibility_tier": 1,
+                "paywall_policy": "full",
+                "fetch_interval": "daily",
+                "tags": ["policy_centralbank"],
+            },
+            "wsj_markets": {
+                "id": "wsj_markets",
+                "name": "Wall Street Journal",
+                "url": "https://example.test/counter",
+                "type": "rss",
+                "credibility_tier": 2,
+                "paywall_policy": "full",
+                "fetch_interval": "daily",
+                "tags": ["market_narrative"],
+            },
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_evidence_pack_report") as evidence_pack_report_mock:
+            evidence_pack_report_mock.return_value = {
+                "items": [
+                    {
+                        "chunk_id": "chunk_001",
+                        "source_id": "fed_press_releases",
+                        "publisher": "Federal Reserve",
+                        "credibility_tier": 1,
+                        "retrieval_score": 0.88,
+                        "semantic_score": 0.88,
+                        "recency_score": 0.70,
+                        "credibility_score": 1.0,
+                        "rank_in_pack": 1,
+                    },
+                    {
+                        "chunk_id": "chunk_002",
+                        "source_id": "wsj_markets",
+                        "publisher": "Wall Street Journal",
+                        "credibility_tier": 2,
+                        "retrieval_score": 0.84,
+                        "semantic_score": 0.84,
+                        "recency_score": 0.66,
+                        "credibility_score": 0.8,
+                        "rank_in_pack": 2,
+                    },
+                ],
+                "diversity_stats": {"unique_publishers": 4},
+                "diversity_check": "pass",
+                "notes": [],
+            }
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=stage_data,
+                registry=registry,
+                run_id="run_bottom_line",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+        self.assertEqual(
+            synthesis.final_result["synthesis"]["brief"]["bottom_line"],
+            "Growth data softened while payrolls still held up. "
+            "Policy language remained cautious despite the softer data.",
+        )
+        self.assertNotIn(
+            "is shaping the day",
+            synthesis.final_result["synthesis"]["brief"]["bottom_line"],
+        )
+
     def test_load_active_fixture_payloads_filters_to_runtime_subset(self):
         fixture_payloads = {
             "fed_press_releases": [{"url": "https://example.test/fed"}],
