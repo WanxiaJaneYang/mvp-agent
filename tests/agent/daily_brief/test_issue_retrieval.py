@@ -351,7 +351,10 @@ class IssueRetrievalTests(unittest.TestCase):
         scopes = build_issue_evidence_scopes(
             brief_plan={
                 "brief_id": "brief_2026-03-12_run_demo",
-                "brief_thesis": "Growth cooling is overrepresented and duplicate issue seeds should not borrow evidence.",
+                "brief_thesis": (
+                    "Growth cooling is overrepresented and duplicate issue seeds "
+                    "should not borrow evidence."
+                ),
                 "top_takeaways": [],
                 "issue_budget": 2,
                 "render_mode": "full",
