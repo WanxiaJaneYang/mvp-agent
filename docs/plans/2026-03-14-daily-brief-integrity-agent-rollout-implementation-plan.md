@@ -73,11 +73,15 @@ Run:
 ```bash
 git add docs/plans/2026-03-14-daily-brief-integrity-agent-rollout-design.md docs/plans/2026-03-14-daily-brief-integrity-agent-rollout-implementation-plan.md
 git commit -m "docs(plan): map issue-by-issue rollout for daily-brief integrity fixes"
-gh pr create --base master --title "docs(plan): map issue-by-issue rollout for daily-brief integrity fixes" --body "Closes <planning-issue-number>"
+gh pr create --base master --title "docs(plan): map issue-by-issue rollout for daily-brief integrity fixes" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 Expected:
 - one docs-only planning PR exists
+
+PR body requirement:
+- include the exact issue URL, for example `Issue: https://github.com/WanxiaJaneYang/mvp-agent/issues/167`
+- include the closing keyword on its own line, for example `Closes #167`
 
 ### Task 2: Execute issue `#163` on its own branch
 
@@ -139,7 +143,7 @@ Run:
 python -m unittest tests.agent.daily_brief.test_editorial_planner tests.agent.daily_brief.test_runner -v
 git add apps/agent/daily_brief/editorial_planner.py apps/agent/daily_brief/runner.py tests/agent/daily_brief/test_editorial_planner.py tests/agent/daily_brief/test_runner.py
 git commit -m "fix(daily-brief): harden bottom-line generation"
-gh pr create --base master --title "fix(daily-brief): harden bottom-line generation" --body "Closes #163"
+gh pr create --base master --title "fix(daily-brief): harden bottom-line generation" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 Expected:
@@ -199,7 +203,7 @@ Run:
 python -m unittest tests.agent.synthesis.test_postprocess tests.agent.delivery.test_html_report tests.agent.daily_brief.test_runner -v
 git add apps/agent/synthesis/postprocess.py apps/agent/delivery/html_report.py apps/agent/daily_brief/runner.py tests/agent/synthesis/test_postprocess.py tests/agent/delivery/test_html_report.py tests/agent/daily_brief/test_runner.py
 git commit -m "fix(delivery): close abstain render-state"
-gh pr create --base master --title "fix(delivery): close abstain render-state" --body "Closes #161"
+gh pr create --base master --title "fix(delivery): close abstain render-state" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 ### Task 4: Execute issue `#164` after `#163` merges
@@ -256,7 +260,7 @@ Run:
 python -m unittest tests.agent.daily_brief.test_issue_retrieval tests.agent.daily_brief.test_openai_issue_planner tests.agent.daily_brief.test_openai_claim_composer -v
 git add apps/agent/daily_brief/issue_retrieval.py apps/agent/daily_brief/openai_issue_planner.py apps/agent/daily_brief/openai_claim_composer.py tests/agent/daily_brief/test_issue_retrieval.py tests/agent/daily_brief/test_openai_issue_planner.py tests/agent/daily_brief/test_openai_claim_composer.py
 git commit -m "feat(retrieval): strengthen semantic issue scoping"
-gh pr create --base master --title "feat(retrieval): strengthen semantic issue scoping" --body "Closes #164"
+gh pr create --base master --title "feat(retrieval): strengthen semantic issue scoping" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 ### Task 5: Execute issue `#162` after `#161` merges
@@ -313,7 +317,7 @@ Run:
 python -m unittest tests.agent.validators.test_citation_validator tests.agent.synthesis.test_postprocess tests.agent.delivery.test_html_report -v
 git add apps/agent/validators/citation_validator.py apps/agent/synthesis/postprocess.py apps/agent/delivery/html_report.py tests/agent/validators/test_citation_validator.py tests/agent/synthesis/test_postprocess.py tests/agent/delivery/test_html_report.py
 git commit -m "fix(delivery): suppress validator placeholders in final artifacts"
-gh pr create --base master --title "fix(delivery): suppress validator placeholders in final artifacts" --body "Closes #162"
+gh pr create --base master --title "fix(delivery): suppress validator placeholders in final artifacts" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 ### Task 6: Execute issue `#160` after `#161` and `#162` merge
@@ -371,7 +375,7 @@ python -m unittest tests.agent.daily_brief.test_runner -v
 python scripts/validate_artifacts.py
 git add scripts/run_daily_brief_fixture.py scripts/run_daily_brief.py apps/agent/daily_brief/runner.py tests/agent/daily_brief/test_runner.py README.md artifacts/modelling/pipeline.md
 git commit -m "fix(demo): align fixture and live publish-gate behavior"
-gh pr create --base master --title "fix(demo): align fixture and live publish-gate behavior" --body "Closes #160"
+gh pr create --base master --title "fix(demo): align fixture and live publish-gate behavior" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 ### Task 7: Execute issue `#165` after `#164` and `#162` merge
@@ -432,7 +436,7 @@ python -m unittest tests.agent.validators.test_citation_validator tests.agent.da
 python -m unittest discover -s tests/evals -p "test_*.py" -v
 git add apps/agent/validators/citation_validator.py apps/agent/daily_brief/critic.py apps/agent/daily_brief/openai_claim_composer.py tests/agent/validators/test_citation_validator.py tests/agent/daily_brief/test_critic.py tests/agent/daily_brief/test_openai_claim_composer.py evals tests/evals
 git commit -m "feat(validation): add claim-citation entailment gating"
-gh pr create --base master --title "feat(validation): add claim-citation entailment gating" --body "Closes #165"
+gh pr create --base master --title "feat(validation): add claim-citation entailment gating" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 ### Task 8: Execute issue `#166` after `#160` and `#165` merge
@@ -496,7 +500,7 @@ python -m unittest discover -s tests/evals -p "test_*.py" -v
 python -m unittest tests.agent.daily_brief.test_runner tests.agent.delivery.test_html_report tests.agent.synthesis.test_postprocess tests.agent.validators.test_citation_validator tests.agent.daily_brief.test_editorial_planner tests.agent.daily_brief.test_issue_retrieval -v
 git add evals tests/evals tests/agent/daily_brief/test_runner.py tests/agent/delivery/test_html_report.py tests/agent/synthesis/test_postprocess.py tests/agent/validators/test_citation_validator.py tests/agent/daily_brief/test_editorial_planner.py tests/agent/daily_brief/test_issue_retrieval.py README.md
 git commit -m "test(daily-brief): add stage-level regression fixtures"
-gh pr create --base master --title "test(daily-brief): add stage-level regression fixtures" --body "Closes #166"
+gh pr create --base master --title "test(daily-brief): add stage-level regression fixtures" --body-file <temp-file-containing-issue-url-and-closing-keyword>
 ```
 
 ### Task 9: Run merge-gate verification after each implementation PR
