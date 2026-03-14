@@ -202,6 +202,98 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("Abstained", html)
         self.assertIn("Insufficient evidence", html)
 
+    def test_render_daily_brief_html_renders_only_abstain_ui_when_meta_status_is_abstained(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
+
+            render_daily_brief_html(
+                output_path=output_path,
+                report_date="2026-03-10",
+                run_id="run_meta_abstain",
+                synthesis={
+                    "issues": [
+                        {
+                            "issue_id": "issue_001",
+                            "issue_question": "Will the Fed cut soon?",
+                            "title": "Will the Fed cut soon?",
+                            "summary": "Normal issue content should not render in an abstain state.",
+                            "prevailing": [
+                                {
+                                    "text": "Markets still expect policy easing later this year.",
+                                    "citation_ids": ["cite_001"],
+                                }
+                            ],
+                            "counter": [],
+                            "minority": [],
+                            "watch": [],
+                        }
+                    ],
+                    "meta": {
+                        "status": "abstained",
+                        "reason": "validation_retry_exhausted",
+                        "citation_status": "abstained",
+                        "analytical_status": "pass",
+                        "publish_decision": "hold",
+                        "reason_codes": ["citation_validation_abstained"],
+                    },
+                },
+                citation_store={
+                    "cite_001": {"title": "Fed release", "url": "https://example.test/fed"},
+                },
+            )
+
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("Abstained", html)
+        self.assertIn("validation_retry_exhausted", html)
+        self.assertNotIn("Will the Fed cut soon?", html)
+        self.assertNotIn(">Issues<", html)
+
+    def test_render_daily_brief_html_uses_meta_statuses_for_non_abstain_hold_state(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
+
+            render_daily_brief_html(
+                output_path=output_path,
+                report_date="2026-03-10",
+                run_id="run_hold_without_abstain",
+                synthesis={
+                    "issues": [
+                        {
+                            "issue_id": "issue_001",
+                            "issue_question": "Issue preserved despite hold",
+                            "title": "Issue preserved despite hold",
+                            "summary": "A critic hold should not turn this into abstain UI.",
+                            "prevailing": [
+                                {
+                                    "text": "[Insufficient evidence to produce a validated output]",
+                                    "citation_ids": [],
+                                }
+                            ],
+                            "counter": [],
+                            "minority": [],
+                            "watch": [],
+                        }
+                    ],
+                    "meta": {
+                        "status": "validated",
+                        "citation_status": "partial",
+                        "analytical_status": "fail",
+                        "publish_decision": "hold",
+                        "reason_codes": ["empty_why_it_matters"],
+                    },
+                },
+                citation_store={},
+            )
+
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("Issue preserved despite hold", html)
+        self.assertIn("Partial", html)
+        self.assertIn("Fail", html)
+        self.assertIn("Hold", html)
+        self.assertNotIn("validation_retry_exhausted", html)
+
     def test_render_daily_brief_html_renders_changed_section_only_when_present(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
