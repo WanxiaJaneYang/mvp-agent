@@ -49,6 +49,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                 issue_evidence_scopes=[
                     {
                         "issue_id": "issue_oil",
+                        "issue_seed": "supply pressure",
                         "primary_chunk_ids": ["chunk_1", "chunk_2"],
                         "opposing_chunk_ids": ["chunk_3"],
                         "minority_chunk_ids": ["chunk_4"],
@@ -83,6 +84,7 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
             set(captured_request["input"]["issue_evidence_scopes"][0]),
             {
                 "issue_id",
+                "issue_seed",
                 "primary_chunk_ids",
                 "opposing_chunk_ids",
                 "minority_chunk_ids",
@@ -335,6 +337,125 @@ class OpenAIIssuePlannerTests(unittest.TestCase):
                                 "unique_publishers": 1,
                                 "source_roles": ["market_media"],
                                 "time_span_hours": 0,
+                            },
+                        }
+                    ],
+                    prior_brief_context=None,
+                )
+            )
+
+    def test_rejects_issue_output_that_borrows_evidence_from_another_issue_scope(self) -> None:
+        planner = OpenAIIssuePlanner(
+            response_loader=lambda _request_payload: """
+            [
+              {
+                "issue_id": "issue_oil",
+                "issue_question": "Will oil prices keep rising over the next few weeks?",
+                "thesis_hint": "Supply concerns are keeping near-term pressure skewed upward.",
+                "supporting_evidence_ids": ["chunk_5"],
+                "opposing_evidence_ids": ["chunk_2"],
+                "minority_evidence_ids": ["chunk_3"],
+                "watch_evidence_ids": ["chunk_4"]
+              }
+            ]
+            """
+        )
+
+        with self.assertRaises(ValueError):
+            planner.plan_issues(
+                brief_input=IssuePlannerInput(
+                    run_id="run_001",
+                    generated_at_utc="2026-03-12T00:00:00Z",
+                    brief_plan={
+                        "brief_id": "brief_2026-03-12_run_001",
+                        "brief_thesis": "Supply pressure and refining bottlenecks are the main debates.",
+                        "top_takeaways": [],
+                        "issue_budget": 2,
+                        "render_mode": "full",
+                        "source_scarcity_mode": "normal",
+                        "candidate_issue_seeds": ["supply pressure", "refining bottlenecks"],
+                        "issue_order": ["seed_001", "seed_002"],
+                        "watchlist": [],
+                        "reason_codes": ["two_distinct_debates_supported"],
+                    },
+                    issue_evidence_scopes=[
+                        {
+                            "issue_id": "issue_oil",
+                            "issue_seed": "supply pressure",
+                            "primary_chunk_ids": ["chunk_1"],
+                            "opposing_chunk_ids": ["chunk_2"],
+                            "minority_chunk_ids": ["chunk_3"],
+                            "watch_chunk_ids": ["chunk_4"],
+                            "coverage_summary": {
+                                "unique_publishers": 4,
+                                "source_roles": ["market_media"],
+                                "time_span_hours": 12,
+                            },
+                        },
+                        {
+                            "issue_id": "issue_refining",
+                            "issue_seed": "refining bottlenecks",
+                            "primary_chunk_ids": ["chunk_5"],
+                            "opposing_chunk_ids": ["chunk_6"],
+                            "minority_chunk_ids": [],
+                            "watch_chunk_ids": ["chunk_7"],
+                            "coverage_summary": {
+                                "unique_publishers": 3,
+                                "source_roles": ["market_media"],
+                                "time_span_hours": 8,
+                            },
+                        },
+                    ],
+                    prior_brief_context=None,
+                )
+            )
+
+    def test_rejects_issue_output_that_breaks_bucket_semantics_within_scope(self) -> None:
+        planner = OpenAIIssuePlanner(
+            response_loader=lambda _request_payload: """
+            [
+              {
+                "issue_id": "issue_oil",
+                "issue_question": "Will oil prices keep rising over the next few weeks?",
+                "thesis_hint": "Supply concerns are keeping near-term pressure skewed upward.",
+                "supporting_evidence_ids": ["chunk_4"],
+                "opposing_evidence_ids": ["chunk_2"],
+                "minority_evidence_ids": ["chunk_3"],
+                "watch_evidence_ids": ["chunk_1"]
+              }
+            ]
+            """
+        )
+
+        with self.assertRaises(ValueError):
+            planner.plan_issues(
+                brief_input=IssuePlannerInput(
+                    run_id="run_001",
+                    generated_at_utc="2026-03-12T00:00:00Z",
+                    brief_plan={
+                        "brief_id": "brief_2026-03-12_run_001",
+                        "brief_thesis": "Supply pressure is the main debate.",
+                        "top_takeaways": [],
+                        "issue_budget": 1,
+                        "render_mode": "compressed",
+                        "source_scarcity_mode": "scarce",
+                        "candidate_issue_seeds": ["supply pressure"],
+                        "issue_order": ["seed_001"],
+                        "watchlist": [],
+                        "reason_codes": ["source_scarcity_detected"],
+                    },
+                    issue_evidence_scopes=[
+                        {
+                            "issue_id": "issue_oil",
+                            "issue_seed": "supply pressure",
+                            "primary_chunk_ids": ["chunk_1"],
+                            "opposing_chunk_ids": ["chunk_2"],
+                            "minority_chunk_ids": ["chunk_3"],
+                            "watch_chunk_ids": ["chunk_4"],
+                            "coverage_summary": {
+                                "unique_publishers": 4,
+                                "source_roles": ["market_media"],
+                                "time_span_hours": 12,
                             },
                         }
                     ],

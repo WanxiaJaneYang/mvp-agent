@@ -78,29 +78,36 @@ def build_issue_evidence_scopes(
                 used_chunk_ids=used_chunk_ids,
                 limit=2,
             )
-        used_chunk_ids.update(primary_chunk_ids)
+        seed_tokens = frozenset(_tokens(str(seed)))
+        issue_used_chunk_ids = set(primary_chunk_ids)
 
         opposing_chunk_ids = _bucket_chunk_ids(
             chunk_ids=scored_chunk_ids,
             rows_by_chunk_id=rows_by_chunk_id,
+            seed_tokens=seed_tokens,
             terms=OPPOSING_TERMS,
-            used_chunk_ids=used_chunk_ids,
+            used_chunk_ids=used_chunk_ids | issue_used_chunk_ids,
             limit=2,
         )
+        issue_used_chunk_ids.update(opposing_chunk_ids)
         minority_chunk_ids = _bucket_chunk_ids(
             chunk_ids=scored_chunk_ids,
             rows_by_chunk_id=rows_by_chunk_id,
+            seed_tokens=seed_tokens,
             terms=MINORITY_TERMS,
-            used_chunk_ids=used_chunk_ids,
+            used_chunk_ids=used_chunk_ids | issue_used_chunk_ids,
             limit=2,
         )
+        issue_used_chunk_ids.update(minority_chunk_ids)
         watch_chunk_ids = _bucket_chunk_ids(
             chunk_ids=scored_chunk_ids,
             rows_by_chunk_id=rows_by_chunk_id,
+            seed_tokens=seed_tokens,
             terms=WATCH_TERMS,
-            used_chunk_ids=set(),
+            used_chunk_ids=used_chunk_ids | issue_used_chunk_ids,
             limit=2,
         )
+        issue_used_chunk_ids.update(watch_chunk_ids)
         all_chunk_ids = primary_chunk_ids + opposing_chunk_ids + minority_chunk_ids + watch_chunk_ids
         scopes.append(
             IssueEvidenceScope(
@@ -117,6 +124,7 @@ def build_issue_evidence_scopes(
                 ),
             )
         )
+        used_chunk_ids.update(issue_used_chunk_ids)
     return scopes[: max(1, int(brief_plan["issue_budget"]))]
 
 
@@ -203,6 +211,7 @@ def _bucket_chunk_ids(
     *,
     chunk_ids: Iterable[str],
     rows_by_chunk_id: Mapping[str, Mapping[str, Any]],
+    seed_tokens: frozenset[str],
     terms: tuple[str, ...],
     used_chunk_ids: set[str],
     limit: int,
@@ -213,6 +222,8 @@ def _bucket_chunk_ids(
             continue
         row = rows_by_chunk_id.get(chunk_id)
         text = str(row.get("text") if isinstance(row, Mapping) else "").lower()
+        if seed_tokens and not (seed_tokens & set(_tokens(text))):
+            continue
         if not any(term in text for term in terms):
             continue
         bucket.append(chunk_id)

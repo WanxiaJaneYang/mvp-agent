@@ -15,6 +15,7 @@ REQUEST_TASK = "daily_brief_issue_planner"
 ISSUE_PLAN_PROMPT_TEMPLATE = (
     "You are planning up to {issue_budget} issue-centered literature review topic(s) "
     "for a daily brief. Use only the provided brief plan and issue-aware evidence scopes. "
+    "Keep evidence issue-local, and keep each evidence list aligned to its matching bucket. "
     "Return strict JSON matching the issue map schema."
 )
 
@@ -35,11 +36,11 @@ class OpenAIIssuePlanner(IssuePlannerProvider):
         issues: list[IssueMap] = []
         required_fields = set(IssueMap.__annotations__)
         seen_issue_ids: set[str] = set()
-        valid_evidence_ids = _extract_evidence_ids(brief_input)
+        issue_scope_allowlists = _extract_issue_scope_allowlists(brief_input)
         for item in parsed:
             if not isinstance(item, dict) or set(item) != required_fields:
                 raise ValueError("Malformed issue planner output.")
-            validated = _validate_issue_map(item, valid_evidence_ids=valid_evidence_ids)
+            validated = _validate_issue_map(item, issue_scope_allowlists=issue_scope_allowlists)
             if validated["issue_id"] in seen_issue_ids:
                 raise ValueError("Malformed issue planner output.")
             seen_issue_ids.add(validated["issue_id"])
@@ -76,7 +77,8 @@ def _build_request_payload(brief_input: IssuePlannerInput) -> dict[str, Any]:
                 "role": "user",
                 "content": (
                     f"Plan up to {issue_budget} issue-centered daily brief topic(s) from the brief plan "
-                    "and issue-aware evidence scopes. Return only strict JSON matching the provided schema."
+                    "and issue-aware evidence scopes. Never borrow evidence across issues or buckets. "
+                    "Return only strict JSON matching the provided schema."
                 ),
             },
         ],
@@ -130,6 +132,7 @@ def _normalize_issue_scope(item: Mapping[str, Any]) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     for field in (
         "issue_id",
+        "issue_seed",
         "primary_chunk_ids",
         "opposing_chunk_ids",
         "minority_chunk_ids",
@@ -188,20 +191,28 @@ def _parse_response_payload(payload: Any) -> Any:
     raise ValueError("Malformed issue planner output.")
 
 
-def _extract_evidence_ids(brief_input: IssuePlannerInput) -> set[str]:
-    evidence_ids: set[str] = set()
+def _extract_issue_scope_allowlists(brief_input: IssuePlannerInput) -> dict[str, dict[str, set[str]]]:
+    issue_scope_allowlists: dict[str, dict[str, set[str]]] = {}
     for scope in brief_input["issue_evidence_scopes"]:
-        for field in ("primary_chunk_ids", "opposing_chunk_ids", "minority_chunk_ids", "watch_chunk_ids"):
-            values = scope.get(field)
-            if not isinstance(values, list):
-                continue
-            for chunk_id in values:
-                if isinstance(chunk_id, str) and chunk_id:
-                    evidence_ids.add(chunk_id)
-    return evidence_ids
+        issue_id = str(scope.get("issue_id") or "")
+        if not issue_id:
+            continue
+        issue_scope_allowlists[issue_id] = {
+            "supporting_evidence_ids": _string_set(scope.get("primary_chunk_ids")),
+            "opposing_evidence_ids": _string_set(scope.get("opposing_chunk_ids")),
+            "minority_evidence_ids": _string_set(scope.get("minority_chunk_ids")),
+            "watch_evidence_ids": _string_set(scope.get("watch_chunk_ids")),
+        }
+    return issue_scope_allowlists
 
 
-def _validate_issue_map(item: dict[str, Any], *, valid_evidence_ids: set[str]) -> IssueMap:
+def _string_set(values: Any) -> set[str]:
+    if not isinstance(values, list):
+        return set()
+    return {str(value) for value in values if isinstance(value, str) and value}
+
+
+def _validate_issue_map(item: dict[str, Any], *, issue_scope_allowlists: dict[str, dict[str, set[str]]]) -> IssueMap:
     list_fields = (
         "supporting_evidence_ids",
         "opposing_evidence_ids",
@@ -213,10 +224,13 @@ def _validate_issue_map(item: dict[str, Any], *, valid_evidence_ids: set[str]) -
         for field in ("issue_id", "issue_question", "thesis_hint")
     ):
         raise ValueError("Malformed issue planner output.")
+    allowed_fields = issue_scope_allowlists.get(str(item["issue_id"]))
+    if allowed_fields is None:
+        raise ValueError("Malformed issue planner output.")
     for field in list_fields:
         values = item.get(field)
         if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
             raise ValueError("Malformed issue planner output.")
-        if any(value not in valid_evidence_ids for value in values):
+        if any(value not in allowed_fields[field] for value in values):
             raise ValueError("Malformed issue planner output.")
     return cast(IssueMap, item)
