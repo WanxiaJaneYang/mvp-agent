@@ -188,7 +188,7 @@ def _normalize_summary_line(summary: str) -> str | None:
         return None
 
     tokens = _tokens(collapsed)
-    if len(tokens) < 4:
+    if len(tokens) < 3:
         return None
     if len(set(tokens)) <= max(1, len(tokens) // 3):
         return None

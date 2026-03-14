@@ -44,6 +44,20 @@ class EditorialPlannerTests(unittest.TestCase):
         )
         self.assertNotEqual(plan["brief_thesis"], "growth growth growth growth")
 
+    def test_plan_brief_keeps_readable_three_word_summary_lines(self) -> None:
+        plan = plan_brief_locally(
+            run_id="run_demo",
+            generated_at_utc="2026-03-12T07:05:00Z",
+            corpus_summary=[
+                "Fed holds rates",
+                "growth growth growth growth",
+            ],
+            source_diversity_stats={"unique_publishers": 2},
+            prior_brief_context=None,
+        )
+
+        self.assertEqual(plan["brief_thesis"], "Fed holds rates.")
+
     def test_plan_brief_uses_full_mode_when_diversity_supports_two_issues(self) -> None:
         plan = plan_brief_locally(
             run_id="run_demo",
