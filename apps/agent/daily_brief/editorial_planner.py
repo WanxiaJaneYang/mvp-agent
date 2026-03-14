@@ -153,17 +153,14 @@ def _brief_thesis(
     candidate_issue_seeds: list[str],
     prior_brief_context: Mapping[str, Any] | None,
 ) -> str:
-    if len(candidate_issue_seeds) >= 2:
-        thesis = (
-            f"{candidate_issue_seeds[0].capitalize()} is shaping the day, while "
-            f"{candidate_issue_seeds[1]} defines the secondary debate."
-        )
-    elif candidate_issue_seeds:
-        thesis = f"{candidate_issue_seeds[0].capitalize()} is the main thesis of today's brief."
-    elif corpus_summary:
-        thesis = corpus_summary[0]
+    retained_summaries = _retained_summary_lines(
+        corpus_summary=corpus_summary,
+        limit=2 if len(candidate_issue_seeds) >= 2 else 1,
+    )
+    if retained_summaries:
+        thesis = " ".join(retained_summaries)
     else:
-        thesis = "The brief is constrained by limited distinct evidence today."
+        thesis = "Today's retained evidence points to a narrower, still-developing market debate."
 
     previous_issue_count = 0
     if isinstance(prior_brief_context, Mapping):
@@ -171,6 +168,35 @@ def _brief_thesis(
     if previous_issue_count > 0:
         return f"{thesis} Prior context suggests continuity, but today's evidence mix remains distinct."
     return thesis
+
+
+def _retained_summary_lines(*, corpus_summary: Iterable[str], limit: int) -> list[str]:
+    retained: list[str] = []
+    for summary in corpus_summary:
+        normalized = _normalize_summary_line(summary)
+        if normalized is None or normalized in retained:
+            continue
+        retained.append(normalized)
+        if len(retained) >= limit:
+            break
+    return retained
+
+
+def _normalize_summary_line(summary: str) -> str | None:
+    collapsed = " ".join(str(summary).strip().split())
+    if not collapsed:
+        return None
+
+    tokens = _tokens(collapsed)
+    if len(tokens) < 3:
+        return None
+    if len(set(tokens)) <= max(1, len(tokens) // 3):
+        return None
+
+    normalized = collapsed[0].upper() + collapsed[1:] if len(collapsed) > 1 else collapsed.upper()
+    if normalized[-1] not in ".!?":
+        normalized = f"{normalized}."
+    return normalized
 
 
 def _tokens(value: str) -> list[str]:
