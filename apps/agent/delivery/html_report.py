@@ -4,6 +4,10 @@ from html import escape
 from pathlib import Path
 from typing import Any, Mapping
 
+from apps.agent.daily_brief.placeholders import (
+    is_abstain_fallback_bullet,
+    is_validator_placeholder_bullet,
+)
 from apps.agent.pipeline.types import CitationStoreEntry
 
 SECTION_TITLES = {
@@ -12,8 +16,6 @@ SECTION_TITLES = {
     "minority": "Minority",
     "watch": "What to Watch",
 }
-VALIDATOR_PLACEHOLDER_TEXT = "[Insufficient evidence to support this claim]"
-ABSTAIN_PLACEHOLDER_TEXT = "[Insufficient evidence to produce a validated output]"
 
 
 def render_daily_brief_html(
@@ -285,7 +287,7 @@ def _render_issue_section(*, title: str, bullets: Any) -> str:
         bullet_items = "".join(
             _render_bullet(bullet)
             for bullet in bullets
-            if isinstance(bullet, Mapping) and not _is_internal_placeholder_bullet(bullet)
+            if isinstance(bullet, Mapping) and not is_validator_placeholder_bullet(bullet)
         )
     if not bullet_items:
         return ""
@@ -347,7 +349,7 @@ def _render_changed_section(changed_bullets: Any) -> str:
     items = "".join(
         _render_bullet(bullet)
         for bullet in changed_bullets
-        if isinstance(bullet, Mapping) and not _is_internal_placeholder_bullet(bullet)
+        if isinstance(bullet, Mapping) and not is_validator_placeholder_bullet(bullet)
     )
     if not items:
         return ""
@@ -425,18 +427,7 @@ def _is_abstained(synthesis: Mapping[str, Any]) -> bool:
 
     if not bullets:
         return True
-    return all(_is_abstain_placeholder_bullet(bullet) for bullet in bullets)
-
-
-def _is_internal_placeholder_bullet(bullet: Mapping[str, Any]) -> bool:
-    return (
-        str(bullet.get("text", "")) == VALIDATOR_PLACEHOLDER_TEXT
-        or str(bullet.get("validator_action", "")) == "replaced_insufficient_evidence"
-    )
-
-
-def _is_abstain_placeholder_bullet(bullet: Mapping[str, Any]) -> bool:
-    return str(bullet.get("text", "")) == ABSTAIN_PLACEHOLDER_TEXT
+    return all(is_abstain_fallback_bullet(bullet) for bullet in bullets)
 
 
 def _normalized_issues(synthesis: Mapping[str, Any]) -> list[Mapping[str, Any]]:

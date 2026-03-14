@@ -6,8 +6,13 @@ from dataclasses import dataclass
 from typing import Any, Collection, Dict, Iterable, List, Mapping
 from urllib.parse import urlparse
 
+from apps.agent.daily_brief.placeholders import (
+    VALIDATOR_PLACEHOLDER_ACTION,
+    VALIDATOR_PLACEHOLDER_TEXT,
+    is_validator_placeholder_bullet,
+)
+
 CORE_SECTIONS = ("prevailing", "counter", "minority", "watch")
-INSUFFICIENT_EVIDENCE_TEXT = "[Insufficient evidence to support this claim]"
 NUMERIC_TIME_PATTERN = re.compile(
     r"\b(?:\d+(?:\.\d+)?%?|\d{4}-\d{2}-\d{2}|q[1-4]|"
     r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
@@ -166,7 +171,7 @@ def _has_claim_span_coverage(bullet: Mapping[str, Any], valid_ids: List[str]) ->
 
 
 def _is_placeholder_bullet(bullet: Mapping[str, Any]) -> bool:
-    return str(bullet.get("text", "")) == INSUFFICIENT_EVIDENCE_TEXT
+    return is_validator_placeholder_bullet(bullet)
 
 
 def _citation_quality_meta(
@@ -454,9 +459,9 @@ def _validate_core_sections(
                     section_out.append(
                         {
                             **bullet,
-                            "text": INSUFFICIENT_EVIDENCE_TEXT,
+                            "text": VALIDATOR_PLACEHOLDER_TEXT,
                             "citation_ids": [],
-                            "validator_action": "replaced_insufficient_evidence",
+                            "validator_action": VALIDATOR_PLACEHOLDER_ACTION,
                         }
                     )
                 continue

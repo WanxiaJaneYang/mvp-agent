@@ -396,6 +396,54 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("Hold", html)
         self.assertNotIn("[Insufficient evidence to support this claim]", html)
 
+    def test_render_daily_brief_html_treats_legacy_validator_placeholders_as_abstained(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
+
+            render_daily_brief_html(
+                output_path=output_path,
+                report_date="2026-03-10",
+                run_id="run_legacy_validator_abstain",
+                synthesis={
+                    "prevailing": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                    "counter": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                    "minority": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                    "watch": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                },
+                citation_store={},
+            )
+
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("Abstained", html)
+        self.assertIn("Hold", html)
+        self.assertNotIn("[Insufficient evidence to support this claim]", html)
+        self.assertNotIn(">Issues<", html)
+
     def test_render_daily_brief_html_renders_changed_section_only_when_present(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
