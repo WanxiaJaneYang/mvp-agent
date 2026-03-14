@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, cast
 
 from apps.agent.daily_brief.model_interfaces import ClaimComposerInput, ClaimComposerProvider
@@ -13,6 +13,12 @@ CLAIM_KIND_TO_ISSUE_FIELD = {
     "counter": "opposing_evidence_ids",
     "minority": "minority_evidence_ids",
     "watch": "watch_evidence_ids",
+}
+CLAIM_KIND_TO_OPPOSING_FIELD = {
+    "prevailing": "opposing_evidence_ids",
+    "counter": "supporting_evidence_ids",
+    "minority": "supporting_evidence_ids",
+    "watch": "supporting_evidence_ids",
 }
 VALID_NOVELTY_LABELS = {
     "new",
@@ -119,7 +125,7 @@ class OpenAIClaimComposer(ClaimComposerProvider):
 
 def _build_issue_citation_scopes(
     *,
-    issue_map: list[dict[str, Any]],
+    issue_map: Sequence[Mapping[str, Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     allowlists = _issue_citation_allowlists(issue_map=issue_map, citation_store=citation_store)
@@ -152,15 +158,16 @@ def _validate_claim_bindings(*, claims: list[StructuredClaim], brief_input: Clai
         if issue_scope is None:
             raise ValueError("Malformed claim composer output.")
         support_field = CLAIM_KIND_TO_ISSUE_FIELD[str(claim["claim_kind"])]
+        opposing_field = CLAIM_KIND_TO_OPPOSING_FIELD[str(claim["claim_kind"])]
         if any(citation_id not in issue_scope[support_field] for citation_id in claim["supporting_citation_ids"]):
             raise ValueError("Malformed claim composer output.")
-        if any(citation_id not in issue_scope["all_citation_ids"] for citation_id in claim["opposing_citation_ids"]):
+        if any(citation_id not in issue_scope[opposing_field] for citation_id in claim["opposing_citation_ids"]):
             raise ValueError("Malformed claim composer output.")
 
 
 def _issue_citation_allowlists(
     *,
-    issue_map: list[dict[str, Any]],
+    issue_map: Sequence[Mapping[str, Any]],
     citation_store: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, dict[str, set[str]]]:
     citations_by_chunk_id: dict[str, set[str]] = {}
