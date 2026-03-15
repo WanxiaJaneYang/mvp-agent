@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Repo Ops Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="dashboard-shell">
+    <header class="hero">
+      <div class="hero__eyebrow">Local Repo Ops</div>
+      <div class="hero__main">
+        <div>
+          <h1 id="repo-name">Repo Ops Dashboard</h1>
+          <p class="hero__copy">Architecture visibility, runtime health, publish-decision context, and command control in one operator surface.</p>
+        </div>
+        <div class="hero__actions">
+          <button id="refresh-button" class="button button--ghost" type="button">Refresh Surface</button>
+          <div class="active-run-card">
+            <span class="active-run-card__label">Active Run</span>
+            <strong id="active-run-label">No active run</strong>
+            <span id="active-run-meta">Idle</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section id="architecture-panel" class="panel panel--wide">
+        <div class="panel__heading">
+          <span class="panel__kicker">Architecture</span>
+          <h2>Docs And Diagram Anchors</h2>
+        </div>
+        <div id="architecture-grid" class="diagram-grid"></div>
+      </section>
+
+      <section id="health-panel" class="panel">
+        <div class="panel__heading">
+          <span class="panel__kicker">Health</span>
+          <h2>Latest Surface State</h2>
+        </div>
+        <div id="health-grid" class="health-grid"></div>
+      </section>
+
+      <section id="control-panel" class="panel">
+        <div class="panel__heading">
+          <span class="panel__kicker">Control</span>
+          <h2>Run Commands</h2>
+        </div>
+        <div id="command-grid" class="command-grid"></div>
+      </section>
+
+      <section id="runtime-panel" class="panel panel--wide">
+        <div class="panel__heading">
+          <span class="panel__kicker">Runtime</span>
+          <h2>Latest Decision And Artifacts</h2>
+        </div>
+        <div class="runtime-grid">
+          <article class="decision-card">
+            <div class="decision-card__header">
+              <span id="decision-pill" class="status-pill status-pill--idle">No decision yet</span>
+              <span id="decision-run-kind" class="decision-card__meta">Waiting for data</span>
+            </div>
+            <p id="decision-reason" class="decision-card__reason">Reason details will appear here after the latest run or artifact refresh.</p>
+            <div>
+              <span class="subhead">Reason Codes</span>
+              <div id="reason-codes" class="tag-row"></div>
+            </div>
+            <div>
+              <span class="subhead">Artifacts</span>
+              <div id="artifact-links" class="artifact-links"></div>
+            </div>
+          </article>
+
+          <article class="runs-card">
+            <div class="runs-card__header">
+              <span class="subhead">Recent Runs</span>
+              <span id="runs-count" class="runs-card__meta">0 recorded</span>
+            </div>
+            <div id="recent-runs" class="runs-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel panel--wide">
+        <div class="panel__heading">
+          <span class="panel__kicker">Logs</span>
+          <h2>Latest Output Tail</h2>
+        </div>
+        <div id="log-meta" class="log-meta">No log stream yet.</div>
+        <pre id="log-viewer" class="log-viewer">Waiting for logs…</pre>
+      </section>
+    </main>
+  </div>
+
+  <template id="empty-tag-template">
+    <span class="tag tag--muted">none</span>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
