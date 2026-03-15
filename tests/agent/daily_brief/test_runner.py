@@ -1,4 +1,5 @@
 import json
+import runpy
 import sqlite3
 import subprocess
 import sys
@@ -1518,9 +1519,10 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(result["scheduled_for_local_date"], "2026-03-11")
         self.assertEqual(result["next_scheduled_run_at_utc"], "2026-03-11T23:05:00Z")
         self.assertEqual(result["email_delivery"]["recipient_count"], 1)
+        self.assertEqual(result["analytical_status"], "not_run")
         self.assertEqual(
             DailyBriefRunnerTests._FakeSMTP.last_instance.sent_messages[0]["Subject"],
-            "Daily Brief: 2026-03-11",
+            "Daily Brief [OK/NOT_RUN]: 2026-03-11",
         )
 
     def test_run_fixture_daily_brief_holds_email_when_critic_fails(self):
@@ -1558,6 +1560,135 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(decision_record["publish_decision"], "hold")
         self.assertEqual(decision_record["analytical_status"], "fail")
         self.assertEqual(decision_record["reason_codes"], ["empty_why_it_matters"])
+
+    def test_run_fixture_daily_brief_marks_analytical_status_not_run_without_critic(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_no_critic",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+            run_summary = json.loads((Path(result["artifact_dir"]) / "run_summary.json").read_text(encoding="utf-8"))
+            decision_record = json.loads(Path(result["decision_record_path"]).read_text(encoding="utf-8"))
+
+        self.assertEqual(result["analytical_status"], "not_run")
+        self.assertEqual(result["publish_decision"], "publish")
+        self.assertEqual(run_summary["analytical_status"], "not_run")
+        self.assertEqual(run_summary["publish_decision"], "publish")
+        self.assertEqual(decision_record["analytical_status"], "not_run")
+        self.assertEqual(decision_record["publish_decision"], "publish")
+
+    def test_script_entrypoints_inject_local_critic_by_default(self):
+        repo_root = Path(__file__).resolve().parents[3]
+        fixture_script_path = repo_root / "scripts" / "run_daily_brief_fixture.py"
+        live_script_path = repo_root / "scripts" / "run_daily_brief.py"
+
+        class _FakeCritic:
+            pass
+
+        planner = object()
+        composer = object()
+        provider_resolution = {
+            "requested_provider": "deterministic",
+            "resolved_provider": "deterministic",
+            "provider_mode": "deterministic",
+            "provider_fallback_used": False,
+            "issue_planner": planner,
+            "claim_composer": composer,
+        }
+
+        def capture_kwargs(*, script_path: Path, run_target: str) -> dict[str, object]:
+            captured: dict[str, object] = {}
+
+            def _capture(**kwargs):
+                captured.update(kwargs)
+                return {"status": "ok"}
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                argv = [
+                    str(script_path),
+                    "--base-dir",
+                    tmpdir,
+                    "--run-id",
+                    "run_script_parity",
+                    "--generated-at-utc",
+                    "2026-03-10T16:00:00Z",
+                ]
+                with patch("apps.agent.daily_brief.provider_registry.resolve_daily_brief_provider") as resolve_mock, patch(
+                    run_target
+                ) as run_mock, patch(
+                    "apps.agent.daily_brief.critic.LocalDailyBriefCritic", return_value=_FakeCritic()
+                ), patch("builtins.print"), patch.object(sys, "argv", argv):
+                    resolve_mock.return_value = provider_resolution
+                    run_mock.side_effect = _capture
+                    runpy.run_path(str(script_path), run_name="__main__")
+
+            return captured
+
+        fixture_kwargs = capture_kwargs(
+            script_path=fixture_script_path,
+            run_target="apps.agent.daily_brief.runner.run_fixture_daily_brief",
+        )
+        live_kwargs = capture_kwargs(
+            script_path=live_script_path,
+            run_target="apps.agent.daily_brief.runner.run_daily_brief",
+        )
+
+        self.assertIs(fixture_kwargs["issue_planner"], planner)
+        self.assertIs(fixture_kwargs["claim_composer"], composer)
+        self.assertEqual(fixture_kwargs["provider_resolution"], provider_resolution)
+        self.assertIsInstance(fixture_kwargs["critic"], _FakeCritic)
+        self.assertIs(live_kwargs["issue_planner"], planner)
+        self.assertIs(live_kwargs["claim_composer"], composer)
+        self.assertEqual(live_kwargs["provider_resolution"], provider_resolution)
+        self.assertIsInstance(live_kwargs["critic"], _FakeCritic)
+
+    def test_fixture_provider_demo_injects_local_critic_for_publish_gate_parity(self):
+        repo_root = Path(__file__).resolve().parents[3]
+        script_path = repo_root / "scripts" / "run_daily_brief_fixture.py"
+
+        class _FakeCritic:
+            pass
+
+        critic_instance = _FakeCritic()
+        provider_resolution = {
+            "requested_provider": "openai",
+            "resolved_provider": "openai",
+            "provider_mode": "model-assisted",
+            "provider_fallback_used": False,
+            "issue_planner": object(),
+            "claim_composer": object(),
+        }
+        captured: dict[str, object] = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return {"status": "ok"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            argv = [
+                str(script_path),
+                "--base-dir",
+                tmpdir,
+                "--run-id",
+                "run_fixture_provider_demo",
+                "--generated-at-utc",
+                "2026-03-10T16:00:00Z",
+                "--provider",
+                "openai",
+            ]
+            with patch("apps.agent.daily_brief.provider_registry.resolve_daily_brief_provider") as resolve_mock, patch(
+                "apps.agent.daily_brief.runner.run_fixture_daily_brief"
+            ) as run_mock, patch(
+                "apps.agent.daily_brief.critic.LocalDailyBriefCritic", return_value=critic_instance
+            ), patch("builtins.print"), patch.object(sys, "argv", argv):
+                resolve_mock.return_value = provider_resolution
+                run_mock.side_effect = _capture
+                runpy.run_path(str(script_path), run_name="__main__")
+
+        self.assertEqual(captured["provider_resolution"], provider_resolution)
+        self.assertIs(captured["critic"], critic_instance)
 
     def test_build_daily_brief_synthesis_calls_issue_planner_before_claim_composer(self):
         call_order: list[str] = []

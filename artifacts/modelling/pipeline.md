@@ -160,6 +160,8 @@ Actions:
   - claims under one issue share the same `issue_id`
   - `prevailing`, `counter`, and `minority` address the same issue question
 - optionally run critic pass to detect shallow source-by-source paraphrase
+- script entrypoints for fixture and live runs apply the same local critic gate by default
+- if a caller skips the critic in direct runner usage, persist `analytical_status=not_run` rather than treating the brief as passed
 
 Failure handling:
 - minor claim failures -> drop invalid claims and continue with partial issue output
