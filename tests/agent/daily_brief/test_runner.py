@@ -810,7 +810,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(citation_rows[0]["citation_id"], "cite_001")
             self.assertIn("brief_thesis", brief_plan)
             self.assertIn("render_mode", brief_plan)
-            self.assertIn(corpus_summary[0], brief_plan["brief_thesis"])
+            self.assertEqual(brief_plan["top_takeaways"][0], corpus_summary[0])
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
             self.assertEqual(
                 bullet_citations[0]["citation_id"],

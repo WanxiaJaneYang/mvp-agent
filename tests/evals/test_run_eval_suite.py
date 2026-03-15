@@ -1,4 +1,5 @@
 import unittest
+import json
 from pathlib import Path
 
 from evals import run_eval_suite
@@ -6,83 +7,7 @@ from evals import run_eval_suite
 
 class EvalRunnerTests(unittest.TestCase):
     def test_daily_brief_stage_case_passes_when_required_artifacts_and_html_are_present(self):
-        case = {
-            "id": "DBR-020",
-            "type": "daily_brief_stage",
-            "run_mode": "fixture",
-            "generated_at_utc": "2026-03-10T16:00:00Z",
-            "providers": {
-                "issues": [
-                    {
-                        "scope_index": 0,
-                        "issue_question": "Will softer growth change near-term Fed expectations?",
-                        "thesis_hint": "Growth is cooling while policy stays cautious.",
-                    }
-                ],
-                "claims": [
-                    {
-                        "issue_index": 0,
-                        "claim_kind": "prevailing",
-                        "text": "Softer growth is raising later-cut expectations.",
-                        "citation_source_id": "us_bls_news",
-                        "confidence": "medium",
-                        "novelty_vs_prior_brief": "new",
-                        "why_it_matters": "Rate-sensitive assets remain exposed to data surprises.",
-                    },
-                    {
-                        "issue_index": 0,
-                        "claim_kind": "counter",
-                        "text": "Steady policy language can still slow repricing.",
-                        "citation_source_id": "fed_press_releases",
-                        "confidence": "medium",
-                        "novelty_vs_prior_brief": "continued",
-                        "why_it_matters": "Policy communication still anchors the near-term debate.",
-                    },
-                    {
-                        "issue_index": 0,
-                        "claim_kind": "minority",
-                        "text": "Softer spending could cool the growth scare faster than markets expect.",
-                        "citation_source_id": "us_bea_news",
-                        "confidence": "medium",
-                        "novelty_vs_prior_brief": "reframed",
-                        "why_it_matters": "Consumer demand can challenge the dominant market read.",
-                    },
-                    {
-                        "issue_index": 0,
-                        "claim_kind": "watch",
-                        "text": "Watch the next payroll release for confirmation that labor demand is easing.",
-                        "citation_source_id": "us_bls_news",
-                        "confidence": "high",
-                        "novelty_vs_prior_brief": "continued",
-                        "why_it_matters": "The next labor print can confirm or break the easing thesis.",
-                    },
-                ],
-            },
-            "expected": {
-                "status": "ok",
-                "publish_decision": "publish",
-                "artifact_paths": [
-                    "corpus_summary.json",
-                    "brief_plan.json",
-                    "issue_evidence_scopes.json",
-                    "issue_map.json",
-                    "claim_objects.json",
-                    "synthesis.json",
-                    "run_summary.json",
-                ],
-                "issue_scope_count_at_least": 1,
-                "issue_map_count": 1,
-                "claim_count": 4,
-                "brief_thesis_contains": [
-                    "Officials said inflation progress remains uneven",
-                    "Payroll growth moderated and wage gains cooled.",
-                ],
-                "html_contains": [
-                    "Will softer growth change near-term Fed expectations?",
-                    "Softer growth is raising later-cut expectations.",
-                ],
-            },
-        }
+        case = self._load_golden_case("case20.json")
 
         failure = run_eval_suite._run_case(case)
 
@@ -106,6 +31,10 @@ class EvalRunnerTests(unittest.TestCase):
         )
 
         self.assertEqual(errors, ["missing artifact_dir in daily_brief_stage result"])
+
+    def _load_golden_case(self, filename: str) -> dict:
+        case_path = run_eval_suite.ROOT / "evals" / "golden" / filename
+        return json.loads(case_path.read_text(encoding="utf-8"))
 
     def test_retrieval_case_passes_when_expected_order_and_size_match(self):
         case = {
