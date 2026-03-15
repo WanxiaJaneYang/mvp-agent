@@ -1326,7 +1326,7 @@ def _publish_summary(
     elif str(stage8_result.get("status")) == "retry":
         citation_status = "abstained"
 
-    analytical_status = "pass"
+    analytical_status = "not_run"
     reason_codes: list[str] = []
     if critic_report is not None:
         analytical_status = str(critic_report.get("status") or "pass")
