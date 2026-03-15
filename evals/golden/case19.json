@@ -1,0 +1,35 @@
+{
+  "id": "literature_review_thesis_mismatch_and_templated_why",
+  "type": "literature_review",
+  "synthesis": {
+    "brief": {
+      "bottom_line": "The brief drifts off-issue and uses a template implication.",
+      "top_takeaways": [
+        "A generic implication is not enough."
+      ]
+    },
+    "issues": [
+      {
+        "issue_id": "issue_001",
+        "issue_question": "Will oil prices keep rising over the next few weeks?",
+        "prevailing": [],
+        "counter": [],
+        "minority": [],
+        "watch": [
+          {
+            "text": "Watch payroll growth for signs of labor-market cooling.",
+            "novelty_vs_prior_brief": "continued",
+            "why_it_matters": "Investors should watch this closely."
+          }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "passes": false,
+    "reason_codes": [
+      "thesis_mismatch",
+      "templated_why_it_matters"
+    ]
+  }
+}

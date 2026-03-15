@@ -29,6 +29,41 @@ VALID_NOVELTY_LABELS = {
     "reversed",
     "unknown",
 }
+QUESTION_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "change",
+    "does",
+    "few",
+    "for",
+    "how",
+    "in",
+    "is",
+    "keep",
+    "latest",
+    "near",
+    "next",
+    "of",
+    "on",
+    "or",
+    "term",
+    "the",
+    "this",
+    "to",
+    "what",
+    "weeks",
+    "will",
+}
+TEMPLATED_WHY_IT_MATTERS = frozenset(
+    {
+        "investors should watch this closely.",
+        "investors should watch this closely",
+        "this could move markets.",
+        "this could move markets",
+    }
+)
 REQUIRED_STRUCTURED_CLAIM_FIELDS = frozenset(StructuredClaim.__annotations__)
 REQUEST_TASK = "daily_brief_claim_composer"
 CLAIM_COMPOSER_SYSTEM_PROMPT = (
@@ -152,6 +187,11 @@ def _validate_claim_bindings(*, claims: list[StructuredClaim], brief_input: Clai
         issue_map=brief_input["issue_map"],
         citation_store=brief_input["citation_store"],
     )
+    issues_by_id = {
+        str(issue.get("issue_id") or ""): issue
+        for issue in brief_input["issue_map"]
+        if isinstance(issue, Mapping) and str(issue.get("issue_id") or "")
+    }
     for claim in claims:
         issue_id = str(claim["issue_id"])
         issue_scope = issue_citation_allowlists.get(issue_id)
@@ -163,6 +203,10 @@ def _validate_claim_bindings(*, claims: list[StructuredClaim], brief_input: Clai
             raise ValueError("Malformed claim composer output.")
         if any(citation_id not in issue_scope[opposing_field] for citation_id in claim["opposing_citation_ids"]):
             raise ValueError("Malformed claim composer output.")
+        issue = issues_by_id.get(issue_id)
+        if issue is None:
+            raise ValueError("Malformed claim composer output.")
+        _validate_claim_semantics(claim=claim, issue=issue)
 
 
 def _issue_citation_allowlists(
@@ -247,3 +291,34 @@ def _validate_structured_claim(item: dict[str, Any]) -> StructuredClaim:
         novelty_vs_prior_brief=novelty,
         why_it_matters=normalized_text_fields["why_it_matters"],
     )
+
+
+def _validate_claim_semantics(*, claim: StructuredClaim, issue: Mapping[str, Any]) -> None:
+    claim_text = str(claim["claim_text"])
+    normalized_claim_text = claim_text.lower()
+    issue_tokens = _normalized_tokens(
+        " ".join(
+            (
+                str(issue.get("issue_question") or ""),
+                str(issue.get("thesis_hint") or ""),
+            )
+        )
+    )
+    claim_tokens = _normalized_tokens(claim_text)
+    watch_has_issue_anchor = str(claim["claim_kind"]) == "watch" and any(
+        marker in normalized_claim_text for marker in ("falsification", "debate", "issue", "thesis")
+    )
+    if issue_tokens and claim_tokens and issue_tokens.isdisjoint(claim_tokens) and not watch_has_issue_anchor:
+        raise ValueError("Malformed claim composer output.")
+    if str(claim["why_it_matters"]).strip().lower() in TEMPLATED_WHY_IT_MATTERS:
+        raise ValueError("Malformed claim composer output.")
+
+
+def _normalized_tokens(value: str) -> set[str]:
+    cleaned = "".join(character.lower() if character.isalnum() else " " for character in value)
+    tokens = {token for token in cleaned.split() if token and token not in QUESTION_STOPWORDS}
+    if "fed" in tokens:
+        tokens.update({"federal", "reserve"})
+    if {"federal", "reserve"}.issubset(tokens):
+        tokens.add("fed")
+    return tokens

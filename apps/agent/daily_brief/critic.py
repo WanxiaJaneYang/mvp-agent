@@ -40,7 +40,17 @@ QUESTION_STOPWORDS = {
     "weeks",
     "will",
 }
-HARD_FAIL_REASON_CODES = frozenset({"empty_why_it_matters", "thesis_mismatch"})
+TEMPLATED_WHY_IT_MATTERS = frozenset(
+    {
+        "investors should watch this closely.",
+        "investors should watch this closely",
+        "this could move markets.",
+        "this could move markets",
+    }
+)
+HARD_FAIL_REASON_CODES = frozenset(
+    {"empty_why_it_matters", "thesis_mismatch", "templated_why_it_matters"}
+)
 
 
 class LocalDailyBriefCritic(CriticProvider):
@@ -76,6 +86,10 @@ def review_brief_locally(
 
             if _has_empty_why_it_matters(claim):
                 _append_reason(reason_codes, "empty_why_it_matters")
+                flagged_claim_ids.add(claim_id)
+
+            if _has_templated_why_it_matters(claim):
+                _append_reason(reason_codes, "templated_why_it_matters")
                 flagged_claim_ids.add(claim_id)
 
     status: CriticStatus = "pass"
@@ -134,9 +148,12 @@ def _is_source_by_source_paraphrase(
 
 
 def _has_thesis_mismatch(*, issue_question: str, claim: Mapping[str, Any], section: str) -> bool:
-    if section == "watch":
-        return False
     claim_text = str(claim.get("text") or claim.get("claim_text") or "")
+    normalized_claim_text = claim_text.lower()
+    if section == "watch" and any(
+        marker in normalized_claim_text for marker in ("falsification", "debate", "issue", "thesis")
+    ):
+        return False
     question_tokens = _normalized_tokens(issue_question)
     claim_tokens = _normalized_tokens(claim_text)
     if not question_tokens or not claim_tokens:
@@ -148,6 +165,13 @@ def _has_empty_why_it_matters(claim: Mapping[str, Any]) -> bool:
     if "why_it_matters" not in claim:
         return False
     return not str(claim.get("why_it_matters") or "").strip()
+
+
+def _has_templated_why_it_matters(claim: Mapping[str, Any]) -> bool:
+    if "why_it_matters" not in claim:
+        return False
+    normalized = str(claim.get("why_it_matters") or "").strip().lower()
+    return normalized in TEMPLATED_WHY_IT_MATTERS
 
 
 def _normalized_tokens(text: str) -> set[str]:

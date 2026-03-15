@@ -27,6 +27,13 @@ POLICY_OR_MACRO_PATTERN = re.compile(
     re.IGNORECASE,
 )
 OFFICIAL_POLICY_TAGS = frozenset({"policy_centralbank", "macro_data"})
+TOPIC_TAG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("energy", re.compile(r"\b(?:oil|opec|crude|brent|wti|energy)\b", re.IGNORECASE)),
+    ("policy", re.compile(r"\b(?:fed|federal reserve|ecb|rates?|policy|central bank)\b", re.IGNORECASE)),
+    ("inflation", re.compile(r"\b(?:inflation|cpi|ppi)\b", re.IGNORECASE)),
+    ("labor", re.compile(r"\b(?:payroll|labor|employment|jobs?|unemployment|wages?)\b", re.IGNORECASE)),
+    ("growth", re.compile(r"\b(?:growth|gdp|demand|consumer spending|income)\b", re.IGNORECASE)),
+)
 
 
 @dataclass(frozen=True)
@@ -299,23 +306,60 @@ def _passes_quality_rules(
     available_source_ids: Collection[str] | None,
     source_registry: Mapping[str, Mapping[str, Any]] | None,
 ) -> bool:
-    if source_registry is None:
-        return True
-
     cited_citations = [
         citation_store[citation_id] for citation_id in valid_ids if citation_id in citation_store
     ]
     text = str(bullet.get("text", ""))
-    return _passes_numeric_time_quality(
+    return (
+        _passes_numeric_time_quality(
+            text=text,
+            cited_citations=cited_citations,
+            source_registry=source_registry,
+        )
+        and _passes_policy_claim_quality(
+            text=text,
+            cited_citations=cited_citations,
+            available_source_ids=available_source_ids,
+            source_registry=source_registry,
+        )
+        and _passes_entailment_quality(
         text=text,
         cited_citations=cited_citations,
-        source_registry=source_registry,
-    ) and _passes_policy_claim_quality(
-        text=text,
-        cited_citations=cited_citations,
-        available_source_ids=available_source_ids,
-        source_registry=source_registry,
     )
+    )
+
+
+def _passes_entailment_quality(
+    *,
+    text: str,
+    cited_citations: List[Mapping[str, Any]],
+) -> bool:
+    claim_topics = _topic_tags(text)
+    if not claim_topics:
+        return True
+
+    citation_topics: set[str] = set()
+    for citation in cited_citations:
+        support_texts = [
+            str(citation.get("quote_text") or "").strip(),
+            str(citation.get("snippet_text") or "").strip(),
+        ]
+        for support_text in support_texts:
+            if not support_text:
+                continue
+            citation_topics.update(_topic_tags(support_text))
+
+    if not citation_topics:
+        return True
+    return not claim_topics.isdisjoint(citation_topics)
+
+
+def _topic_tags(text: str) -> set[str]:
+    tags: set[str] = set()
+    for tag, pattern in TOPIC_TAG_PATTERNS:
+        if pattern.search(text):
+            tags.add(tag)
+    return tags
 
 
 def validate_synthesis(

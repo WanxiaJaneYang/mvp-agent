@@ -1,0 +1,59 @@
+{
+  "id": "citation_entailment_mismatch",
+  "type": "citation",
+  "synthesis": {
+    "prevailing": [
+      {
+        "text": "Oil prices rose after OPEC cut production.",
+        "citation_ids": ["c1"]
+      }
+    ],
+    "counter": [
+      {
+        "text": "Counter.",
+        "citation_ids": ["c2"]
+      }
+    ],
+    "minority": [
+      {
+        "text": "Minority.",
+        "citation_ids": ["c3"]
+      }
+    ],
+    "watch": [
+      {
+        "text": "Watch.",
+        "citation_ids": ["c4"]
+      }
+    ]
+  },
+  "citation_store": {
+    "c1": {
+      "id": "c1",
+      "url": "u1",
+      "published_at": "2026-02-19T00:00:00Z",
+      "paywall_policy": "full",
+      "quote_text": "The ECB held rates steady and left guidance unchanged.",
+      "snippet_text": "ECB policymakers emphasized patience on inflation."
+    },
+    "c2": {
+      "id": "c2",
+      "url": "u2",
+      "published_at": "2026-02-19T00:00:00Z"
+    },
+    "c3": {
+      "id": "c3",
+      "url": "u3",
+      "published_at": "2026-02-19T00:00:00Z"
+    },
+    "c4": {
+      "id": "c4",
+      "url": "u4",
+      "published_at": "2026-02-19T00:00:00Z"
+    }
+  },
+  "expected": {
+    "status": "retry",
+    "removed_bullets": 1
+  }
+}
