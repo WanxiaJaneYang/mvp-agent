@@ -19,7 +19,11 @@ def discover_dashboard_artifacts(*, repo_root: Path) -> dict[str, Any]:
         if relative_base is None:
             by_kind[run_kind] = _empty_entry(run_kind)
             continue
-        by_kind[run_kind] = _discover_run_kind(repo_root=repo_root, run_kind=run_kind, base_dir=repo_root / relative_base)
+        by_kind[run_kind] = _discover_run_kind(
+            repo_root=repo_root,
+            run_kind=run_kind,
+            base_dir=repo_root / relative_base,
+        )
     latest = _select_latest(by_kind)
     return {"refreshed_at_utc": _utc_now_iso(), "by_kind": by_kind, "latest": latest}
 

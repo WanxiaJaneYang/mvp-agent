@@ -94,13 +94,13 @@ Lint and type-check commands are required and CI-gated:
 Run lint:
 
 ```bash
-python -m ruff check apps tests scripts
+python -m ruff check apps tests scripts tools
 ```
 
 Run type checks:
 
 ```bash
-python -m mypy apps
+python -m mypy apps tools
 ```
 
 Run tests:
@@ -174,8 +174,23 @@ Run repository validation:
 ```bash
 python scripts/validate_artifacts.py
 python scripts/validate_decision_record_schema.py
-python -m compileall -q apps tests scripts
+python -m compileall -q apps tests scripts tools
 ```
+
+Run the local Repo Ops Dashboard:
+
+```bash
+python -m tools.repo_dashboard.app
+```
+
+The dashboard runs locally at `http://127.0.0.1:8000/` and exposes:
+- architecture/doc anchors for the current pipeline and data model
+- latest health for fixture demo, eval suite, targeted tests, and live daily brief
+- buttons to launch those four commands locally
+- latest publish decision, reason, `reason_codes`, and artifact links
+- a polled log tail for the active or most recent dashboard-triggered run
+
+Dashboard-specific notes and storage paths live in `tools/repo_dashboard/README.md`.
 
 ## Working Conventions
 

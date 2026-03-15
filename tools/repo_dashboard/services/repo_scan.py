@@ -75,7 +75,13 @@ def build_repo_overview(*, repo_root: Path) -> dict[str, Any]:
     }
 
 
-def _card(*, card_id: str, title: str, primary_path: Path, assets: list[dict[str, str]] | None = None) -> dict[str, Any]:
+def _card(
+    *,
+    card_id: str,
+    title: str,
+    primary_path: Path,
+    assets: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
     return {
         "id": card_id,
         "title": title,
