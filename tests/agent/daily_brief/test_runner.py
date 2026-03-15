@@ -2075,6 +2075,141 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual([issue["issue_id"] for issue in synthesis.issue_map], ["issue_001"])
         self.assertEqual([issue["issue_id"] for issue in synthesis.final_result["synthesis"]["issues"]], ["issue_001"])
 
+    def test_build_daily_brief_synthesis_excludes_empty_issue_scopes_from_provider_planning(self):
+        test_case = self
+
+        class _BriefPlanner(BriefPlannerProvider):
+            def plan_brief(self, *, brief_input):
+                return BriefPlan(
+                    brief_id="brief_2026-03-10_run_empty_scope",
+                    brief_thesis="Growth is the only supported debate today.",
+                    top_takeaways=["Growth cooling has the only scoped evidence."],
+                    issue_budget=2,
+                    render_mode="full",
+                    source_scarcity_mode="normal",
+                    candidate_issue_seeds=["growth", "growth"],
+                    issue_order=["seed_001", "seed_002"],
+                    watchlist=[],
+                    reason_codes=["two_distinct_debates_supported"],
+                )
+
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                test_case.assertEqual(brief_input["brief_plan"]["issue_budget"], 1)
+                test_case.assertEqual(len(brief_input["issue_evidence_scopes"]), 1)
+                test_case.assertCountEqual(
+                    brief_input["issue_evidence_scopes"][0]["primary_chunk_ids"],
+                    ["chunk_001", "chunk_002"],
+                )
+                return [
+                    IssueMap(
+                        issue_id="issue_001",
+                        issue_question="Will softer growth change near-term Fed expectations?",
+                        thesis_hint="Growth is cooling, but inflation remains sticky.",
+                        supporting_evidence_ids=["chunk_001"],
+                        opposing_evidence_ids=[],
+                        minority_evidence_ids=[],
+                        watch_evidence_ids=[],
+                    )
+                ]
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                test_case.assertEqual([issue["issue_id"] for issue in brief_input["issue_map"]], ["issue_001"])
+                return [
+                    StructuredClaim(
+                        claim_id="claim_prevailing",
+                        issue_id="issue_001",
+                        claim_kind="prevailing",
+                        claim_text="Softer growth is raising later-cut expectations.",
+                        supporting_citation_ids=["cite_001"],
+                        opposing_citation_ids=[],
+                        confidence="medium",
+                        novelty_vs_prior_brief="new",
+                        why_it_matters="Rate-sensitive assets remain exposed to data surprises.",
+                    )
+                ]
+
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "fed_press_releases",
+                    "publisher": "Federal Reserve",
+                    "canonical_url": "https://example.test/prevailing",
+                    "title": "Fed keeps policy steady",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "statement",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "fetched_at": "2026-03-10T14:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "body_text": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "content_hash": "hash_prevailing",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:05:00Z",
+                    "updated_at": "2026-03-10T14:05:00Z",
+                    "doc_id": "doc_001",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_empty_scope",
+                },
+                {
+                    "source_id": "wsj_markets",
+                    "publisher": "Wall Street Journal",
+                    "canonical_url": "https://example.test/counter",
+                    "title": "Investors question the soft-landing narrative",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T14:20:00Z",
+                    "fetched_at": "2026-03-10T14:25:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Investors question the soft-landing narrative as growth data weakens.",
+                    "body_text": "Investors question the soft-landing narrative as growth data weakens.",
+                    "content_hash": "hash_counter",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:25:00Z",
+                    "updated_at": "2026-03-10T14:25:00Z",
+                    "doc_id": "doc_002",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_empty_scope",
+                },
+            ],
+            chunks=[
+                {"chunk_id": "chunk_001", "doc_id": "doc_001", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},
+                {"chunk_id": "chunk_002", "doc_id": "doc_002", "chunk_index": 0, "text": "Investors question the soft-landing narrative as growth data weakens.", "token_count": 9, "char_start": 0, "char_end": 68, "created_at": "2026-03-10T14:25:00Z"},
+            ],
+            fts_rows=[
+                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_001", "chunk_id": "chunk_001", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
+                {"text": "Investors question the soft-landing narrative as growth data weakens.", "doc_id": "doc_002", "chunk_id": "chunk_002", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T14:20:00Z", "credibility_tier": 2},
+            ],
+            corpus_items=[
+                {"chunk_id": "chunk_001", "doc_id": "doc_001", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.88, "semantic_score": 0.88, "recency_score": 0.70, "credibility_score": 1.0, "rank_in_pack": 1},
+                {"chunk_id": "chunk_002", "doc_id": "doc_002", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.84, "semantic_score": 0.84, "recency_score": 0.66, "credibility_score": 0.8, "rank_in_pack": 2},
+            ],
+            diversity_stats={"unique_publishers": 2},
+        )
+        registry = {
+            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/prevailing", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},
+            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/counter", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+        }
+
+        synthesis = build_daily_brief_synthesis(
+            stage_data=stage_data,
+            registry=registry,
+            run_id="run_empty_scope",
+            generated_at_utc="2026-03-10T16:00:00Z",
+            brief_planner=_BriefPlanner(),
+            issue_planner=_Planner(),
+            claim_composer=_Composer(),
+        )
+
+        self.assertEqual([scope["issue_id"] for scope in synthesis.issue_evidence_scopes], ["issue_001"])
+        self.assertEqual([issue["issue_id"] for issue in synthesis.issue_map], ["issue_001"])
+
     def test_build_daily_brief_synthesis_rejects_partial_provider_injection(self):
         stage_data = DailyBriefCorpusStageData(
             source_rows=[],

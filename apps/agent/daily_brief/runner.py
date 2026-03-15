@@ -670,6 +670,11 @@ def build_daily_brief_synthesis(
             fts_rows=stage_data.fts_rows,
             registry=registry,
         )
+        issue_evidence_scopes = [
+            scope
+            for scope in issue_evidence_scopes
+            if _issue_scope_has_evidence(scope=scope)
+        ]
         issue_map = _build_issue_map(
             brief_plan=brief_plan,
             query_text="",
@@ -939,16 +944,23 @@ def _build_issue_map(
     generated_at_utc: str,
 ) -> list[IssueMap]:
     if issue_planner is not None:
+        provider_issue_scopes = (
+            []
+            if issue_evidence_scopes is None
+            else [cast(IssueEvidenceScope, dict(item)) for item in issue_evidence_scopes]
+        )
+        provider_brief_plan = cast(BriefPlan, dict(brief_plan))
+        if provider_issue_scopes:
+            provider_brief_plan["issue_budget"] = min(
+                max(1, int(brief_plan["issue_budget"])),
+                len(provider_issue_scopes),
+            )
         issue_map = issue_planner.plan_issues(
             brief_input=IssuePlannerInput(
                 run_id=run_id,
                 generated_at_utc=generated_at_utc,
-                brief_plan=brief_plan,
-                issue_evidence_scopes=(
-                    []
-                    if issue_evidence_scopes is None
-                    else [cast(IssueEvidenceScope, dict(item)) for item in issue_evidence_scopes]
-                ),
+                brief_plan=provider_brief_plan,
+                issue_evidence_scopes=provider_issue_scopes,
                 prior_brief_context=prior_brief_context,
             )
         )
@@ -972,6 +984,18 @@ def _build_issue_map(
             watch_evidence_ids=chunk_ids[:1],
         )
     ]
+
+
+def _issue_scope_has_evidence(*, scope: Mapping[str, Any]) -> bool:
+    return any(
+        isinstance(scope.get(field), list) and any(isinstance(value, str) and value for value in scope[field])
+        for field in (
+            "primary_chunk_ids",
+            "opposing_chunk_ids",
+            "minority_chunk_ids",
+            "watch_chunk_ids",
+        )
+    )
 
 
 def _build_structured_claims(
