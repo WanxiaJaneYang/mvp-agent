@@ -127,6 +127,9 @@ Run the deterministic fixture-backed daily brief slice:
 python scripts/run_daily_brief_fixture.py
 ```
 
+The fixture runner now applies the same local critic gate as the live runner by default.
+If a caller bypasses the critic when using `run_fixture_daily_brief(...)` directly, the publish summary records `analytical_status=not_run` instead of treating the brief as passed.
+
 Run the fixture slice with real OpenAI issue planning and claim composition:
 
 ```bash
@@ -148,6 +151,8 @@ Provider-backed demo modes:
   - uses the local `codex login` session
   - does not require `OPENAI_API_KEY`
   - can return `ok` or a validator-driven `abstained` result depending on model output quality
+
+Provider-backed fixture demos now use the same critic-driven hold/publish gate as the live runner.
 
 The current provider-agnostic seam is covered in `tests/agent/daily_brief/test_runner.py` for both `run_fixture_daily_brief(...)` and `run_daily_brief(...)`.
 

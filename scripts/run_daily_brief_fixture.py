@@ -44,6 +44,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    from apps.agent.daily_brief.critic import LocalDailyBriefCritic
     from apps.agent.daily_brief.provider_registry import resolve_daily_brief_provider
     from apps.agent.daily_brief.runner import run_fixture_daily_brief
     from apps.agent.delivery.email_sender import EmailDeliveryConfig
@@ -80,6 +81,7 @@ def main() -> None:
         email_config=email_config,
         issue_planner=provider_resolution["issue_planner"],
         claim_composer=provider_resolution["claim_composer"],
+        critic=LocalDailyBriefCritic(),
         provider_resolution=provider_resolution,
     )
     print(json.dumps(result, indent=2))
