@@ -1,5 +1,5 @@
-import unittest
 import json
+import unittest
 from pathlib import Path
 
 from evals import run_eval_suite
