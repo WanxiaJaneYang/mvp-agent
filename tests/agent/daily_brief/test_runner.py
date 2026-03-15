@@ -1615,6 +1615,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
                     "--generated-at-utc",
                     "2026-03-10T16:00:00Z",
                 ]
+                original_sys_path = list(sys.path)
                 with patch("apps.agent.daily_brief.provider_registry.resolve_daily_brief_provider") as resolve_mock, patch(
                     run_target
                 ) as run_mock, patch(
@@ -1622,7 +1623,12 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 ), patch("builtins.print"), patch.object(sys, "argv", argv):
                     resolve_mock.return_value = provider_resolution
                     run_mock.side_effect = _capture
-                    runpy.run_path(str(script_path), run_name="__main__")
+                    try:
+                        runpy.run_path(str(script_path), run_name="__main__")
+                    finally:
+                        sys.path[:] = original_sys_path
+
+                self.assertEqual(sys.path, original_sys_path)
 
             return captured
 
@@ -1678,6 +1684,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 "--provider",
                 "openai",
             ]
+            original_sys_path = list(sys.path)
             with patch("apps.agent.daily_brief.provider_registry.resolve_daily_brief_provider") as resolve_mock, patch(
                 "apps.agent.daily_brief.runner.run_fixture_daily_brief"
             ) as run_mock, patch(
@@ -1685,7 +1692,12 @@ class DailyBriefRunnerTests(unittest.TestCase):
             ), patch("builtins.print"), patch.object(sys, "argv", argv):
                 resolve_mock.return_value = provider_resolution
                 run_mock.side_effect = _capture
-                runpy.run_path(str(script_path), run_name="__main__")
+                try:
+                    runpy.run_path(str(script_path), run_name="__main__")
+                finally:
+                    sys.path[:] = original_sys_path
+
+        self.assertEqual(sys.path, original_sys_path)
 
         self.assertEqual(captured["provider_resolution"], provider_resolution)
         self.assertIs(captured["critic"], critic_instance)
