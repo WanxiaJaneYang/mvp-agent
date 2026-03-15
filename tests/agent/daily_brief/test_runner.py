@@ -786,6 +786,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertTrue(decision_record_path.exists())
             self.assertTrue((artifact_dir / "documents.json").exists())
             self.assertTrue((artifact_dir / "chunks.json").exists())
+            self.assertTrue((artifact_dir / "corpus_summary.json").exists())
             self.assertTrue((artifact_dir / "brief_plan.json").exists())
             self.assertTrue((artifact_dir / "evidence_pack_items.json").exists())
             self.assertTrue((artifact_dir / "issue_overlap_reports.json").exists())
@@ -801,11 +802,15 @@ class DailyBriefRunnerTests(unittest.TestCase):
             synthesis_bullets = json.loads((artifact_dir / "synthesis_bullets.json").read_text(encoding="utf-8"))
             bullet_citations = json.loads((artifact_dir / "bullet_citations.json").read_text(encoding="utf-8"))
             run_summary = json.loads((artifact_dir / "run_summary.json").read_text(encoding="utf-8"))
+            corpus_summary = json.loads((artifact_dir / "corpus_summary.json").read_text(encoding="utf-8"))
             brief_plan = json.loads((artifact_dir / "brief_plan.json").read_text(encoding="utf-8"))
             self.assertIsInstance(citation_rows, list)
+            self.assertIsInstance(corpus_summary, list)
+            self.assertGreater(len(corpus_summary), 0)
             self.assertEqual(citation_rows[0]["citation_id"], "cite_001")
             self.assertIn("brief_thesis", brief_plan)
             self.assertIn("render_mode", brief_plan)
+            self.assertEqual(brief_plan["top_takeaways"][0], corpus_summary[0])
             self.assertEqual(synthesis_bullets[0]["section"], "prevailing")
             self.assertEqual(
                 bullet_citations[0]["citation_id"],
@@ -994,6 +999,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertEqual(result["status"], "ok")
             self.assertTrue(html_path.exists())
             self.assertTrue((artifact_dir / "documents.json").exists())
+            self.assertTrue((artifact_dir / "corpus_summary.json").exists())
             self.assertEqual(run_summary["docs_fetched"], 5)
             self.assertEqual(result["pipeline_status"], "ok")
 

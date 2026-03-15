@@ -419,6 +419,7 @@ def _execute_daily_brief_slice(
     _write_json(artifact_dir / "documents.json", corpus_data.documents)
     _write_json(artifact_dir / "chunks.json", corpus_data.chunks)
     _write_json(artifact_dir / "fts_rows.json", corpus_data.fts_rows)
+    _write_json(artifact_dir / "corpus_summary.json", synthesis_data.corpus_summary)
     _write_json(artifact_dir / "brief_plan.json", synthesis_data.brief_plan)
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
     _write_json(artifact_dir / "issue_evidence_scopes.json", synthesis_data.issue_evidence_scopes)
@@ -647,7 +648,7 @@ def build_daily_brief_synthesis(
         previous_synthesis=previous_synthesis,
         previous_generated_at_utc=None,
     )
-    brief_plan = _build_brief_plan(
+    brief_plan, corpus_summary = _build_brief_plan(
         evidence_pack_items=evidence_pack_items,
         documents_by_id=documents_by_id,
         evidence_pack_report=evidence_pack_report,
@@ -813,6 +814,7 @@ def build_daily_brief_synthesis(
     synthesis_id = build_synthesis_id(run_id=run_id)
     return DailyBriefSynthesisStageData(
         query_text=query_text,
+        corpus_summary=corpus_summary,
         brief_plan=brief_plan,
         evidence_pack_items=evidence_pack_items,
         evidence_pack_report=evidence_pack_report,
@@ -848,20 +850,23 @@ def _build_brief_plan(
     brief_planner: BriefPlannerProvider | None,
     run_id: str,
     generated_at_utc: str,
-) -> BriefPlan:
+) -> tuple[BriefPlan, list[str]]:
     corpus_summary = build_corpus_summary(
         corpus_items=evidence_pack_items,
         documents_by_id=documents_by_id,
     )
     planner = brief_planner or LocalBriefPlanner()
-    return planner.plan_brief(
-        brief_input={
-            "run_id": run_id,
-            "generated_at_utc": generated_at_utc,
-            "corpus_summary": corpus_summary,
-            "source_diversity_stats": dict(evidence_pack_report.get("diversity_stats", {})),
-            "prior_brief_context": None if prior_brief_context is None else dict(prior_brief_context),
-        }
+    return (
+        planner.plan_brief(
+            brief_input={
+                "run_id": run_id,
+                "generated_at_utc": generated_at_utc,
+                "corpus_summary": corpus_summary,
+                "source_diversity_stats": dict(evidence_pack_report.get("diversity_stats", {})),
+                "prior_brief_context": None if prior_brief_context is None else dict(prior_brief_context),
+            }
+        ),
+        corpus_summary,
     )
 
 

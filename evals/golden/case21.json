@@ -1,0 +1,36 @@
+{
+  "id": "DBR-021",
+  "type": "daily_brief_stage",
+  "run_mode": "fixture",
+  "generated_at_utc": "2026-03-10T16:00:00Z",
+  "fixture_payloads": {
+    "wsj_markets": [
+      {
+        "url": "https://example.test/wsj-only",
+        "title": "Cooling growth draws focus",
+        "published_at": "2026-03-10T15:15:00Z",
+        "fetched_at": "2026-03-10T15:20:00Z",
+        "summary": "Cooling growth becomes the focus.",
+        "doc_type": "news",
+        "language": "en"
+      }
+    ]
+  },
+  "expected": {
+    "status": "abstained",
+    "publish_decision": "hold",
+    "artifact_paths": [
+      "corpus_summary.json",
+      "brief_plan.json",
+      "synthesis.json",
+      "run_summary.json"
+    ],
+    "html_contains": [
+      "Abstained"
+    ],
+    "html_not_contains": [
+      "[Insufficient evidence to support this claim]",
+      ">Issues<"
+    ]
+  }
+}

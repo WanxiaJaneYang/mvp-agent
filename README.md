@@ -18,7 +18,7 @@ Implemented in-tree today:
 - daily-brief runtime, scheduled HTML/email delivery, and citation/postprocess guardrails
 - persistent SQLite/FTS5 retrieval with lexical plus semantic scoring
 - alert scoring, policy-gate helpers, and alert delivery runtime
-- eval harness with 12 golden cases
+- eval harness with 22 golden cases, including stage-level daily-brief demos
 - manual portfolio relevance mapping with local runtime persistence
 
 Completed modelling artifacts:
@@ -107,6 +107,13 @@ Run tests:
 
 ```bash
 python -m unittest discover -s tests -t . -p "test_*.py" -v
+```
+
+Mandatory daily-brief integrity quality gates:
+
+```bash
+python -m unittest discover -s tests/evals -p "test_*.py" -v
+python -m unittest tests.agent.daily_brief.test_runner tests.agent.delivery.test_html_report tests.agent.synthesis.test_postprocess tests.agent.validators.test_citation_validator tests.agent.daily_brief.test_editorial_planner tests.agent.daily_brief.test_issue_retrieval -v
 ```
 
 Run the active-subset daily brief against live feeds:

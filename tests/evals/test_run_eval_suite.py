@@ -1,3 +1,5 @@
+import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -5,6 +7,37 @@ from evals import run_eval_suite
 
 
 class EvalRunnerTests(unittest.TestCase):
+    def test_daily_brief_stage_case_passes_when_required_artifacts_and_html_are_present(self):
+        case = self._load_golden_case("case20.json")
+
+        failure = run_eval_suite._run_case(case)
+
+        self.assertEqual(failure, [])
+
+    def test_daily_brief_stage_case_reports_missing_artifact_for_declared_expectation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            errors = run_eval_suite._validate_daily_brief_stage_result(
+                result={"artifact_dir": tmpdir},
+                expected={"issue_map_count": 1},
+            )
+
+        self.assertIn(
+            "missing artifact required for issue_map_count expectations: issue_map.json",
+            errors,
+        )
+
+    def test_daily_brief_stage_case_reports_missing_artifact_dir(self):
+        errors = run_eval_suite._validate_daily_brief_stage_result(
+            result={"status": "failed"},
+            expected={},
+        )
+
+        self.assertEqual(errors, ["missing artifact_dir in daily_brief_stage result"])
+
+    def _load_golden_case(self, filename: str) -> dict:
+        case_path = run_eval_suite.ROOT / "evals" / "golden" / filename
+        return json.loads(case_path.read_text(encoding="utf-8"))
+
     def test_retrieval_case_passes_when_expected_order_and_size_match(self):
         case = {
             "type": "retrieval",
@@ -110,16 +143,25 @@ class EvalRunnerTests(unittest.TestCase):
         cases = run_eval_suite._load_cases(golden_dir)
         case_types = {case["type"] for case in cases}
 
+        self.assertIn("daily_brief_stage", case_types)
         self.assertIn("retrieval", case_types)
         self.assertIn("postprocess", case_types)
 
     def test_readme_documents_supported_case_types_and_future_todo(self):
         readme_text = (run_eval_suite.ROOT / "evals" / "README.md").read_text(encoding="utf-8")
 
+        self.assertIn("daily_brief_stage", readme_text)
         self.assertIn("retrieval", readme_text)
         self.assertIn("postprocess", readme_text)
         self.assertIn("TODO", readme_text)
         self.assertIn("retrieval -> validation -> abstain", readme_text)
+        self.assertIn('python -m unittest discover -s tests/evals -p "test_*.py" -v', readme_text)
+        self.assertIn(
+            "python -m unittest tests.agent.daily_brief.test_runner tests.agent.delivery.test_html_report "
+            "tests.agent.synthesis.test_postprocess tests.agent.validators.test_citation_validator "
+            "tests.agent.daily_brief.test_editorial_planner tests.agent.daily_brief.test_issue_retrieval -v",
+            readme_text,
+        )
 
     def test_literature_review_case_fails_on_unexpected_extra_reason_codes(self):
         case = {
