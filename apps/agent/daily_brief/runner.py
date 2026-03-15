@@ -670,11 +670,12 @@ def build_daily_brief_synthesis(
             fts_rows=stage_data.fts_rows,
             registry=registry,
         )
-        issue_evidence_scopes = [
+        pruned_issue_evidence_scopes = [
             scope
             for scope in issue_evidence_scopes
             if _issue_scope_has_evidence(scope=scope)
         ]
+        issue_evidence_scopes = pruned_issue_evidence_scopes or issue_evidence_scopes[:1]
         issue_map = _build_issue_map(
             brief_plan=brief_plan,
             query_text="",

@@ -2232,6 +2232,61 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 issue_planner=_Planner(),
             )
 
+    def test_build_daily_brief_synthesis_preserves_fallback_empty_issue_scope_for_provider_planning(self):
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                self._test_case.assertEqual(brief_input["brief_plan"]["issue_budget"], 1)
+                self._test_case.assertEqual(len(brief_input["issue_evidence_scopes"]), 1)
+                self._test_case.assertEqual(
+                    brief_input["issue_evidence_scopes"][0]["primary_chunk_ids"],
+                    [],
+                )
+                return [
+                    IssueMap(
+                        issue_id="issue_001",
+                        issue_question="What is the latest market debate?",
+                        thesis_hint="No defensible issue has evidence yet.",
+                        supporting_evidence_ids=[],
+                        opposing_evidence_ids=[],
+                        minority_evidence_ids=[],
+                        watch_evidence_ids=[],
+                    )
+                ]
+
+            def __init__(self, test_case):
+                self._test_case = test_case
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                self._test_case.assertEqual([issue["issue_id"] for issue in brief_input["issue_map"]], ["issue_001"])
+                return []
+
+            def __init__(self, test_case):
+                self._test_case = test_case
+
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[],
+            chunks=[],
+            fts_rows=[],
+            corpus_items=[],
+            diversity_stats={},
+        )
+
+        synthesis = build_daily_brief_synthesis(
+            stage_data=stage_data,
+            registry={},
+            run_id="run_empty_provider_scope",
+            generated_at_utc="2026-03-10T16:00:00Z",
+            issue_planner=_Planner(self),
+            claim_composer=_Composer(self),
+        )
+
+        self.assertEqual([scope["issue_id"] for scope in synthesis.issue_evidence_scopes], ["issue_001"])
+        self.assertEqual(synthesis.issue_map[0]["issue_id"], "issue_001")
+        self.assertEqual(synthesis.structured_claims, [])
+        self.assertEqual(synthesis.final_result["status"], "abstained")
+
     def test_run_fixture_daily_brief_forwards_opaque_provider_objects_to_execute_slice(self):
         class _Planner(IssuePlannerProvider):
             def plan_issues(self, *, brief_input):
