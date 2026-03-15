@@ -323,9 +323,9 @@ def _passes_quality_rules(
             source_registry=source_registry,
         )
         and _passes_entailment_quality(
-        text=text,
-        cited_citations=cited_citations,
-    )
+            text=text,
+            cited_citations=cited_citations,
+        )
     )
 
 

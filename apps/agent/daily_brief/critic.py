@@ -4,6 +4,11 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from apps.agent.daily_brief.model_interfaces import CriticInput, CriticProvider
+from apps.agent.daily_brief.semantic_checks import (
+    TEMPLATED_WHY_IT_MATTERS,
+    has_watch_issue_anchor,
+    normalized_issue_tokens,
+)
 from apps.agent.pipeline.types import CriticReport, CriticStatus
 
 PARAPHRASE_VERBS = (
@@ -12,41 +17,6 @@ PARAPHRASE_VERBS = (
     " reports ",
     " said ",
     " says ",
-)
-QUESTION_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "change",
-    "does",
-    "few",
-    "for",
-    "how",
-    "in",
-    "is",
-    "keep",
-    "latest",
-    "near",
-    "next",
-    "of",
-    "on",
-    "or",
-    "term",
-    "the",
-    "this",
-    "to",
-    "what",
-    "weeks",
-    "will",
-}
-TEMPLATED_WHY_IT_MATTERS = frozenset(
-    {
-        "investors should watch this closely.",
-        "investors should watch this closely",
-        "this could move markets.",
-        "this could move markets",
-    }
 )
 HARD_FAIL_REASON_CODES = frozenset(
     {"empty_why_it_matters", "thesis_mismatch", "templated_why_it_matters"}
@@ -149,13 +119,10 @@ def _is_source_by_source_paraphrase(
 
 def _has_thesis_mismatch(*, issue_question: str, claim: Mapping[str, Any], section: str) -> bool:
     claim_text = str(claim.get("text") or claim.get("claim_text") or "")
-    normalized_claim_text = claim_text.lower()
-    if section == "watch" and any(
-        marker in normalized_claim_text for marker in ("falsification", "debate", "issue", "thesis")
-    ):
+    if section == "watch" and has_watch_issue_anchor(claim_text):
         return False
-    question_tokens = _normalized_tokens(issue_question)
-    claim_tokens = _normalized_tokens(claim_text)
+    question_tokens = normalized_issue_tokens(issue_question)
+    claim_tokens = normalized_issue_tokens(claim_text)
     if not question_tokens or not claim_tokens:
         return False
     return question_tokens.isdisjoint(claim_tokens)
@@ -172,16 +139,6 @@ def _has_templated_why_it_matters(claim: Mapping[str, Any]) -> bool:
         return False
     normalized = str(claim.get("why_it_matters") or "").strip().lower()
     return normalized in TEMPLATED_WHY_IT_MATTERS
-
-
-def _normalized_tokens(text: str) -> set[str]:
-    cleaned = "".join(character.lower() if character.isalnum() else " " for character in text)
-    tokens = {token for token in cleaned.split() if token and token not in QUESTION_STOPWORDS}
-    if "fed" in tokens:
-        tokens.update({"federal", "reserve"})
-    if {"federal", "reserve"}.issubset(tokens):
-        tokens.add("fed")
-    return tokens
 
 
 def _append_reason(reason_codes: list[str], code: str) -> None:

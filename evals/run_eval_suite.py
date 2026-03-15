@@ -9,51 +9,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from apps.agent.daily_brief.semantic_checks import (  # noqa: E402
+    TEMPLATED_WHY_IT_MATTERS,
+    has_watch_issue_anchor,
+    normalized_issue_tokens,
+)
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation  # noqa: E402
 from apps.agent.retrieval.evidence_pack import build_evidence_pack  # noqa: E402
 from apps.agent.synthesis.postprocess import CORE_SECTIONS, finalize_validation_outcome  # noqa: E402
 
-SUPPORTED_NOVELTY_LABELS = {
-    "new",
-    "continued",
-    "reframed",
-    "weakened",
-    "strengthened",
-    "reversed",
-}
-QUESTION_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "change",
-    "does",
-    "few",
-    "for",
-    "how",
-    "in",
-    "is",
-    "keep",
-    "latest",
-    "near",
-    "next",
-    "of",
-    "on",
-    "or",
-    "term",
-    "the",
-    "this",
-    "to",
-    "what",
-    "weeks",
-    "will",
-}
-TEMPLATED_WHY_IT_MATTERS = {
-    "investors should watch this closely.",
-    "investors should watch this closely",
-    "this could move markets.",
-    "this could move markets",
-}
+SUPPORTED_NOVELTY_LABELS = {"new", "continued", "reframed", "weakened", "strengthened", "reversed"}
 
 
 def _load_cases(golden_dir: Path) -> List[Dict[str, Any]]:
@@ -210,7 +175,7 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
         if not isinstance(issue, dict):
             continue
         issue_question = str(issue.get("issue_question") or issue.get("title") or "").strip().lower()
-        issue_tokens = _normalized_tokens(issue_question)
+        issue_tokens = normalized_issue_tokens(issue_question)
         if issue_question in normalized_questions:
             reason_codes.append("duplicate_issue")
         else:
@@ -225,10 +190,8 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
                 why_it_matters = str(bullet.get("why_it_matters") or "").strip()
                 novelty = str(bullet.get("novelty_vs_prior_brief") or "").strip()
                 text = str(bullet.get("text") or "").lower()
-                claim_tokens = _normalized_tokens(text)
-                watch_has_issue_anchor = section == "watch" and any(
-                    marker in text for marker in ("falsification", "debate", "issue", "thesis")
-                )
+                claim_tokens = normalized_issue_tokens(text)
+                watch_has_issue_anchor = section == "watch" and has_watch_issue_anchor(text)
                 if not why_it_matters:
                     reason_codes.append("empty_why_it_matters")
                 if why_it_matters.lower() in TEMPLATED_WHY_IT_MATTERS:
@@ -252,16 +215,6 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
         if code not in deduped:
             deduped.append(code)
     return deduped
-
-
-def _normalized_tokens(text: str) -> set[str]:
-    cleaned = "".join(character.lower() if character.isalnum() else " " for character in text)
-    tokens = {token for token in cleaned.split() if token and token not in QUESTION_STOPWORDS}
-    if "fed" in tokens:
-        tokens.update({"federal", "reserve"})
-    if {"federal", "reserve"}.issubset(tokens):
-        tokens.add("fed")
-    return tokens
 
 
 if __name__ == "__main__":

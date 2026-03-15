@@ -5,6 +5,11 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any, cast
 
 from apps.agent.daily_brief.model_interfaces import ClaimComposerInput, ClaimComposerProvider
+from apps.agent.daily_brief.semantic_checks import (
+    TEMPLATED_WHY_IT_MATTERS,
+    has_watch_issue_anchor,
+    normalized_issue_tokens,
+)
 from apps.agent.pipeline.types import StructuredClaim
 
 VALID_CLAIM_KINDS = {"prevailing", "counter", "minority", "watch"}
@@ -29,41 +34,6 @@ VALID_NOVELTY_LABELS = {
     "reversed",
     "unknown",
 }
-QUESTION_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "change",
-    "does",
-    "few",
-    "for",
-    "how",
-    "in",
-    "is",
-    "keep",
-    "latest",
-    "near",
-    "next",
-    "of",
-    "on",
-    "or",
-    "term",
-    "the",
-    "this",
-    "to",
-    "what",
-    "weeks",
-    "will",
-}
-TEMPLATED_WHY_IT_MATTERS = frozenset(
-    {
-        "investors should watch this closely.",
-        "investors should watch this closely",
-        "this could move markets.",
-        "this could move markets",
-    }
-)
 REQUIRED_STRUCTURED_CLAIM_FIELDS = frozenset(StructuredClaim.__annotations__)
 REQUEST_TASK = "daily_brief_claim_composer"
 CLAIM_COMPOSER_SYSTEM_PROMPT = (
@@ -295,8 +265,7 @@ def _validate_structured_claim(item: dict[str, Any]) -> StructuredClaim:
 
 def _validate_claim_semantics(*, claim: StructuredClaim, issue: Mapping[str, Any]) -> None:
     claim_text = str(claim["claim_text"])
-    normalized_claim_text = claim_text.lower()
-    issue_tokens = _normalized_tokens(
+    issue_tokens = normalized_issue_tokens(
         " ".join(
             (
                 str(issue.get("issue_question") or ""),
@@ -304,21 +273,9 @@ def _validate_claim_semantics(*, claim: StructuredClaim, issue: Mapping[str, Any
             )
         )
     )
-    claim_tokens = _normalized_tokens(claim_text)
-    watch_has_issue_anchor = str(claim["claim_kind"]) == "watch" and any(
-        marker in normalized_claim_text for marker in ("falsification", "debate", "issue", "thesis")
-    )
+    claim_tokens = normalized_issue_tokens(claim_text)
+    watch_has_issue_anchor = str(claim["claim_kind"]) == "watch" and has_watch_issue_anchor(claim_text)
     if issue_tokens and claim_tokens and issue_tokens.isdisjoint(claim_tokens) and not watch_has_issue_anchor:
         raise ValueError("Malformed claim composer output.")
     if str(claim["why_it_matters"]).strip().lower() in TEMPLATED_WHY_IT_MATTERS:
         raise ValueError("Malformed claim composer output.")
-
-
-def _normalized_tokens(value: str) -> set[str]:
-    cleaned = "".join(character.lower() if character.isalnum() else " " for character in value)
-    tokens = {token for token in cleaned.split() if token and token not in QUESTION_STOPWORDS}
-    if "fed" in tokens:
-        tokens.update({"federal", "reserve"})
-    if {"federal", "reserve"}.issubset(tokens):
-        tokens.add("fed")
-    return tokens
