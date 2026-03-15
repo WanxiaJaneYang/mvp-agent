@@ -181,9 +181,9 @@ function renderRuns() {
 function renderLogs() {
   const lines = Array.isArray(state.logs.lines) ? state.logs.lines : [];
   els.logMeta.textContent = state.logs.run_id
-    ? `${state.logs.run_id} • ${state.logs.is_running ? "running" : "latest stored output"}`
+    ? `${state.logs.run_id} - ${state.logs.is_running ? "running" : "latest stored output"}`
     : "No log stream yet.";
-  els.logViewer.textContent = lines.length ? lines.join("\n") : "Waiting for logs…";
+  els.logViewer.textContent = lines.length ? lines.join("\n") : "Waiting for logs...";
 }
 
 function renderActiveRun() {
@@ -253,4 +253,3 @@ refreshAll().catch((error) => {
 window.setInterval(() => {
   refreshRuntime().catch(() => undefined);
 }, POLL_INTERVAL_MS);
-
