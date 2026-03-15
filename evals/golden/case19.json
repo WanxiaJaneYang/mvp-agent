@@ -28,8 +28,8 @@
   "expected": {
     "passes": false,
     "reason_codes": [
-      "thesis_mismatch",
-      "templated_why_it_matters"
+      "templated_why_it_matters",
+      "thesis_mismatch"
     ]
   }
 }
