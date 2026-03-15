@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from apps.agent.daily_brief.placeholders import ABSTAIN_PLACEHOLDER_TEXT
 from apps.agent.pipeline.types import (
     CitationValidationResult,
     DailyBriefBullet,
@@ -10,13 +11,12 @@ from apps.agent.pipeline.types import (
     FinalSynthesisResult,
 )
 
-ABSTAIN_TEXT = "[Insufficient evidence to produce a validated output]"
 CORE_SECTIONS = ("prevailing", "counter", "minority", "watch")
 
 
 def _build_abstain_bullet() -> DailyBriefBullet:
     return {
-        "text": ABSTAIN_TEXT,
+        "text": ABSTAIN_PLACEHOLDER_TEXT,
         "citation_ids": [],
         "confidence_label": "abstained",
     }

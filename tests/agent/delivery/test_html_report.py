@@ -294,6 +294,156 @@ class HtmlReportTests(unittest.TestCase):
         self.assertIn("Hold", html)
         self.assertNotIn("validation_retry_exhausted", html)
 
+    def test_render_daily_brief_html_suppresses_validator_placeholders_in_partial_output(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
+
+            render_daily_brief_html(
+                output_path=output_path,
+                report_date="2026-03-10",
+                run_id="run_partial_placeholder",
+                synthesis={
+                    "issues": [
+                        {
+                            "issue_id": "issue_001",
+                            "issue_question": "Will softer growth change near-term Fed expectations?",
+                            "title": "Will softer growth change near-term Fed expectations?",
+                            "summary": "The issue should still render without leaking validator placeholder copy.",
+                            "prevailing": [
+                                {
+                                    "text": "Softer growth is raising later-cut expectations.",
+                                    "citation_ids": ["cite_001"],
+                                }
+                            ],
+                            "counter": [
+                                {
+                                    "text": "[Insufficient evidence to support this claim]",
+                                    "citation_ids": [],
+                                    "validator_action": "replaced_insufficient_evidence",
+                                }
+                            ],
+                            "minority": [],
+                            "watch": [],
+                        }
+                    ],
+                    "meta": {
+                        "status": "partial",
+                        "citation_status": "partial",
+                        "analytical_status": "pass",
+                        "publish_decision": "hold",
+                    },
+                },
+                citation_store={
+                    "cite_001": {"title": "Fed release", "url": "https://example.test/fed"},
+                },
+            )
+
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("Will softer growth change near-term Fed expectations?", html)
+        self.assertIn("Softer growth is raising later-cut expectations.", html)
+        self.assertNotIn("[Insufficient evidence to support this claim]", html)
+        self.assertNotIn(">Counter<", html)
+
+    def test_render_daily_brief_html_suppresses_validator_placeholders_in_hold_output(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
+
+            render_daily_brief_html(
+                output_path=output_path,
+                report_date="2026-03-10",
+                run_id="run_hold_placeholder",
+                synthesis={
+                    "issues": [
+                        {
+                            "issue_id": "issue_001",
+                            "issue_question": "Issue preserved despite hold",
+                            "title": "Issue preserved despite hold",
+                            "summary": "Hold output should not surface validator placeholder text.",
+                            "prevailing": [
+                                {
+                                    "text": "[Insufficient evidence to support this claim]",
+                                    "citation_ids": [],
+                                    "validator_action": "replaced_insufficient_evidence",
+                                }
+                            ],
+                            "counter": [],
+                            "minority": [],
+                            "watch": [
+                                {
+                                    "text": "Watch the next CPI release.",
+                                    "citation_ids": ["cite_002"],
+                                }
+                            ],
+                        }
+                    ],
+                    "meta": {
+                        "status": "validated",
+                        "citation_status": "partial",
+                        "analytical_status": "fail",
+                        "publish_decision": "hold",
+                    },
+                },
+                citation_store={
+                    "cite_002": {"title": "CPI preview", "url": "https://example.test/cpi"},
+                },
+            )
+
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("Issue preserved despite hold", html)
+        self.assertIn("Watch the next CPI release.", html)
+        self.assertIn("Hold", html)
+        self.assertNotIn("[Insufficient evidence to support this claim]", html)
+
+    def test_render_daily_brief_html_treats_legacy_validator_placeholders_as_abstained(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"
+
+            render_daily_brief_html(
+                output_path=output_path,
+                report_date="2026-03-10",
+                run_id="run_legacy_validator_abstain",
+                synthesis={
+                    "prevailing": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                    "counter": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                    "minority": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                    "watch": [
+                        {
+                            "text": "[Insufficient evidence to support this claim]",
+                            "citation_ids": [],
+                            "validator_action": "replaced_insufficient_evidence",
+                        }
+                    ],
+                },
+                citation_store={},
+            )
+
+            html = output_path.read_text(encoding="utf-8")
+
+        self.assertIn("Abstained", html)
+        self.assertIn("Hold", html)
+        self.assertNotIn("[Insufficient evidence to support this claim]", html)
+        self.assertNotIn(">Issues<", html)
+
     def test_render_daily_brief_html_renders_changed_section_only_when_present(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "artifacts" / "daily" / "2026-03-10" / "brief.html"

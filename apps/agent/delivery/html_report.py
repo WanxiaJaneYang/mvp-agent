@@ -4,6 +4,10 @@ from html import escape
 from pathlib import Path
 from typing import Any, Mapping
 
+from apps.agent.daily_brief.placeholders import (
+    is_abstain_fallback_bullet,
+    is_validator_placeholder_bullet,
+)
 from apps.agent.pipeline.types import CitationStoreEntry
 
 SECTION_TITLES = {
@@ -280,7 +284,13 @@ def _render_issue(issue: Mapping[str, Any]) -> str:
 def _render_issue_section(*, title: str, bullets: Any) -> str:
     bullet_items = ""
     if isinstance(bullets, list):
-        bullet_items = "".join(_render_bullet(bullet) for bullet in bullets if isinstance(bullet, Mapping))
+        bullet_items = "".join(
+            _render_bullet(bullet)
+            for bullet in bullets
+            if isinstance(bullet, Mapping) and not is_validator_placeholder_bullet(bullet)
+        )
+    if not bullet_items:
+        return ""
     return (
         '<section class="argument">'
         f"<h3>{escape(title)}</h3>"
@@ -336,7 +346,13 @@ def _render_evidence_item(evidence: Mapping[str, Any]) -> str:
 def _render_changed_section(changed_bullets: Any) -> str:
     if not isinstance(changed_bullets, list) or not changed_bullets:
         return ""
-    items = "".join(_render_bullet(bullet) for bullet in changed_bullets if isinstance(bullet, Mapping))
+    items = "".join(
+        _render_bullet(bullet)
+        for bullet in changed_bullets
+        if isinstance(bullet, Mapping) and not is_validator_placeholder_bullet(bullet)
+    )
+    if not items:
+        return ""
     return (
         '<section class="changed">'
         "<h2>What Changed</h2>"
@@ -411,7 +427,7 @@ def _is_abstained(synthesis: Mapping[str, Any]) -> bool:
 
     if not bullets:
         return True
-    return all("Insufficient evidence" in str(bullet.get("text", "")) for bullet in bullets)
+    return all(is_abstain_fallback_bullet(bullet) for bullet in bullets)
 
 
 def _normalized_issues(synthesis: Mapping[str, Any]) -> list[Mapping[str, Any]]:

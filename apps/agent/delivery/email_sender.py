@@ -5,6 +5,8 @@ from email.message import EmailMessage
 from smtplib import SMTP
 from typing import Any
 
+from apps.agent.daily_brief.placeholders import is_validator_placeholder_bullet
+
 
 @dataclass(frozen=True)
 class EmailDeliveryConfig:
@@ -95,7 +97,7 @@ def _build_plain_text_summary(*, synthesis: dict[str, Any] | None) -> list[str]:
             bullets = issue.get(section, [])
             if not isinstance(bullets, list) or not bullets:
                 continue
-            bullet = bullets[0]
+            bullet = _first_renderable_bullet(bullets)
             if not isinstance(bullet, dict):
                 continue
             novelty = str(bullet.get("novelty_vs_prior_brief") or "").strip()
@@ -109,3 +111,11 @@ def _build_plain_text_summary(*, synthesis: dict[str, Any] | None) -> list[str]:
             if why_it_matters:
                 lines.append(f"Why it matters: {why_it_matters}")
     return lines
+
+
+def _first_renderable_bullet(bullets: list[Any]) -> dict[str, Any] | None:
+    for bullet in bullets:
+        if not isinstance(bullet, dict) or is_validator_placeholder_bullet(bullet):
+            continue
+        return bullet
+    return None

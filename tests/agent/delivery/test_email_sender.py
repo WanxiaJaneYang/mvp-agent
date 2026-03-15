@@ -78,6 +78,55 @@ class DailyBriefEmailSenderTests(unittest.TestCase):
         self.assertIn("prevailing [strengthened]: Softer growth is raising later-cut expectations.", rendered)
         self.assertIn("Why it matters: Rate-sensitive assets can reprice quickly.", rendered)
 
+    def test_send_daily_brief_email_suppresses_internal_placeholder_bullets(self):
+        send_daily_brief_email(
+            config=EmailDeliveryConfig(
+                smtp_host="smtp.example.test",
+                smtp_port=2525,
+                sender_email="briefs@example.test",
+                recipient_emails=("pm@example.test",),
+            ),
+            report_date="2026-03-10",
+            run_id="run_placeholder_email",
+            html_body="<html><body><h1>Daily Brief</h1></body></html>",
+            status_title="Hold",
+            synthesis={
+                "issues": [
+                    {
+                        "title": "Will softer growth change near-term Fed expectations?",
+                        "prevailing": [
+                            {
+                                "text": "[Insufficient evidence to support this claim]",
+                                "citation_ids": [],
+                                "validator_action": "replaced_insufficient_evidence",
+                            },
+                            {
+                                "text": "Softer growth is raising later-cut expectations.",
+                                "citation_ids": ["cite_001"],
+                            },
+                        ],
+                        "watch": [
+                            {
+                                "text": "[Insufficient evidence to support this claim]",
+                                "citation_ids": [],
+                                "validator_action": "replaced_insufficient_evidence",
+                            }
+                        ],
+                    }
+                ]
+            },
+            citation_status="partial",
+            analytical_status="fail",
+            publish_decision="hold",
+            smtp_class=_FakeSMTP,
+        )
+
+        rendered = _FakeSMTP.last_instance.sent_messages[0].as_string()
+
+        self.assertIn("prevailing: Softer growth is raising later-cut expectations.", rendered)
+        self.assertNotIn("[Insufficient evidence to support this claim]", rendered)
+        self.assertNotIn("\nwatch:", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
