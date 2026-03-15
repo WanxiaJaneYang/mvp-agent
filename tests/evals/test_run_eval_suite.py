@@ -88,6 +88,25 @@ class EvalRunnerTests(unittest.TestCase):
 
         self.assertEqual(failure, [])
 
+    def test_daily_brief_stage_case_reports_missing_artifact_for_declared_expectation(self):
+        errors = run_eval_suite._validate_daily_brief_stage_result(
+            result={"artifact_dir": str(Path.cwd())},
+            expected={"issue_map_count": 1},
+        )
+
+        self.assertIn(
+            "missing artifact required for issue_map_count expectations: issue_map.json",
+            errors,
+        )
+
+    def test_daily_brief_stage_case_reports_missing_artifact_dir(self):
+        errors = run_eval_suite._validate_daily_brief_stage_result(
+            result={"status": "failed"},
+            expected={},
+        )
+
+        self.assertEqual(errors, ["missing artifact_dir in daily_brief_stage result"])
+
     def test_retrieval_case_passes_when_expected_order_and_size_match(self):
         case = {
             "type": "retrieval",

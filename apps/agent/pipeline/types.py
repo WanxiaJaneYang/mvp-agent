@@ -446,6 +446,7 @@ class DailyBriefCorpusStageData:
 @dataclass
 class DailyBriefSynthesisStageData:
     query_text: str
+    corpus_summary: list[str]
     brief_plan: BriefPlan
     evidence_pack_items: list[EvidencePackItem]
     evidence_pack_report: dict[str, Any]

@@ -379,7 +379,11 @@ def _build_stage_providers(case: Dict[str, Any]) -> tuple[Any | None, Any | None
 
 def _validate_daily_brief_stage_result(*, result: Dict[str, Any], expected: Dict[str, Any]) -> List[str]:
     errors: List[str] = []
-    artifact_dir = Path(str(result["artifact_dir"]))
+    artifact_dir_value = result.get("artifact_dir")
+    if not artifact_dir_value:
+        errors.append("missing artifact_dir in daily_brief_stage result")
+        return errors
+    artifact_dir = Path(str(artifact_dir_value))
     html_path_value = result.get("html_path")
     html_path = Path(str(html_path_value)) if html_path_value else None
     html = html_path.read_text(encoding="utf-8") if html_path and html_path.exists() else ""
@@ -399,40 +403,57 @@ def _validate_daily_brief_stage_result(*, result: Dict[str, Any], expected: Dict
             errors.append(f"missing artifact: {relative_path}")
 
     corpus_summary_path = artifact_dir / "corpus_summary.json"
-    if corpus_summary_path.exists():
-        corpus_summary = json.loads(corpus_summary_path.read_text(encoding="utf-8"))
-        for needle in expected.get("corpus_summary_contains", []):
-            if not any(str(needle) in str(item) for item in corpus_summary):
-                errors.append(f"expected corpus_summary to contain {needle!r}")
+    corpus_summary_expectations = expected.get("corpus_summary_contains", [])
+    if corpus_summary_expectations:
+        if not corpus_summary_path.exists():
+            errors.append("missing artifact required for corpus_summary expectations: corpus_summary.json")
+        else:
+            corpus_summary = json.loads(corpus_summary_path.read_text(encoding="utf-8"))
+            for needle in corpus_summary_expectations:
+                if not any(str(needle) in str(item) for item in corpus_summary):
+                    errors.append(f"expected corpus_summary to contain {needle!r}")
 
     brief_plan_path = artifact_dir / "brief_plan.json"
-    if brief_plan_path.exists():
-        brief_plan = json.loads(brief_plan_path.read_text(encoding="utf-8"))
-        brief_thesis = str(brief_plan.get("brief_thesis") or "")
-        for needle in expected.get("brief_thesis_contains", []):
-            if str(needle) not in brief_thesis:
-                errors.append(f"expected brief_thesis to contain {needle!r}")
+    brief_thesis_expectations = expected.get("brief_thesis_contains", [])
+    if brief_thesis_expectations:
+        if not brief_plan_path.exists():
+            errors.append("missing artifact required for brief_thesis expectations: brief_plan.json")
+        else:
+            brief_plan = json.loads(brief_plan_path.read_text(encoding="utf-8"))
+            brief_thesis = str(brief_plan.get("brief_thesis") or "")
+            for needle in brief_thesis_expectations:
+                if str(needle) not in brief_thesis:
+                    errors.append(f"expected brief_thesis to contain {needle!r}")
 
     issue_scopes_path = artifact_dir / "issue_evidence_scopes.json"
-    if issue_scopes_path.exists():
-        issue_scopes = json.loads(issue_scopes_path.read_text(encoding="utf-8"))
-        minimum_scope_count = expected.get("issue_scope_count_at_least")
-        if minimum_scope_count is not None and len(issue_scopes) < int(minimum_scope_count):
-            errors.append(f"expected issue_scope_count>={minimum_scope_count}, got {len(issue_scopes)}")
+    minimum_scope_count = expected.get("issue_scope_count_at_least")
+    if minimum_scope_count is not None:
+        if not issue_scopes_path.exists():
+            errors.append("missing artifact required for issue_scope_count expectations: issue_evidence_scopes.json")
+        else:
+            issue_scopes = json.loads(issue_scopes_path.read_text(encoding="utf-8"))
+            if len(issue_scopes) < int(minimum_scope_count):
+                errors.append(f"expected issue_scope_count>={minimum_scope_count}, got {len(issue_scopes)}")
 
     issue_map_path = artifact_dir / "issue_map.json"
-    if issue_map_path.exists():
-        issue_map = json.loads(issue_map_path.read_text(encoding="utf-8"))
-        issue_map_count = expected.get("issue_map_count")
-        if issue_map_count is not None and len(issue_map) != int(issue_map_count):
-            errors.append(f"expected issue_map_count={issue_map_count}, got {len(issue_map)}")
+    issue_map_count = expected.get("issue_map_count")
+    if issue_map_count is not None:
+        if not issue_map_path.exists():
+            errors.append("missing artifact required for issue_map_count expectations: issue_map.json")
+        else:
+            issue_map = json.loads(issue_map_path.read_text(encoding="utf-8"))
+            if len(issue_map) != int(issue_map_count):
+                errors.append(f"expected issue_map_count={issue_map_count}, got {len(issue_map)}")
 
     claim_objects_path = artifact_dir / "claim_objects.json"
-    if claim_objects_path.exists():
-        claim_objects = json.loads(claim_objects_path.read_text(encoding="utf-8"))
-        claim_count = expected.get("claim_count")
-        if claim_count is not None and len(claim_objects) != int(claim_count):
-            errors.append(f"expected claim_count={claim_count}, got {len(claim_objects)}")
+    claim_count = expected.get("claim_count")
+    if claim_count is not None:
+        if not claim_objects_path.exists():
+            errors.append("missing artifact required for claim_count expectations: claim_objects.json")
+        else:
+            claim_objects = json.loads(claim_objects_path.read_text(encoding="utf-8"))
+            if len(claim_objects) != int(claim_count):
+                errors.append(f"expected claim_count={claim_count}, got {len(claim_objects)}")
 
     for needle in expected.get("html_contains", []):
         if str(needle) not in html:
