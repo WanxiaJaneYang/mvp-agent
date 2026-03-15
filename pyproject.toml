@@ -9,9 +9,11 @@ description = "Local-first financial news and macro literature-review assistant.
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "fastapi>=0.115,<1",
   "openai>=2,<3",
   "PyYAML==6.0.2",
   "pypdf>=5,<6",
+  "uvicorn>=0.34,<1",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +41,6 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 
 [tool.setuptools.packages.find]
-include = ["apps*"]
+include = ["apps*", "tools*"]
 exclude = ["artifacts*", "evals*", "tests*"]
 namespaces = true

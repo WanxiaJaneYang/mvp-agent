@@ -1,0 +1,117 @@
+{
+  "active_run_id": null,
+  "overview": {
+    "repo_name": "issue-182-backend",
+    "repo_root": "D:\\aiProjects\\workspaces\\mvp-agent\\.worktrees\\issue-182-backend",
+    "generated_at_utc": "2026-03-15T09:25:53Z",
+    "diagram_cards": [
+      {
+        "id": "architecture",
+        "title": "Architecture",
+        "primary_path": "D:\\aiProjects\\workspaces\\mvp-agent\\.worktrees\\issue-182-backend\\artifacts\\modelling\\pipeline.md",
+        "primary_uri": "file:///D:/aiProjects/workspaces/mvp-agent/.worktrees/issue-182-backend/artifacts/modelling/pipeline.md",
+        "assets": []
+      },
+      {
+        "id": "data_model",
+        "title": "Data Model",
+        "primary_path": "D:\\aiProjects\\workspaces\\mvp-agent\\.worktrees\\issue-182-backend\\artifacts\\modelling\\data_model.md",
+        "primary_uri": "file:///D:/aiProjects/workspaces/mvp-agent/.worktrees/issue-182-backend/artifacts/modelling/data_model.md",
+        "assets": []
+      },
+      {
+        "id": "run_flow",
+        "title": "Run Flow",
+        "primary_path": "D:\\aiProjects\\workspaces\\mvp-agent\\.worktrees\\issue-182-backend\\artifacts\\modelling\\decision_record_schema.md",
+        "primary_uri": "file:///D:/aiProjects/workspaces/mvp-agent/.worktrees/issue-182-backend/artifacts/modelling/decision_record_schema.md",
+        "assets": []
+      }
+    ],
+    "commands": {
+      "fixture": {
+        "id": "fixture",
+        "label": "Fixture Demo",
+        "argv": [
+          "python",
+          "scripts/run_daily_brief_fixture.py",
+          "--base-dir",
+          ".tmp_repo_dashboard/demo"
+        ],
+        "base_dir": ".tmp_repo_dashboard/demo"
+      },
+      "evals": {
+        "id": "evals",
+        "label": "Eval Suite",
+        "argv": [
+          "python",
+          "evals/run_eval_suite.py"
+        ],
+        "base_dir": null
+      },
+      "targeted_tests": {
+        "id": "targeted_tests",
+        "label": "Targeted Tests",
+        "argv": [
+          "python",
+          "-m",
+          "unittest",
+          "tests.agent.daily_brief.test_runner",
+          "tests.agent.delivery.test_html_report",
+          "tests.agent.validators.test_citation_validator",
+          "-v"
+        ],
+        "base_dir": null
+      },
+      "live": {
+        "id": "live",
+        "label": "Live Daily Brief",
+        "argv": [
+          "python",
+          "scripts/run_daily_brief.py",
+          "--base-dir",
+          ".tmp_repo_dashboard/live"
+        ],
+        "base_dir": ".tmp_repo_dashboard/live"
+      }
+    }
+  },
+  "health": {
+    "fixture": {
+      "run_kind": "fixture",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    },
+    "evals": {
+      "run_kind": "evals",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    },
+    "targeted_tests": {
+      "run_kind": "targeted_tests",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    },
+    "live": {
+      "run_kind": "live",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    }
+  },
+  "recent_runs": []
+}
