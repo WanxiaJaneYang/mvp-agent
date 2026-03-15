@@ -140,7 +140,10 @@ class DashboardStatusStore:
         state["recent_runs"] = recent_runs[:20]
         if is_active:
             state["active_run_id"] = normalized["run_id"]
-        elif state["active_run_id"] == normalized["run_id"] and normalized["status"] != DashboardRunStatus.RUNNING.value:
+        elif (
+            state["active_run_id"] == normalized["run_id"]
+            and normalized["status"] != DashboardRunStatus.RUNNING.value
+        ):
             state["active_run_id"] = None
         self.save_state(state)
         return normalized

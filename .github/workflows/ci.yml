@@ -22,10 +22,10 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Run Ruff
-        run: python -m ruff check apps tests scripts
+        run: python -m ruff check apps tests scripts tools
 
       - name: Run mypy
-        run: python -m mypy apps
+        run: python -m mypy apps tools
 
       - name: Validate modelling artifacts
         run: python scripts/validate_artifacts.py
@@ -34,7 +34,7 @@ jobs:
         run: python scripts/validate_decision_record_schema.py
 
       - name: Bytecode compile check
-        run: python -m compileall -q apps tests scripts
+        run: python -m compileall -q apps tests scripts tools
 
       - name: Run golden eval suite
         run: python evals/run_eval_suite.py
