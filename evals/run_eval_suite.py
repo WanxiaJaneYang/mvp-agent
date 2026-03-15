@@ -105,6 +105,14 @@ def _run_daily_brief_stage_case(case: Dict[str, Any]) -> List[str]:
                     critic=critic,
                 )
 
+            errors.extend(
+                f"fixture run: {error}"
+                for error in _validate_daily_brief_stage_result(result=fixture_result, expected=expected)
+            )
+            errors.extend(
+                f"live run: {error}"
+                for error in _validate_daily_brief_stage_result(result=live_result, expected=expected)
+            )
             for field in expected.get("parity_fields", []):
                 if fixture_result.get(field) != live_result.get(field):
                     errors.append(

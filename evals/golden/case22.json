@@ -4,6 +4,17 @@
   "run_mode": "fixture_live_parity",
   "generated_at_utc": "2026-03-10T16:00:00Z",
   "expected": {
+    "status": "ok",
+    "publish_decision": "publish",
+    "artifact_paths": [
+      "corpus_summary.json",
+      "brief_plan.json",
+      "issue_evidence_scopes.json",
+      "issue_map.json",
+      "claim_objects.json",
+      "synthesis.json",
+      "run_summary.json"
+    ],
     "parity_fields": [
       "status",
       "citation_status",

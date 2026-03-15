@@ -1,4 +1,5 @@
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -14,10 +15,11 @@ class EvalRunnerTests(unittest.TestCase):
         self.assertEqual(failure, [])
 
     def test_daily_brief_stage_case_reports_missing_artifact_for_declared_expectation(self):
-        errors = run_eval_suite._validate_daily_brief_stage_result(
-            result={"artifact_dir": str(Path.cwd())},
-            expected={"issue_map_count": 1},
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            errors = run_eval_suite._validate_daily_brief_stage_result(
+                result={"artifact_dir": tmpdir},
+                expected={"issue_map_count": 1},
+            )
 
         self.assertIn(
             "missing artifact required for issue_map_count expectations: issue_map.json",
