@@ -5,6 +5,89 @@ from evals import run_eval_suite
 
 
 class EvalRunnerTests(unittest.TestCase):
+    def test_daily_brief_stage_case_passes_when_required_artifacts_and_html_are_present(self):
+        case = {
+            "id": "DBR-020",
+            "type": "daily_brief_stage",
+            "run_mode": "fixture",
+            "generated_at_utc": "2026-03-10T16:00:00Z",
+            "providers": {
+                "issues": [
+                    {
+                        "scope_index": 0,
+                        "issue_question": "Will softer growth change near-term Fed expectations?",
+                        "thesis_hint": "Growth is cooling while policy stays cautious.",
+                    }
+                ],
+                "claims": [
+                    {
+                        "issue_index": 0,
+                        "claim_kind": "prevailing",
+                        "text": "Softer growth is raising later-cut expectations.",
+                        "citation_source_id": "us_bls_news",
+                        "confidence": "medium",
+                        "novelty_vs_prior_brief": "new",
+                        "why_it_matters": "Rate-sensitive assets remain exposed to data surprises.",
+                    },
+                    {
+                        "issue_index": 0,
+                        "claim_kind": "counter",
+                        "text": "Steady policy language can still slow repricing.",
+                        "citation_source_id": "fed_press_releases",
+                        "confidence": "medium",
+                        "novelty_vs_prior_brief": "continued",
+                        "why_it_matters": "Policy communication still anchors the near-term debate.",
+                    },
+                    {
+                        "issue_index": 0,
+                        "claim_kind": "minority",
+                        "text": "Softer spending could cool the growth scare faster than markets expect.",
+                        "citation_source_id": "us_bea_news",
+                        "confidence": "medium",
+                        "novelty_vs_prior_brief": "reframed",
+                        "why_it_matters": "Consumer demand can challenge the dominant market read.",
+                    },
+                    {
+                        "issue_index": 0,
+                        "claim_kind": "watch",
+                        "text": "Watch the next payroll release for confirmation that labor demand is easing.",
+                        "citation_source_id": "us_bls_news",
+                        "confidence": "high",
+                        "novelty_vs_prior_brief": "continued",
+                        "why_it_matters": "The next labor print can confirm or break the easing thesis.",
+                    },
+                ],
+            },
+            "expected": {
+                "status": "ok",
+                "publish_decision": "publish",
+                "artifact_paths": [
+                    "corpus_summary.json",
+                    "brief_plan.json",
+                    "issue_evidence_scopes.json",
+                    "issue_map.json",
+                    "claim_objects.json",
+                    "synthesis.json",
+                    "run_summary.json",
+                ],
+                "issue_scope_count_at_least": 1,
+                "issue_map_count": 1,
+                "claim_count": 4,
+                "brief_thesis_contains": [
+                    "Officials said inflation progress remains uneven",
+                    "Payroll growth moderated and wage gains cooled.",
+                ],
+                "html_contains": [
+                    "Will softer growth change near-term Fed expectations?",
+                    "Softer growth is raising later-cut expectations.",
+                ],
+            },
+        }
+
+        failure = run_eval_suite._run_case(case)
+
+        self.assertEqual(failure, [])
+
     def test_retrieval_case_passes_when_expected_order_and_size_match(self):
         case = {
             "type": "retrieval",
@@ -110,16 +193,25 @@ class EvalRunnerTests(unittest.TestCase):
         cases = run_eval_suite._load_cases(golden_dir)
         case_types = {case["type"] for case in cases}
 
+        self.assertIn("daily_brief_stage", case_types)
         self.assertIn("retrieval", case_types)
         self.assertIn("postprocess", case_types)
 
     def test_readme_documents_supported_case_types_and_future_todo(self):
         readme_text = (run_eval_suite.ROOT / "evals" / "README.md").read_text(encoding="utf-8")
 
+        self.assertIn("daily_brief_stage", readme_text)
         self.assertIn("retrieval", readme_text)
         self.assertIn("postprocess", readme_text)
         self.assertIn("TODO", readme_text)
         self.assertIn("retrieval -> validation -> abstain", readme_text)
+        self.assertIn('python -m unittest discover -s tests/evals -p "test_*.py" -v', readme_text)
+        self.assertIn(
+            "python -m unittest tests.agent.daily_brief.test_runner tests.agent.delivery.test_html_report "
+            "tests.agent.synthesis.test_postprocess tests.agent.validators.test_citation_validator "
+            "tests.agent.daily_brief.test_editorial_planner tests.agent.daily_brief.test_issue_retrieval -v",
+            readme_text,
+        )
 
     def test_literature_review_case_fails_on_unexpected_extra_reason_codes(self):
         case = {

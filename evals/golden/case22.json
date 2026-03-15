@@ -1,0 +1,16 @@
+{
+  "id": "DBR-022",
+  "type": "daily_brief_stage",
+  "run_mode": "fixture_live_parity",
+  "generated_at_utc": "2026-03-10T16:00:00Z",
+  "expected": {
+    "parity_fields": [
+      "status",
+      "citation_status",
+      "analytical_status",
+      "publish_decision",
+      "reason_codes",
+      "delivery_mode"
+    ]
+  }
+}

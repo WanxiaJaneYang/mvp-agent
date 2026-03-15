@@ -415,10 +415,15 @@ def _execute_daily_brief_slice(
     )
 
     artifact_dir = _artifact_dir(base_dir=base_dir, report_date=report_date, run_id=run_id)
+    corpus_summary = build_corpus_summary(
+        corpus_items=synthesis_data.evidence_pack_items,
+        documents_by_id={str(document["doc_id"]): document for document in corpus_data.documents},
+    )
     _write_json(artifact_dir / "sources.json", corpus_data.source_rows)
     _write_json(artifact_dir / "documents.json", corpus_data.documents)
     _write_json(artifact_dir / "chunks.json", corpus_data.chunks)
     _write_json(artifact_dir / "fts_rows.json", corpus_data.fts_rows)
+    _write_json(artifact_dir / "corpus_summary.json", corpus_summary)
     _write_json(artifact_dir / "brief_plan.json", synthesis_data.brief_plan)
     _write_json(artifact_dir / "evidence_pack_items.json", synthesis_data.evidence_pack_items)
     _write_json(artifact_dir / "issue_evidence_scopes.json", synthesis_data.issue_evidence_scopes)
