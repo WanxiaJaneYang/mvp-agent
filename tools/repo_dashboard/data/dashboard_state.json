@@ -1,0 +1,43 @@
+{
+  "active_run_id": null,
+  "overview": {},
+  "health": {
+    "fixture": {
+      "run_kind": "fixture",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    },
+    "evals": {
+      "run_kind": "evals",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    },
+    "targeted_tests": {
+      "run_kind": "targeted_tests",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    },
+    "live": {
+      "run_kind": "live",
+      "status": "idle",
+      "publish_decision": null,
+      "reason": null,
+      "reason_codes": [],
+      "updated_at_utc": null,
+      "artifact_paths": {}
+    }
+  },
+  "recent_runs": []
+}
