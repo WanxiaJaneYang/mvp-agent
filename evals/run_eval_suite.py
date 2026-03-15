@@ -9,18 +9,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from apps.agent.daily_brief.semantic_checks import (  # noqa: E402
+    TEMPLATED_WHY_IT_MATTERS,
+    has_watch_issue_anchor,
+    normalized_issue_tokens,
+)
 from apps.agent.pipeline.stage8_validation import run_stage8_citation_validation  # noqa: E402
 from apps.agent.retrieval.evidence_pack import build_evidence_pack  # noqa: E402
 from apps.agent.synthesis.postprocess import CORE_SECTIONS, finalize_validation_outcome  # noqa: E402
 
-SUPPORTED_NOVELTY_LABELS = {
-    "new",
-    "continued",
-    "reframed",
-    "weakened",
-    "strengthened",
-    "reversed",
-}
+SUPPORTED_NOVELTY_LABELS = {"new", "continued", "reframed", "weakened", "strengthened", "reversed"}
 
 
 def _load_cases(golden_dir: Path) -> List[Dict[str, Any]]:
@@ -177,6 +175,7 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
         if not isinstance(issue, dict):
             continue
         issue_question = str(issue.get("issue_question") or issue.get("title") or "").strip().lower()
+        issue_tokens = normalized_issue_tokens(issue_question)
         if issue_question in normalized_questions:
             reason_codes.append("duplicate_issue")
         else:
@@ -191,10 +190,21 @@ def _literature_review_reason_codes(synthesis: Dict[str, Any]) -> List[str]:
                 why_it_matters = str(bullet.get("why_it_matters") or "").strip()
                 novelty = str(bullet.get("novelty_vs_prior_brief") or "").strip()
                 text = str(bullet.get("text") or "").lower()
+                claim_tokens = normalized_issue_tokens(text)
+                watch_has_issue_anchor = section == "watch" and has_watch_issue_anchor(text)
                 if not why_it_matters:
                     reason_codes.append("empty_why_it_matters")
+                if why_it_matters.lower() in TEMPLATED_WHY_IT_MATTERS:
+                    reason_codes.append("templated_why_it_matters")
                 if novelty not in SUPPORTED_NOVELTY_LABELS:
                     reason_codes.append("unsupported_novelty")
+                if (
+                    issue_tokens
+                    and claim_tokens
+                    and issue_tokens.isdisjoint(claim_tokens)
+                    and not watch_has_issue_anchor
+                ):
+                    reason_codes.append("thesis_mismatch")
                 if any(verb in text for verb in (" says ", " said ", " reported ", " reports ")) and any(
                     publisher in text for publisher in ("reuters", "federal reserve", "wsj", "bloomberg")
                 ):

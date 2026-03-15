@@ -774,6 +774,36 @@ class CitationValidatorTests(unittest.TestCase):
         self.assertEqual(report.removed_bullets, 1)
         self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
 
+    def test_claim_entailment_requires_overlap_with_citation_support_text(self):
+        synthesis = {
+            "prevailing": [
+                {
+                    "text": "Oil prices rose after OPEC cut production.",
+                    "citation_ids": ["c1"],
+                }
+            ],
+            "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+            "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+            "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+        }
+        store = {
+            "c1": self._citation(
+                "c1",
+                url="https://example.test/ecb",
+                quote_text="The ECB held rates steady and left guidance unchanged.",
+                snippet_text="ECB policymakers emphasized patience on inflation.",
+            ),
+            "c2": self._citation("c2", url="https://source2.example/doc"),
+            "c3": self._citation("c3", url="https://source3.example/doc"),
+            "c4": self._citation("c4", url="https://source4.example/doc"),
+        }
+
+        report = validate_synthesis(synthesis, store)
+
+        self.assertEqual(report.removed_bullets, 1)
+        self.assertEqual(report.synthesis["prevailing"][0]["citation_ids"], [])
+        self.assertIn("Insufficient evidence", report.synthesis["prevailing"][0]["text"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -343,6 +343,94 @@ class OpenAIClaimComposerTests(unittest.TestCase):
                 )
             )
 
+    def test_rejects_claims_when_issue_thesis_tokens_do_not_overlap(self) -> None:
+        composer = OpenAIClaimComposer(
+            response_loader=lambda _brief_input: """
+            [
+              {
+                "claim_id": "claim_oil_watch",
+                "issue_id": "issue_oil",
+                "claim_kind": "watch",
+                "claim_text": "Watch payroll growth for signs of labor-market cooling.",
+                "supporting_citation_ids": ["cite_watch"],
+                "opposing_citation_ids": [],
+                "confidence": "medium",
+                "novelty_vs_prior_brief": "continued",
+                "why_it_matters": "Labor data can move macro pricing."
+              }
+            ]
+            """
+        )
+
+        with self.assertRaises(ValueError):
+            composer.compose_claims(
+                brief_input=ClaimComposerInput(
+                    run_id="run_001",
+                    generated_at_utc="2026-03-12T00:00:00Z",
+                    issue_map=[
+                        {
+                            "issue_id": "issue_oil",
+                            "issue_question": "Will oil prices keep rising over the next few weeks?",
+                            "thesis_hint": "Supply concerns are keeping near-term pressure skewed upward.",
+                            "supporting_evidence_ids": ["chunk_1"],
+                            "opposing_evidence_ids": ["chunk_2"],
+                            "minority_evidence_ids": ["chunk_3"],
+                            "watch_evidence_ids": ["chunk_4"],
+                        }
+                    ],
+                    citation_store={
+                        "cite_support": {"citation_id": "cite_support", "chunk_id": "chunk_1"},
+                        "cite_counter": {"citation_id": "cite_counter", "chunk_id": "chunk_2"},
+                        "cite_watch": {"citation_id": "cite_watch", "chunk_id": "chunk_4"},
+                    },
+                    prior_brief_context=None,
+                )
+            )
+
+    def test_rejects_claims_with_templated_why_it_matters(self) -> None:
+        composer = OpenAIClaimComposer(
+            response_loader=lambda _brief_input: """
+            [
+              {
+                "claim_id": "claim_oil_prevailing",
+                "issue_id": "issue_oil",
+                "claim_kind": "prevailing",
+                "claim_text": "Most sources still expect near-term upside in oil prices.",
+                "supporting_citation_ids": ["cite_support"],
+                "opposing_citation_ids": [],
+                "confidence": "medium",
+                "novelty_vs_prior_brief": "continued",
+                "why_it_matters": "Investors should watch this closely."
+              }
+            ]
+            """
+        )
+
+        with self.assertRaises(ValueError):
+            composer.compose_claims(
+                brief_input=ClaimComposerInput(
+                    run_id="run_001",
+                    generated_at_utc="2026-03-12T00:00:00Z",
+                    issue_map=[
+                        {
+                            "issue_id": "issue_oil",
+                            "issue_question": "Will oil prices keep rising over the next few weeks?",
+                            "thesis_hint": "Supply concerns are keeping near-term pressure skewed upward.",
+                            "supporting_evidence_ids": ["chunk_1"],
+                            "opposing_evidence_ids": ["chunk_2"],
+                            "minority_evidence_ids": ["chunk_3"],
+                            "watch_evidence_ids": ["chunk_4"],
+                        }
+                    ],
+                    citation_store={
+                        "cite_support": {"citation_id": "cite_support", "chunk_id": "chunk_1"},
+                        "cite_counter": {"citation_id": "cite_counter", "chunk_id": "chunk_2"},
+                        "cite_watch": {"citation_id": "cite_watch", "chunk_id": "chunk_4"},
+                    },
+                    prior_brief_context=None,
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

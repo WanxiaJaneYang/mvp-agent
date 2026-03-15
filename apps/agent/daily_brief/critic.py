@@ -4,6 +4,11 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from apps.agent.daily_brief.model_interfaces import CriticInput, CriticProvider
+from apps.agent.daily_brief.semantic_checks import (
+    TEMPLATED_WHY_IT_MATTERS,
+    has_watch_issue_anchor,
+    normalized_issue_tokens,
+)
 from apps.agent.pipeline.types import CriticReport, CriticStatus
 
 PARAPHRASE_VERBS = (
@@ -13,34 +18,9 @@ PARAPHRASE_VERBS = (
     " said ",
     " says ",
 )
-QUESTION_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "change",
-    "does",
-    "few",
-    "for",
-    "how",
-    "in",
-    "is",
-    "keep",
-    "latest",
-    "near",
-    "next",
-    "of",
-    "on",
-    "or",
-    "term",
-    "the",
-    "this",
-    "to",
-    "what",
-    "weeks",
-    "will",
-}
-HARD_FAIL_REASON_CODES = frozenset({"empty_why_it_matters", "thesis_mismatch"})
+HARD_FAIL_REASON_CODES = frozenset(
+    {"empty_why_it_matters", "thesis_mismatch", "templated_why_it_matters"}
+)
 
 
 class LocalDailyBriefCritic(CriticProvider):
@@ -76,6 +56,10 @@ def review_brief_locally(
 
             if _has_empty_why_it_matters(claim):
                 _append_reason(reason_codes, "empty_why_it_matters")
+                flagged_claim_ids.add(claim_id)
+
+            if _has_templated_why_it_matters(claim):
+                _append_reason(reason_codes, "templated_why_it_matters")
                 flagged_claim_ids.add(claim_id)
 
     status: CriticStatus = "pass"
@@ -134,11 +118,11 @@ def _is_source_by_source_paraphrase(
 
 
 def _has_thesis_mismatch(*, issue_question: str, claim: Mapping[str, Any], section: str) -> bool:
-    if section == "watch":
-        return False
     claim_text = str(claim.get("text") or claim.get("claim_text") or "")
-    question_tokens = _normalized_tokens(issue_question)
-    claim_tokens = _normalized_tokens(claim_text)
+    if section == "watch" and has_watch_issue_anchor(claim_text):
+        return False
+    question_tokens = normalized_issue_tokens(issue_question)
+    claim_tokens = normalized_issue_tokens(claim_text)
     if not question_tokens or not claim_tokens:
         return False
     return question_tokens.isdisjoint(claim_tokens)
@@ -150,14 +134,11 @@ def _has_empty_why_it_matters(claim: Mapping[str, Any]) -> bool:
     return not str(claim.get("why_it_matters") or "").strip()
 
 
-def _normalized_tokens(text: str) -> set[str]:
-    cleaned = "".join(character.lower() if character.isalnum() else " " for character in text)
-    tokens = {token for token in cleaned.split() if token and token not in QUESTION_STOPWORDS}
-    if "fed" in tokens:
-        tokens.update({"federal", "reserve"})
-    if {"federal", "reserve"}.issubset(tokens):
-        tokens.add("fed")
-    return tokens
+def _has_templated_why_it_matters(claim: Mapping[str, Any]) -> bool:
+    if "why_it_matters" not in claim:
+        return False
+    normalized = str(claim.get("why_it_matters") or "").strip().lower()
+    return normalized in TEMPLATED_WHY_IT_MATTERS
 
 
 def _append_reason(reason_codes: list[str], code: str) -> None:

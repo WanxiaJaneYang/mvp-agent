@@ -5,6 +5,11 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any, cast
 
 from apps.agent.daily_brief.model_interfaces import ClaimComposerInput, ClaimComposerProvider
+from apps.agent.daily_brief.semantic_checks import (
+    TEMPLATED_WHY_IT_MATTERS,
+    has_watch_issue_anchor,
+    normalized_issue_tokens,
+)
 from apps.agent.pipeline.types import StructuredClaim
 
 VALID_CLAIM_KINDS = {"prevailing", "counter", "minority", "watch"}
@@ -152,6 +157,11 @@ def _validate_claim_bindings(*, claims: list[StructuredClaim], brief_input: Clai
         issue_map=brief_input["issue_map"],
         citation_store=brief_input["citation_store"],
     )
+    issues_by_id = {
+        str(issue.get("issue_id") or ""): issue
+        for issue in brief_input["issue_map"]
+        if isinstance(issue, Mapping) and str(issue.get("issue_id") or "")
+    }
     for claim in claims:
         issue_id = str(claim["issue_id"])
         issue_scope = issue_citation_allowlists.get(issue_id)
@@ -163,6 +173,10 @@ def _validate_claim_bindings(*, claims: list[StructuredClaim], brief_input: Clai
             raise ValueError("Malformed claim composer output.")
         if any(citation_id not in issue_scope[opposing_field] for citation_id in claim["opposing_citation_ids"]):
             raise ValueError("Malformed claim composer output.")
+        issue = issues_by_id.get(issue_id)
+        if issue is None:
+            raise ValueError("Malformed claim composer output.")
+        _validate_claim_semantics(claim=claim, issue=issue)
 
 
 def _issue_citation_allowlists(
@@ -247,3 +261,21 @@ def _validate_structured_claim(item: dict[str, Any]) -> StructuredClaim:
         novelty_vs_prior_brief=novelty,
         why_it_matters=normalized_text_fields["why_it_matters"],
     )
+
+
+def _validate_claim_semantics(*, claim: StructuredClaim, issue: Mapping[str, Any]) -> None:
+    claim_text = str(claim["claim_text"])
+    issue_tokens = normalized_issue_tokens(
+        " ".join(
+            (
+                str(issue.get("issue_question") or ""),
+                str(issue.get("thesis_hint") or ""),
+            )
+        )
+    )
+    claim_tokens = normalized_issue_tokens(claim_text)
+    watch_has_issue_anchor = str(claim["claim_kind"]) == "watch" and has_watch_issue_anchor(claim_text)
+    if issue_tokens and claim_tokens and issue_tokens.isdisjoint(claim_tokens) and not watch_has_issue_anchor:
+        raise ValueError("Malformed claim composer output.")
+    if str(claim["why_it_matters"]).strip().lower() in TEMPLATED_WHY_IT_MATTERS:
+        raise ValueError("Malformed claim composer output.")

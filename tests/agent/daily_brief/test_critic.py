@@ -182,6 +182,43 @@ class DailyBriefCriticTests(unittest.TestCase):
             "Softer growth is raising later-cut expectations without forcing an immediate pivot.",
         )
 
+    def test_flags_watch_thesis_mismatch_and_templated_why_it_matters(self) -> None:
+        report = review_brief_locally(
+            synthesis={
+                "issues": [
+                    {
+                        "issue_id": "issue_oil",
+                        "issue_question": "Will oil prices keep rising over the next few weeks?",
+                        "summary": "The issue is oil direction.",
+                        "prevailing": [],
+                        "counter": [],
+                        "minority": [],
+                        "watch": [
+                            {
+                                "claim_id": "claim_watch",
+                                "text": "Watch payroll growth for signs of labor-market cooling.",
+                                "citation_ids": ["cite_001"],
+                                "confidence_label": "medium",
+                                "why_it_matters": "Investors should watch this closely.",
+                            }
+                        ],
+                    }
+                ]
+            },
+            citation_store={
+                "cite_001": {
+                    "publisher": "BLS",
+                    "title": "Payroll growth moderates",
+                    "published_at": "2026-03-12T08:30:00Z",
+                }
+            },
+        )
+
+        self.assertEqual(report["status"], "fail")
+        self.assertIn("thesis_mismatch", report["reason_codes"])
+        self.assertIn("templated_why_it_matters", report["reason_codes"])
+        self.assertEqual(report["flagged_claim_ids"], ["claim_watch"])
+
 
 if __name__ == "__main__":
     unittest.main()

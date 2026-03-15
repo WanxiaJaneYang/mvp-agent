@@ -234,6 +234,72 @@ class EvalRunnerTests(unittest.TestCase):
 
         self.assertIn("unsupported_novelty", reason_codes)
 
+    def test_literature_review_reason_codes_include_thesis_mismatch_and_templated_why(self):
+        synthesis = {
+            "brief": {
+                "bottom_line": "The brief drifts off-issue and uses a template implication.",
+                "top_takeaways": ["A generic implication is not enough."],
+            },
+            "issues": [
+                {
+                    "issue_id": "issue_001",
+                    "issue_question": "Will oil prices keep rising over the next few weeks?",
+                    "prevailing": [],
+                    "counter": [],
+                    "minority": [],
+                    "watch": [
+                        {
+                            "text": "Watch payroll growth for signs of labor-market cooling.",
+                            "novelty_vs_prior_brief": "continued",
+                            "why_it_matters": "Investors should watch this closely.",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        reason_codes = run_eval_suite._literature_review_reason_codes(synthesis)
+
+        self.assertIn("thesis_mismatch", reason_codes)
+        self.assertIn("templated_why_it_matters", reason_codes)
+
+    def test_citation_case_reports_claim_citation_entailment_failure(self):
+        case = {
+            "type": "citation",
+            "synthesis": {
+                "prevailing": [
+                    {
+                        "text": "Oil prices rose after OPEC cut production.",
+                        "citation_ids": ["c1"],
+                    }
+                ],
+                "counter": [{"text": "Counter.", "citation_ids": ["c2"]}],
+                "minority": [{"text": "Minority.", "citation_ids": ["c3"]}],
+                "watch": [{"text": "Watch.", "citation_ids": ["c4"]}],
+            },
+            "citation_store": {
+                "c1": {
+                    "id": "c1",
+                    "url": "u1",
+                    "published_at": "2026-02-19T00:00:00Z",
+                    "paywall_policy": "full",
+                    "quote_text": "The ECB held rates steady and left guidance unchanged.",
+                    "snippet_text": "ECB policymakers emphasized patience on inflation.",
+                },
+                "c2": {"id": "c2", "url": "u2", "published_at": "2026-02-19T00:00:00Z"},
+                "c3": {"id": "c3", "url": "u3", "published_at": "2026-02-19T00:00:00Z"},
+                "c4": {"id": "c4", "url": "u4", "published_at": "2026-02-19T00:00:00Z"},
+            },
+            "expected": {
+                "status": "retry",
+                "removed_bullets": 1,
+            },
+        }
+
+        errors = run_eval_suite._run_citation_case(case)
+
+        self.assertEqual(errors, [])
+
 
 if __name__ == "__main__":
     unittest.main()
