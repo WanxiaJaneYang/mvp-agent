@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from tools.repo_dashboard.services.artifact_reader import discover_dashboard_artifacts
 from tools.repo_dashboard.services.command_runner import CommandRunner
@@ -11,6 +13,7 @@ from tools.repo_dashboard.services.repo_scan import build_repo_overview
 from tools.repo_dashboard.services.status_store import DashboardStatusStore, default_health_entry
 
 ROOT = Path(__file__).resolve().parents[2]
+STATIC_ROOT = Path(__file__).resolve().parent / "static"
 
 
 class CommandRunnerProtocol(Protocol):
@@ -44,6 +47,13 @@ def create_app(
     app.state.data_dir = resolved_data_dir
     app.state.status_store = status_store
     app.state.command_runner = runner
+    if STATIC_ROOT.exists():
+        app.mount("/static", StaticFiles(directory=STATIC_ROOT), name="repo-dashboard-static")
+
+    @app.get("/", response_class=HTMLResponse)
+    def dashboard_index() -> HTMLResponse:
+        index_path = STATIC_ROOT / "index.html"
+        return HTMLResponse(index_path.read_text(encoding="utf-8"))
 
     @app.get("/api/overview")
     def get_overview() -> dict[str, Any]:
