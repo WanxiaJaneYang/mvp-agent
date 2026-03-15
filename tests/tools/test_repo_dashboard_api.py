@@ -58,7 +58,15 @@ class RepoDashboardApiTests(unittest.TestCase):
         (repo_root / "artifacts" / "modelling" / "data_model.md").write_text("# data", encoding="utf-8")
         (repo_root / "artifacts" / "modelling" / "decision_record_schema.md").write_text("# schema", encoding="utf-8")
 
-        decision_record = repo_root / ".tmp_repo_dashboard" / "demo" / "artifacts" / "decision_records" / "2026-03-15" / "run_daily_fixture.json"
+        decision_record = (
+            repo_root
+            / ".tmp_repo_dashboard"
+            / "demo"
+            / "artifacts"
+            / "decision_records"
+            / "2026-03-15"
+            / "run_daily_fixture.json"
+        )
         decision_record.parent.mkdir(parents=True, exist_ok=True)
         decision_record.write_text(
             json.dumps(
