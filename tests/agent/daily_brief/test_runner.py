@@ -2075,6 +2075,192 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual([issue["issue_id"] for issue in synthesis.issue_map], ["issue_001"])
         self.assertEqual([issue["issue_id"] for issue in synthesis.final_result["synthesis"]["issues"]], ["issue_001"])
 
+    def test_build_daily_brief_synthesis_caps_provider_issue_map_to_visible_scope_budget(self):
+        test_case = self
+
+        class _BriefPlanner(BriefPlannerProvider):
+            def plan_brief(self, *, brief_input):
+                return BriefPlan(
+                    brief_id="brief_2026-03-10_run_empty_scope_budget",
+                    brief_thesis="Growth is the only supported debate today.",
+                    top_takeaways=["Growth cooling has the only scoped evidence."],
+                    issue_budget=2,
+                    render_mode="full",
+                    source_scarcity_mode="normal",
+                    candidate_issue_seeds=["growth", "growth"],
+                    issue_order=["seed_001", "seed_002"],
+                    watchlist=[],
+                    reason_codes=["two_distinct_debates_supported"],
+                )
+
+        class _Planner(IssuePlannerProvider):
+            def plan_issues(self, *, brief_input):
+                test_case.assertEqual(brief_input["brief_plan"]["issue_budget"], 1)
+                test_case.assertEqual(len(brief_input["issue_evidence_scopes"]), 1)
+                test_case.assertCountEqual(
+                    brief_input["issue_evidence_scopes"][0]["primary_chunk_ids"],
+                    ["chunk_001", "chunk_002"],
+                )
+                return [
+                    IssueMap(
+                        issue_id="issue_001",
+                        issue_question="Will softer growth change near-term Fed expectations?",
+                        thesis_hint="Growth is cooling, but inflation remains sticky.",
+                        supporting_evidence_ids=["chunk_001"],
+                        opposing_evidence_ids=[],
+                        minority_evidence_ids=[],
+                        watch_evidence_ids=[],
+                    ),
+                    IssueMap(
+                        issue_id="issue_002",
+                        issue_question="Will a second debate emerge from the same evidence?",
+                        thesis_hint="The planner over-returned a second issue.",
+                        supporting_evidence_ids=["chunk_002"],
+                        opposing_evidence_ids=[],
+                        minority_evidence_ids=[],
+                        watch_evidence_ids=[],
+                    ),
+                ]
+
+        class _Composer(ClaimComposerProvider):
+            def compose_claims(self, *, brief_input):
+                return []
+
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "src_001",
+                    "publisher": "Pub 1",
+                    "canonical_url": "https://example.test/1",
+                    "title": "Doc 1",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T10:00:00Z",
+                    "fetched_at": "2026-03-10T10:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Growth is cooling but inflation is sticky.",
+                    "body_text": "Growth is cooling but inflation is sticky.",
+                    "content_hash": "hash_001",
+                    "status": "active",
+                    "created_at": "2026-03-10T10:05:00Z",
+                    "updated_at": "2026-03-10T10:05:00Z",
+                    "doc_id": "doc_001",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_issue_scope_budget",
+                },
+                {
+                    "source_id": "src_002",
+                    "publisher": "Pub 2",
+                    "canonical_url": "https://example.test/2",
+                    "title": "Doc 2",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T11:00:00Z",
+                    "fetched_at": "2026-03-10T11:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Policy language remains cautious.",
+                    "body_text": "Policy language remains cautious.",
+                    "content_hash": "hash_002",
+                    "status": "active",
+                    "created_at": "2026-03-10T11:05:00Z",
+                    "updated_at": "2026-03-10T11:05:00Z",
+                    "doc_id": "doc_002",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_issue_scope_budget",
+                },
+            ],
+            chunks=[
+                {
+                    "chunk_id": "chunk_001",
+                    "doc_id": "doc_001",
+                    "chunk_index": 0,
+                    "text": "Growth is cooling but inflation is sticky.",
+                    "token_count": 7,
+                    "char_start": 0,
+                    "char_end": 42,
+                    "created_at": "2026-03-10T10:05:00Z",
+                },
+                {
+                    "chunk_id": "chunk_002",
+                    "doc_id": "doc_002",
+                    "chunk_index": 0,
+                    "text": "Policy language remains cautious.",
+                    "token_count": 4,
+                    "char_start": 0,
+                    "char_end": 33,
+                    "created_at": "2026-03-10T11:05:00Z",
+                },
+            ],
+            fts_rows=[],
+            corpus_items=[
+                {
+                    "chunk_id": "chunk_001",
+                    "doc_id": "doc_001",
+                    "source_id": "src_001",
+                    "publisher": "Pub 1",
+                    "credibility_tier": 1,
+                    "retrieval_score": 0.95,
+                    "semantic_score": 0.95,
+                    "recency_score": 0.90,
+                    "credibility_score": 1.0,
+                    "rank_in_pack": 1,
+                },
+                {
+                    "chunk_id": "chunk_002",
+                    "doc_id": "doc_002",
+                    "source_id": "src_002",
+                    "publisher": "Pub 2",
+                    "credibility_tier": 2,
+                    "retrieval_score": 0.90,
+                    "semantic_score": 0.90,
+                    "recency_score": 0.85,
+                    "credibility_score": 0.8,
+                    "rank_in_pack": 2,
+                },
+            ],
+            diversity_stats={"unique_publishers": 2},
+        )
+        registry = {
+            "src_001": {
+                "id": "src_001",
+                "name": "Pub 1",
+                "url": "https://example.test/1",
+                "type": "rss",
+                "credibility_tier": 1,
+                "paywall_policy": "full",
+                "fetch_interval": "daily",
+                "tags": ["policy"],
+            },
+            "src_002": {
+                "id": "src_002",
+                "name": "Pub 2",
+                "url": "https://example.test/2",
+                "type": "rss",
+                "credibility_tier": 2,
+                "paywall_policy": "full",
+                "fetch_interval": "daily",
+                "tags": ["markets"],
+            },
+        }
+
+        synthesis = build_daily_brief_synthesis(
+            stage_data=stage_data,
+            registry=registry,
+            run_id="run_empty_scope_budget",
+            generated_at_utc="2026-03-10T16:00:00Z",
+            brief_planner=_BriefPlanner(),
+            issue_planner=_Planner(),
+            claim_composer=_Composer(),
+        )
+
+        self.assertEqual([issue["issue_id"] for issue in synthesis.issue_map], ["issue_001"])
+        self.assertEqual(synthesis.brief_plan["issue_budget"], 2)
+
     def test_build_daily_brief_synthesis_excludes_empty_issue_scopes_from_provider_planning(self):
         test_case = self
 

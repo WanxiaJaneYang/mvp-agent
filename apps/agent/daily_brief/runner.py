@@ -951,11 +951,10 @@ def _build_issue_map(
             else [cast(IssueEvidenceScope, dict(item)) for item in issue_evidence_scopes]
         )
         provider_brief_plan = cast(BriefPlan, dict(brief_plan))
+        issue_budget = max(1, int(brief_plan["issue_budget"]))
         if provider_issue_scopes:
-            provider_brief_plan["issue_budget"] = min(
-                max(1, int(brief_plan["issue_budget"])),
-                len(provider_issue_scopes),
-            )
+            issue_budget = min(issue_budget, len(provider_issue_scopes))
+        provider_brief_plan["issue_budget"] = issue_budget
         issue_map = issue_planner.plan_issues(
             brief_input=IssuePlannerInput(
                 run_id=run_id,
@@ -965,7 +964,7 @@ def _build_issue_map(
                 prior_brief_context=prior_brief_context,
             )
         )
-        return issue_map[: max(1, int(brief_plan["issue_budget"]))]
+        return issue_map[:issue_budget]
 
     fallback_topic = query_text or "today's dominant narrative"
     issue_question = (
