@@ -959,12 +959,8 @@ def _build_issue_map(
         )
         return issue_map[: max(1, int(brief_plan["issue_budget"]))]
 
-    fallback_topic = query_text or "today's dominant narrative"
-    issue_question = (
-        f"What is the latest debate around {query_text}?"
-        if query_text
-        else "What is the latest market debate?"
-    )
+    fallback_topic = _fallback_issue_topic(brief_plan=brief_plan, query_text=query_text)
+    issue_question = _fallback_issue_question(brief_plan=brief_plan, query_text=query_text)
     chunk_ids = [str(item["chunk_id"]) for item in evidence_pack_items]
     return [
         IssueMap(
@@ -977,6 +973,27 @@ def _build_issue_map(
             watch_evidence_ids=chunk_ids[:1],
         )
     ]
+
+
+def _fallback_issue_topic(*, brief_plan: BriefPlan, query_text: str) -> str:
+    thesis = str(brief_plan.get("brief_thesis") or "").strip()
+    if thesis:
+        return thesis.rstrip(".!?")
+    takeaways = brief_plan.get("top_takeaways", [])
+    if isinstance(takeaways, list):
+        for takeaway in takeaways:
+            if isinstance(takeaway, str) and takeaway.strip():
+                return takeaway.strip().rstrip(".!?")
+    return query_text or "today's dominant narrative"
+
+
+def _fallback_issue_question(*, brief_plan: BriefPlan, query_text: str) -> str:
+    thesis = str(brief_plan.get("brief_thesis") or "").strip()
+    if thesis:
+        return thesis
+    if query_text:
+        return f"What is the latest debate around {query_text}?"
+    return "What is the latest market debate?"
 
 
 def _build_structured_claims(

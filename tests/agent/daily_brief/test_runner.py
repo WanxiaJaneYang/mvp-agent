@@ -1541,6 +1541,29 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(run_summary["guardrail_checks"]["diversity_check"], "fail")
         self.assertIn("Diversity: Fail", html)
 
+    def test_run_fixture_daily_brief_default_fixture_stays_publishable_with_local_critic(self):
+        from apps.agent.daily_brief.critic import LocalDailyBriefCritic
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_publishable_default",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                critic=LocalDailyBriefCritic(),
+            )
+            synthesis = json.loads(
+                (Path(result["artifact_dir"]) / "synthesis.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["analytical_status"], "pass")
+        self.assertEqual(result["publish_decision"], "publish")
+        self.assertNotIn("thesis_mismatch", result["reason_codes"])
+        self.assertNotEqual(
+            synthesis["issues"][0]["issue_question"],
+            "What is the latest debate around growth investors policy said?",
+        )
+
     def test_run_fixture_daily_brief_stops_before_stage_on_budget_preflight(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = run_fixture_daily_brief(
