@@ -439,7 +439,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
         stage_data = prepare_daily_brief_inputs(generated_at_utc="2026-03-10T16:00:00Z")
 
         self.assertIsInstance(stage_data, DailyBriefInputStageData)
-        self.assertEqual(len(stage_data.active_sources), 5)
+        self.assertEqual(len(stage_data.active_sources), 6)
         self.assertEqual(len(stage_data.source_rows), len(stage_data.active_sources))
         self.assertGreater(len(stage_data.planned_items), 0)
 
@@ -454,7 +454,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             )
 
         self.assertIsInstance(stage_data, DailyBriefInputStageData)
-        self.assertEqual(len(stage_data.active_sources), 5)
+        self.assertEqual(len(stage_data.active_sources), 6)
         self.assertGreater(len(stage_data.planned_items), 0)
         self.assertEqual(stage_data.planned_items[0]["source_id"], "fed_press_releases")
 
@@ -682,6 +682,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             "us_bea_news": [{"url": "https://example.test/bea"}],
             "reuters_business": [{"url": "https://example.test/reuters"}],
             "wsj_markets": [{"url": "https://example.test/wsj"}],
+            "jpmorgan_am_research": [{"url": "https://example.test/jpm"}],
             "ecb_press_releases": [{"url": "https://example.test/ecb"}],
         }
 
@@ -699,9 +700,151 @@ class DailyBriefRunnerTests(unittest.TestCase):
                 "us_bea_news",
                 "reuters_business",
                 "wsj_markets",
+                "jpmorgan_am_research",
             ],
         )
         self.assertNotIn("ecb_press_releases", loaded)
+
+    def test_build_daily_brief_synthesis_marks_single_thread_four_publisher_pack_as_scarce(self):
+        stage_data = DailyBriefCorpusStageData(
+            source_rows=[],
+            documents=[
+                {
+                    "source_id": "fed_press_releases",
+                    "publisher": "Federal Reserve",
+                    "canonical_url": "https://example.test/fed",
+                    "title": "Fed keeps policy steady",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "statement",
+                    "published_at": "2026-03-10T14:00:00Z",
+                    "fetched_at": "2026-03-10T14:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "body_text": "Fed officials kept policy steady while inflation progress remained uneven.",
+                    "content_hash": "hash_fed",
+                    "status": "active",
+                    "created_at": "2026-03-10T14:05:00Z",
+                    "updated_at": "2026-03-10T14:05:00Z",
+                    "doc_id": "doc_fed",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_single_thread",
+                },
+                {
+                    "source_id": "us_bls_news",
+                    "publisher": "U.S. Bureau of Labor Statistics",
+                    "canonical_url": "https://example.test/bls",
+                    "title": "Employment growth slows in February",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "release",
+                    "published_at": "2026-03-10T13:30:00Z",
+                    "fetched_at": "2026-03-10T13:35:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Payroll growth moderated and wage gains cooled.",
+                    "body_text": "Payroll growth moderated and wage gains cooled.",
+                    "content_hash": "hash_bls",
+                    "status": "active",
+                    "created_at": "2026-03-10T13:35:00Z",
+                    "updated_at": "2026-03-10T13:35:00Z",
+                    "doc_id": "doc_bls",
+                    "credibility_tier": 1,
+                    "ingestion_run_id": "run_single_thread",
+                },
+                {
+                    "source_id": "reuters_business",
+                    "publisher": "Reuters",
+                    "canonical_url": "https://example.test/reuters",
+                    "title": "Investors weigh softer growth against steady policy",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T15:00:00Z",
+                    "fetched_at": "2026-03-10T15:05:00Z",
+                    "paywall_policy": "full",
+                    "metadata_only": 0,
+                    "rss_snippet": "Bond investors questioned whether softer growth justified steady policy expectations.",
+                    "body_text": "Bond investors questioned whether softer growth justified steady policy expectations.",
+                    "content_hash": "hash_reuters",
+                    "status": "active",
+                    "created_at": "2026-03-10T15:05:00Z",
+                    "updated_at": "2026-03-10T15:05:00Z",
+                    "doc_id": "doc_reuters",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_single_thread",
+                },
+                {
+                    "source_id": "wsj_markets",
+                    "publisher": "Wall Street Journal",
+                    "canonical_url": "https://example.test/wsj",
+                    "title": "Markets look for confirmation that growth is cooling",
+                    "author": None,
+                    "language": "en",
+                    "doc_type": "news",
+                    "published_at": "2026-03-10T15:15:00Z",
+                    "fetched_at": "2026-03-10T15:20:00Z",
+                    "paywall_policy": "metadata_only",
+                    "metadata_only": 1,
+                    "rss_snippet": "Investors watched for confirmation that growth is cooling without tipping into contraction.",
+                    "body_text": None,
+                    "content_hash": "hash_wsj",
+                    "status": "active",
+                    "created_at": "2026-03-10T15:20:00Z",
+                    "updated_at": "2026-03-10T15:20:00Z",
+                    "doc_id": "doc_wsj",
+                    "credibility_tier": 2,
+                    "ingestion_run_id": "run_single_thread",
+                },
+            ],
+            chunks=[
+                {"chunk_id": "chunk_fed", "doc_id": "doc_fed", "chunk_index": 0, "text": "Fed officials kept policy steady while inflation progress remained uneven.", "token_count": 10, "char_start": 0, "char_end": 71, "created_at": "2026-03-10T14:05:00Z"},
+                {"chunk_id": "chunk_bls", "doc_id": "doc_bls", "chunk_index": 0, "text": "Payroll growth moderated and wage gains cooled.", "token_count": 7, "char_start": 0, "char_end": 46, "created_at": "2026-03-10T13:35:00Z"},
+                {"chunk_id": "chunk_reuters", "doc_id": "doc_reuters", "chunk_index": 0, "text": "Bond investors questioned whether softer growth justified steady policy expectations.", "token_count": 10, "char_start": 0, "char_end": 84, "created_at": "2026-03-10T15:05:00Z"},
+                {"chunk_id": "chunk_wsj", "doc_id": "doc_wsj", "chunk_index": 0, "text": "Investors watched for confirmation that growth is cooling without tipping into contraction.", "token_count": 12, "char_start": 0, "char_end": 87, "created_at": "2026-03-10T15:20:00Z"},
+            ],
+            fts_rows=[
+                {"text": "Fed officials kept policy steady while inflation progress remained uneven.", "doc_id": "doc_fed", "chunk_id": "chunk_fed", "publisher": "Federal Reserve", "source_id": "fed_press_releases", "published_at": "2026-03-10T14:00:00Z", "credibility_tier": 1},
+                {"text": "Payroll growth moderated and wage gains cooled.", "doc_id": "doc_bls", "chunk_id": "chunk_bls", "publisher": "U.S. Bureau of Labor Statistics", "source_id": "us_bls_news", "published_at": "2026-03-10T13:30:00Z", "credibility_tier": 1},
+                {"text": "Bond investors questioned whether softer growth justified steady policy expectations.", "doc_id": "doc_reuters", "chunk_id": "chunk_reuters", "publisher": "Reuters", "source_id": "reuters_business", "published_at": "2026-03-10T15:00:00Z", "credibility_tier": 2},
+                {"text": "Investors watched for confirmation that growth is cooling without tipping into contraction.", "doc_id": "doc_wsj", "chunk_id": "chunk_wsj", "publisher": "Wall Street Journal", "source_id": "wsj_markets", "published_at": "2026-03-10T15:15:00Z", "credibility_tier": 2},
+            ],
+        )
+        registry = {
+            "fed_press_releases": {"id": "fed_press_releases", "name": "Federal Reserve", "url": "https://example.test/fed", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["policy_centralbank"]},
+            "us_bls_news": {"id": "us_bls_news", "name": "U.S. Bureau of Labor Statistics", "url": "https://example.test/bls", "type": "rss", "credibility_tier": 1, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["macro_data"]},
+            "reuters_business": {"id": "reuters_business", "name": "Reuters", "url": "https://example.test/reuters", "type": "rss", "credibility_tier": 2, "paywall_policy": "full", "fetch_interval": "daily", "tags": ["market_narrative"]},
+            "wsj_markets": {"id": "wsj_markets", "name": "Wall Street Journal", "url": "https://example.test/wsj", "type": "rss", "credibility_tier": 2, "paywall_policy": "metadata_only", "fetch_interval": "daily", "tags": ["market_narrative"]},
+        }
+
+        with patch("apps.agent.daily_brief.runner.build_evidence_pack_report") as evidence_pack_report_mock:
+            evidence_pack_report_mock.return_value = {
+                "items": [
+                    {"chunk_id": "chunk_reuters", "source_id": "reuters_business", "publisher": "Reuters", "credibility_tier": 2, "retrieval_score": 0.92, "semantic_score": None, "recency_score": 0.9, "credibility_score": 0.8, "rank_in_pack": 1},
+                    {"chunk_id": "chunk_wsj", "source_id": "wsj_markets", "publisher": "Wall Street Journal", "credibility_tier": 2, "retrieval_score": 0.89, "semantic_score": None, "recency_score": 0.85, "credibility_score": 0.8, "rank_in_pack": 2},
+                    {"chunk_id": "chunk_fed", "source_id": "fed_press_releases", "publisher": "Federal Reserve", "credibility_tier": 1, "retrieval_score": 0.87, "semantic_score": None, "recency_score": 0.8, "credibility_score": 1.0, "rank_in_pack": 3},
+                    {"chunk_id": "chunk_bls", "source_id": "us_bls_news", "publisher": "U.S. Bureau of Labor Statistics", "credibility_tier": 1, "retrieval_score": 0.84, "semantic_score": None, "recency_score": 0.75, "credibility_score": 1.0, "rank_in_pack": 4},
+                ],
+                "diversity_stats": {"unique_publishers": 4},
+                "diversity_check": "pass",
+                "notes": [],
+            }
+
+            synthesis = build_daily_brief_synthesis(
+                stage_data=stage_data,
+                registry=registry,
+                run_id="run_single_thread",
+                generated_at_utc="2026-03-10T16:00:00Z",
+            )
+
+        self.assertEqual(synthesis.brief_plan["source_scarcity_mode"], "scarce")
+        self.assertEqual(synthesis.brief_plan["render_mode"], "compressed")
+        self.assertEqual(synthesis.brief_plan["issue_budget"], 1)
+        self.assertEqual(
+            synthesis.evidence_pack_report["diversity_stats"]["source_roles"],
+            ["market_media", "official"],
+        )
 
     def test_load_active_live_payloads_degrades_source_level_failures(self):
         active_sources = [
@@ -1000,7 +1143,7 @@ class DailyBriefRunnerTests(unittest.TestCase):
             self.assertTrue(html_path.exists())
             self.assertTrue((artifact_dir / "documents.json").exists())
             self.assertTrue((artifact_dir / "corpus_summary.json").exists())
-            self.assertEqual(run_summary["docs_fetched"], 5)
+            self.assertEqual(run_summary["docs_fetched"], 6)
             self.assertEqual(result["pipeline_status"], "ok")
 
     def test_run_fixture_daily_brief_includes_changed_section_when_previous_synthesis_exists(self):
@@ -1397,6 +1540,29 @@ class DailyBriefRunnerTests(unittest.TestCase):
         self.assertEqual(decision_record["guardrail_checks"]["diversity_check"], "fail")
         self.assertEqual(run_summary["guardrail_checks"]["diversity_check"], "fail")
         self.assertIn("Diversity: Fail", html)
+
+    def test_run_fixture_daily_brief_default_fixture_stays_publishable_with_local_critic(self):
+        from apps.agent.daily_brief.critic import LocalDailyBriefCritic
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_fixture_daily_brief(
+                base_dir=Path(tmpdir),
+                run_id="run_fixture_publishable_default",
+                generated_at_utc="2026-03-10T16:00:00Z",
+                critic=LocalDailyBriefCritic(),
+            )
+            synthesis = json.loads(
+                (Path(result["artifact_dir"]) / "synthesis.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["analytical_status"], "pass")
+        self.assertEqual(result["publish_decision"], "publish")
+        self.assertNotIn("thesis_mismatch", result["reason_codes"])
+        self.assertNotEqual(
+            synthesis["issues"][0]["issue_question"],
+            "What is the latest debate around growth investors policy said?",
+        )
 
     def test_run_fixture_daily_brief_stops_before_stage_on_budget_preflight(self):
         with tempfile.TemporaryDirectory() as tmpdir:

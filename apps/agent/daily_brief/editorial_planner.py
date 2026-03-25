@@ -84,7 +84,19 @@ def plan_brief_locally(
 ) -> BriefPlan:
     candidate_issue_seeds = _candidate_issue_seeds(corpus_summary=corpus_summary)
     unique_publishers = int(source_diversity_stats.get("unique_publishers", 0) or 0)
-    sparse_corpus = unique_publishers < 3 or len(candidate_issue_seeds) < 2
+    source_roles = {
+        str(role)
+        for role in source_diversity_stats.get("source_roles", [])
+        if isinstance(role, str) and role
+    }
+    has_core_roles = {"official", "market_media"}.issubset(source_roles)
+    has_context_role = any(role not in {"official", "market_media"} for role in source_roles)
+    sparse_corpus = (
+        unique_publishers < 3
+        or len(candidate_issue_seeds) < 2
+        or not has_core_roles
+        or not has_context_role
+    )
     issue_budget = 1 if sparse_corpus else 2
     render_mode: DailyBriefRenderMode = "compressed" if sparse_corpus else "full"
     scarcity_mode: SourceScarcityMode = "scarce" if sparse_corpus else "normal"

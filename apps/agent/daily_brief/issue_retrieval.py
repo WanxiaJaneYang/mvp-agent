@@ -267,7 +267,9 @@ def _issue_coverage_summary(
         tags = registry_entry.get("tags", []) if isinstance(registry_entry, Mapping) else []
         for tag in tags:
             if isinstance(tag, str):
-                source_roles.add(_source_role(tag))
+                normalized_role = _source_role(tag)
+                if normalized_role is not None:
+                    source_roles.add(normalized_role)
     nonzero_timestamps = [timestamp for timestamp in timestamps if timestamp > 0]
     time_span_hours = 0
     if nonzero_timestamps:
@@ -305,12 +307,14 @@ def _coverage_summary(
     }
 
 
-def _source_role(tag: str) -> str:
+def _source_role(tag: str) -> str | None:
     if tag.startswith("policy_") or tag.startswith("macro_"):
         return "official"
     if "market" in tag:
         return "market_media"
-    return tag
+    if tag in {"institutional_letter", "institutional_pr", "macro_research", "policy"}:
+        return tag
+    return None
 
 
 def _tokens(value: str) -> list[str]:
