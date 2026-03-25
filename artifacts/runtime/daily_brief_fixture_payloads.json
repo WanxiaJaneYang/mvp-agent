@@ -41,8 +41,8 @@
       "title": "Investors weigh softer growth against steady policy",
       "published_at": "2026-03-10T15:00:00Z",
       "fetched_at": "2026-03-10T15:05:00Z",
-      "summary": "Markets weighed softer growth signals against expectations for a steady Fed.",
-      "body_text": "Investors weighed softer growth signals against expectations for a steady Federal Reserve as Treasury yields drifted lower and equities traded unevenly.",
+      "summary": "Bond investors questioned whether softer growth justified steady policy expectations.",
+      "body_text": "Bond investors questioned whether softer growth justified steady Federal Reserve expectations as Treasury yields drifted lower and equities traded unevenly.",
       "doc_type": "news",
       "language": "en"
     }
@@ -53,8 +53,20 @@
       "title": "Markets look for confirmation that growth is cooling",
       "published_at": "2026-03-10T15:15:00Z",
       "fetched_at": "2026-03-10T15:20:00Z",
-      "summary": "Investors looked for confirmation that growth is cooling without tipping into contraction.",
+      "summary": "Investors watched for confirmation that growth is cooling without tipping into contraction.",
       "doc_type": "news",
+      "language": "en"
+    }
+  ],
+  "jpmorgan_am_research": [
+    {
+      "canonical_url": "https://am.jpmorgan.com/us/en/asset-management/adv/insights/market-insights-2026-03-10/",
+      "headline": "J.P. Morgan AM says a minority of allocators still expect a harder landing",
+      "published_at": "2026-03-10T15:45:00Z",
+      "fetched_at": "2026-03-10T15:50:00Z",
+      "snippet": "A minority of allocators still expects a harder landing and said investors should watch next inflation data.",
+      "text": "J.P. Morgan Asset Management said a minority of allocators still expects a harder landing, challenged the quick-cut consensus, and told investors to watch next inflation data and labor-market revisions.",
+      "doc_type": "research_note",
       "language": "en"
     }
   ]

@@ -67,13 +67,36 @@ class EditorialPlannerTests(unittest.TestCase):
                 "Policy language remained cautious despite the softer data.",
                 "Markets priced cuts more aggressively than officials did.",
             ],
-            source_diversity_stats={"unique_publishers": 4},
+            source_diversity_stats={
+                "unique_publishers": 4,
+                "source_roles": ["official", "market_media", "institutional_letter"],
+            },
             prior_brief_context=None,
         )
 
         self.assertEqual(plan["render_mode"], "full")
         self.assertEqual(plan["issue_budget"], 2)
         self.assertEqual(plan["source_scarcity_mode"], "normal")
+
+    def test_plan_brief_uses_compressed_mode_when_source_roles_remain_single_threaded(self) -> None:
+        plan = plan_brief_locally(
+            run_id="run_demo",
+            generated_at_utc="2026-03-12T07:05:00Z",
+            corpus_summary=[
+                "Growth data softened while payrolls still held up.",
+                "Policy language remained cautious despite the softer data.",
+                "Markets priced cuts more aggressively than officials did.",
+            ],
+            source_diversity_stats={
+                "unique_publishers": 4,
+                "source_roles": ["official", "market_media"],
+            },
+            prior_brief_context=None,
+        )
+
+        self.assertEqual(plan["render_mode"], "compressed")
+        self.assertEqual(plan["issue_budget"], 1)
+        self.assertEqual(plan["source_scarcity_mode"], "scarce")
 
     def test_plan_brief_uses_compressed_mode_when_sources_are_sparse(self) -> None:
         plan = plan_brief_locally(

@@ -636,6 +636,11 @@ def build_daily_brief_synthesis(
             evidence_pack_items=evidence_pack_items,
             fts_rows=stage_data.fts_rows,
         )
+    evidence_pack_report = _enrich_diversity_stats_with_source_roles(
+        evidence_pack_report=evidence_pack_report,
+        evidence_pack_items=evidence_pack_items,
+        registry=registry,
+    )
 
     documents_by_id = {str(document["doc_id"]): document for document in stage_data.documents}
     chunks_by_id = {str(chunk["chunk_id"]): chunk for chunk in stage_data.chunks}
@@ -1608,6 +1613,43 @@ def _provider_summary(*, provider_resolution: Mapping[str, Any] | None) -> dict[
         "provider_mode": None,
         "provider_fallback_used": False,
     }
+
+
+def _enrich_diversity_stats_with_source_roles(
+    *,
+    evidence_pack_report: Mapping[str, Any],
+    evidence_pack_items: Iterable[Mapping[str, Any]],
+    registry: Mapping[str, SourceRegistryEntry],
+) -> dict[str, Any]:
+    diversity_stats = dict(evidence_pack_report.get("diversity_stats", {}))
+    source_roles: set[str] = set()
+    for item in evidence_pack_items:
+        source_id = str(item.get("source_id") or "")
+        if not source_id:
+            continue
+        registry_entry = registry.get(source_id, {})
+        tags = registry_entry.get("tags", []) if isinstance(registry_entry, Mapping) else []
+        for tag in tags:
+            if isinstance(tag, str):
+                normalized_role = _source_role_from_tag(tag)
+                if normalized_role is not None:
+                    source_roles.add(normalized_role)
+    if source_roles:
+        diversity_stats["source_roles"] = sorted(source_roles)
+    return {
+        **dict(evidence_pack_report),
+        "diversity_stats": diversity_stats,
+    }
+
+
+def _source_role_from_tag(tag: str) -> str | None:
+    if tag.startswith("policy_") or tag.startswith("macro_"):
+        return "official"
+    if "market" in tag:
+        return "market_media"
+    if tag in {"institutional_letter", "institutional_pr", "macro_research", "policy"}:
+        return tag
+    return None
 
 
 def _utc_now_iso() -> str:

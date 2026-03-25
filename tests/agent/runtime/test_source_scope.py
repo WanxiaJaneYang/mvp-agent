@@ -19,6 +19,7 @@ class SourceScopeTests(unittest.TestCase):
                 "us_bea_news",
                 "reuters_business",
                 "wsj_markets",
+                "jpmorgan_am_research",
             ],
         )
 
@@ -33,6 +34,9 @@ class SourceScopeTests(unittest.TestCase):
         self.assertGreaterEqual(tier_1_count, 3)
         self.assertEqual(metadata_only_count, 1)
         self.assertIn("Reuters - Business News", {source["name"] for source in subset})
+        self.assertTrue(
+            any("institutional_letter" in source.get("tags", []) for source in subset)
+        )
 
     def test_missing_source_id_in_allowlist_raises_value_error(self):
         registry = load_source_registry()
