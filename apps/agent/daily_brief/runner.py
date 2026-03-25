@@ -1667,7 +1667,7 @@ def _enrich_diversity_stats_with_source_roles(
         source_id = str(item.get("source_id") or "")
         if not source_id:
             continue
-        registry_entry = registry.get(source_id, {})
+        registry_entry: Mapping[str, Any] = registry.get(source_id, {})
         tags = registry_entry.get("tags", []) if isinstance(registry_entry, Mapping) else []
         for tag in tags:
             if isinstance(tag, str):
