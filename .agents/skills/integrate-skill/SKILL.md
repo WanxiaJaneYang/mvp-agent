@@ -99,13 +99,13 @@ See `examples/skills/<skill-name>/`
     +-- skills/
         +-- <skill-name>/
             |-- README.md               # Example documentation
-            |-- example-1.ts.template   # Code example (use .template suffix)
-            +-- example-2.tsx.template
+            |-- example-1.py.template   # Code example (use .template suffix)
+            +-- example-2.py.template
 ```
 
 **File naming conventions**:
-- Code files: `<name>.<ext>.template` (e.g., `component.tsx.template`)
-- Config files: `<name>.config.template` (e.g., `tailwind.config.template`)
+- Code files: `<name>.<ext>.template` (e.g., `helper.py.template`)
+- Config files: `<name>.config.template` (e.g., `pyproject.toml.template`)
 - Documentation: `README.md` (normal suffix)
 
 #### 4.3 Update Index File
@@ -145,12 +145,9 @@ Add to the Quick Navigation table in `index.md`:
 ### # Dependencies (if needed)
 
 ```bash
-# Install required dependencies (adjust for your package manager)
-npm install <package>
-# or
-pnpm add <package>
-# or
-yarn add <package>
+# Install required dependencies (Python)
+pip install <package>
+# or add to pyproject.toml [project.dependencies] / [project.optional-dependencies.dev]
 ```
 
 ### [OK] Completed Changes
@@ -195,9 +192,9 @@ $create-command use-<skill-name> Use <skill-name> skill following project guidel
     +-- skills/
         +-- mcp-builder/
             |-- README.md
-            |-- server.ts.template
-            |-- tools.ts.template
-            +-- types.ts.template
+            |-- server.py.template
+            |-- tools.py.template
+            +-- types.py.template
 ```
 
 ### New Section in doc.md
@@ -210,9 +207,9 @@ $create-command use-<skill-name> Use <skill-name> skill following project guidel
 Create LLM-callable tool services using MCP (Model Context Protocol).
 
 ### Project Adaptation
-- Place services in a dedicated directory
-- Follow existing TypeScript and type definition conventions
-- Use project's logging system
+- Place services in a dedicated directory under `apps/agent/` or `tools/`
+- Follow existing Python typing and dataclass conventions
+- Use project's error-handling patterns (raise ValueError for invalid inputs)
 
 ### Reference Examples
 See `examples/skills/mcp-builder/`
