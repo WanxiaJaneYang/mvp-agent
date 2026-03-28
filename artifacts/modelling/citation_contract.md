@@ -106,6 +106,8 @@ Each issue must include evidence pointers similar to:
 - evidence IDs must resolve to known chunks/documents
 - supporting/opposing/minority/watch evidence sets must belong to the same issue context
 - provider transport (`openai`, `codex-oauth`, future adapters) must not change the issue-map schema
+- issue scope creation must persist a per-issue evidence allowlist for downstream stages
+- once issue scopes are assigned, no claim may cite evidence from another issue's allowlist
 
 ---
 
@@ -134,6 +136,27 @@ Each claim must include fields similar to:
 - `counter` and `minority` claims must still reference the same `issue_id`
 - `why_it_matters` and `novelty_vs_prior_brief` are also grounded outputs and may be removed if unsupported
 - provider transport (`openai`, `codex-oauth`, future adapters) must not change the claim-object schema
+- claim composition must use only the current issue's allowed evidence/citation subset
+
+## 5.1 Issue-Specific Evidence and Citation Allowlists
+
+Every issue must carry a deterministic allowlist that survives the full pipeline:
+
+- `issue_id -> allowed_evidence_ids`
+- `issue_id -> allowed_citation_ids`
+
+These allowlists must agree across:
+- issue retrieval / scoping
+- issue planner validation
+- claim composer input
+- deterministic validator output
+- renderer-visible citations
+- persisted runtime artifacts and decision records
+
+If a claim references evidence or citations outside its issue's allowlist:
+- validator must remove or withhold the claim
+- renderer must not surface the claim or its citations
+- decision records must preserve the withheld reason
 
 ---
 
@@ -194,11 +217,27 @@ Before delivering any synthesis output, the system MUST run a deterministic vali
 
 | Failure Type | Action |
 |--------------|--------|
-| Claim has 0 supporting citations | Remove claim or replace with explicit insufficient-evidence language |
+| Claim has 0 supporting citations | Remove claim or mark it as internal withheld state |
 | Citation ID not found in store | Remove citation; if no valid citations remain, drop claim |
 | Citation missing required fields | Remove citation; if no valid citations remain, drop claim |
 | Paywalled source cited with full-text quote | Strip `quote_span`, keep metadata-only citation |
 | Claim drift across one issue | Mark issue invalid and retry or abstain |
+| Cross-issue evidence/citation leakage | Remove or withhold the offending claim and mark validator failure |
+
+### 7.1 Non-Renderable Placeholder States
+
+Validator downgrade markers are internal states, not delivered prose.
+
+Allowed internal outcomes:
+- `removed`
+- `downgraded_internal`
+- `issue_abstained`
+- `brief_abstained`
+
+Rules:
+- renderer must never print internal placeholder strings directly
+- `citation_store` must never be rendered wholesale; only citations referenced by surviving delivered claims are visible
+- `What Changed` and visible citations must be recomputed from surviving delivered claims after validation, not from pre-validation claim IDs
 
 ---
 
@@ -270,6 +309,9 @@ Recommended critic checks:
 - does the counter claim genuinely challenge the prevailing thesis?
 - is the minority claim materially distinct?
 - is `why_it_matters` specific rather than generic?
+- does the output contain placeholder leakage?
+- is the bottom line syntactically malformed or obviously token-stitched?
+- does render state match validation state, especially for brief-level abstain?
 
 Critic output should be structured:
 
@@ -294,6 +336,8 @@ To prevent runaway costs from repeated synthesis attempts, enforce bounded retri
 If synthesis still fails:
 - allow issue-level abstain when one issue is not supportable
 - use brief-level abstain when no trustworthy issues remain
+- brief-level abstain must render through a dedicated abstain template, not the normal full-brief template
+- brief-level abstain may preserve internal evidence diagnostics, but normal issue cards and full citation sections must be withheld
 
 **Abstain language examples:**
 - `[Insufficient evidence to assess this issue]`

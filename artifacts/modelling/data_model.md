@@ -168,12 +168,19 @@ CREATE TABLE IF NOT EXISTS syntheses (
 
 CREATE TABLE IF NOT EXISTS synthesis_bullets (
   synthesis_id TEXT NOT NULL REFERENCES syntheses(synthesis_id) ON DELETE CASCADE,
+  issue_id TEXT,
+  claim_id TEXT,
   section TEXT NOT NULL CHECK (section IN ('prevailing', 'counter', 'minority', 'watch', 'changed')),
   bullet_index INTEGER NOT NULL,
   text TEXT NOT NULL,
   claim_span_count INTEGER NOT NULL DEFAULT 1,
   is_abstain INTEGER NOT NULL DEFAULT 0 CHECK (is_abstain IN (0,1)),
   confidence_label TEXT, -- optional: high, medium, low
+  delivery_status TEXT NOT NULL DEFAULT 'delivered'
+    CHECK (delivery_status IN ('delivered', 'withheld', 'issue_abstained', 'brief_abstained')),
+  validator_action TEXT NOT NULL DEFAULT 'kept'
+    CHECK (validator_action IN ('kept', 'removed', 'downgraded_internal', 'issue_abstained', 'brief_abstained')),
+  withheld_reason TEXT,
   PRIMARY KEY (synthesis_id, section, bullet_index)
 );
 
@@ -186,6 +193,7 @@ CREATE TABLE IF NOT EXISTS issue_maps (
   opposing_evidence_ids_json TEXT NOT NULL,
   minority_evidence_ids_json TEXT NOT NULL,
   watch_evidence_ids_json TEXT NOT NULL,
+  evidence_allowlist_json TEXT NOT NULL,
   generated_at TEXT NOT NULL,
   PRIMARY KEY (run_id, issue_id)
 );
@@ -201,6 +209,14 @@ CREATE TABLE IF NOT EXISTS structured_claims (
   confidence TEXT NOT NULL,
   novelty_vs_prior_brief TEXT NOT NULL,
   why_it_matters TEXT NOT NULL,
+  coverage_status TEXT NOT NULL
+    CHECK (coverage_status IN ('schema_valid', 'supported', 'unsupported')),
+  delivery_status TEXT NOT NULL
+    CHECK (delivery_status IN ('delivered', 'withheld', 'issue_abstained', 'brief_abstained', 'removed')),
+  validator_action TEXT NOT NULL
+    CHECK (validator_action IN ('kept', 'removed', 'downgraded_internal', 'issue_abstained', 'brief_abstained')),
+  withheld_reason TEXT,
+  surviving_citation_ids_json TEXT NOT NULL,
   generated_at TEXT NOT NULL,
   PRIMARY KEY (run_id, claim_id)
 );
@@ -238,6 +254,11 @@ CREATE TABLE IF NOT EXISTS bullet_citations (
     ON DELETE CASCADE
 );
 ```
+
+Post-validation rules for persistence:
+- `structured_claims.delivery_status` is the source of truth for whether a claim reached the user
+- `surviving_citation_ids_json` stores the final visible citation subset after validation
+- `bullet_citations` must contain only citations attached to delivered bullets, never the full pre-validation citation store
 
 ### 4.8 Alerts (rate-limit and delivery state)
 
@@ -385,6 +406,7 @@ Recommended query pattern:
 ## 7. Constraints Mapped to Requirements
 
 - Citation contract: `synthesis_bullets` + `bullet_citations` + `citations`.
+- Post-validation delivery contract: `structured_claims.delivery_status` + `structured_claims.validator_action` + `structured_claims.surviving_citation_ids_json`.
 - Paywall compliance: `documents.metadata_only`, `citations.quote_text` nullable; no quote for metadata-only sources.
 - Publisher diversity: `evidence_pack_items.publisher` and stored diversity stats in `evidence_packs`.
 - Daily/alert rate limits: `alerts.triggered_at` + app logic with cooldown and daily cap.
@@ -400,7 +422,8 @@ LEFT JOIN bullet_citations bc
   ON bc.synthesis_id = sb.synthesis_id
  AND bc.section = sb.section
  AND bc.bullet_index = sb.bullet_index
-WHERE bc.citation_id IS NULL;
+WHERE sb.delivery_status = 'delivered'
+  AND bc.citation_id IS NULL;
 
 -- 2) Paywall violation (metadata-only source with quote_text)
 SELECT c.citation_id, c.source_id

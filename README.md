@@ -138,6 +138,12 @@ Provider-backed demo modes:
   - does not require `OPENAI_API_KEY`
   - can return `ok` or a validator-driven `abstained` result depending on model output quality
 
+Daily-brief delivery invariants:
+- brief-level `abstained` output uses a dedicated abstain render mode instead of the normal issue-card layout
+- issue-aware retrieval/planning must preserve per-issue evidence binding through validation and rendering
+- visible citations are only the subset referenced by surviving delivered claims
+- `What Changed` is computed after validation from surviving delivered claims only
+
 The current provider-agnostic seam is covered in `tests/agent/daily_brief/test_runner.py` for both `run_fixture_daily_brief(...)` and `run_daily_brief(...)`.
 
 Run the fixture slice with the modeled Asia/Singapore schedule and email delivery:
@@ -169,3 +175,4 @@ python -m compileall -q apps tests scripts
 - Portfolio relevance remains a local-first risk-flag surface, not buy/sell guidance.
 - The live daily-brief slice starts with the current RSS-backed active subset and skips sources that are temporarily blocked or unavailable.
 - Daily-brief scheduling defaults to `07:05 Asia/Singapore`, with timezone overrides available from the runner scripts.
+- Internal validator placeholders are implementation detail only and must never appear in delivered HTML/email.

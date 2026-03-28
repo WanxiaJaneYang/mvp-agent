@@ -124,6 +124,7 @@ Actions:
 - require schema-valid JSON output only
 - identify 2-3 important issues when evidence supports them
 - assign support/opposition/minority/watch evidence groups per issue
+- persist an issue-specific evidence allowlist that later stages must honor without cross-issue borrowing
 
 Outputs:
 - `issue_map.json`
@@ -141,6 +142,7 @@ Actions:
 - require schema-valid JSON output only
 - produce structured claims for `prevailing`, `counter`, `minority`, and `watch`
 - include `why_it_matters`, `confidence`, and `novelty_vs_prior_brief`
+- restrict citation selection to the current issue's allowlisted evidence/citation subset
 
 Outputs:
 - `claim_objects.json`
@@ -160,6 +162,8 @@ Actions:
   - claims under one issue share the same `issue_id`
   - `prevailing`, `counter`, and `minority` address the same issue question
 - optionally run critic pass to detect shallow source-by-source paraphrase
+- recompute post-validation delivery state for each claim (`publishable`, `validated_partial`, `issue_abstained`, `brief_abstained`)
+- derive `What Changed`, visible citations, and final render inputs only from the surviving delivered claim set
 
 Failure handling:
 - minor claim failures -> drop invalid claims and continue with partial issue output
@@ -172,6 +176,7 @@ Actions:
 - render local HTML output from structured issues and claims
 - send email for daily brief and approved alerts
 - store run metrics, costs, and output lineage
+- if final state is brief-level abstain, render a dedicated abstain artifact instead of the normal issue-card layout
 - persist:
   - `issue_map`
   - `claim_objects`
@@ -207,6 +212,23 @@ Failure handling:
 - **Issue-level abstain:** one issue can abstain if evidence is insufficient while other issues still deliver
 - **Brief-level abstain:** if no trustworthy issues remain after validation, deliver abstaining report
 - abstain output must explain why evidence was insufficient and list what evidence was available
+- brief-level abstain must suppress normal issue cards, normal changed sections, and full citation dumps
+
+## 6.1 Validation and Delivery State Machine
+
+Shared post-validation states:
+- `generated`
+- `validated_partial`
+- `issue_abstained`
+- `brief_abstained`
+- `publishable`
+
+Rules:
+- `generated` is pre-validation only and must never render directly
+- `validated_partial` may render only surviving claims and citations
+- `issue_abstained` may keep other issues visible, but the abstained issue's held content stays internal
+- `brief_abstained` renders only abstain explanation plus bounded evidence summary
+- `publishable` renders only delivered claims and the citation subset they reference
 
 ## 7. Observability Requirements
 

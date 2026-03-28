@@ -56,6 +56,7 @@ The product goal is not to summarize sources one by one. It should identify the 
 - **Important issues per brief:** target 2; allow 3 only when evidence diversity and information gain support a third distinct issue
 - **Issue budget rule:** never force 3 issues; if the corpus only supports 1-2 distinct issues, the brief must stay at 1-2
 - **Source-scarcity rule:** if the corpus cannot support 2 distinct issues with adequate diversity, render a compressed brief with 1 main issue + 2-3 key takeaways + a short watchlist instead of padding with thin issues
+- **Abstain rule:** if no issue survives validation with adequate evidence, render a dedicated abstain brief that explains what was withheld instead of reusing the normal issue-card layout
 - **Per issue structure:**
   - issue title or question
   - short synthesis summary
@@ -148,6 +149,7 @@ The daily brief must follow this pipeline:
    - optional critic pass can reject shallow source-by-source paraphrase
 6. **Renderer**
    - HTML/email consume structured issue and claim objects
+   - renderer must consume only the surviving validated claim set and its referenced citations
 
 This replaces the earlier single-query, section-bullet synthesis design and makes editorial issue budgeting explicit before issue generation.
 
@@ -163,6 +165,9 @@ Issue-budget and scarcity rules:
   - 1 main issue block
   - `watchlist`
 - issues that fail distinctness or information-gain thresholds must be merged, demoted to takeaways/watchlist, or dropped rather than forced into the body
+- if no issue remains after validation, switch to a dedicated abstain template with withheld-output rationale rather than a normal brief template
+- `bottom_line` must be synthesized from retained issue titles, thesis hints, and validated takeaways; token-frequency or bag-of-words phrasing is not acceptable
+- `What Changed` and visible citations must be derived only from surviving validated claims that remain in the delivered brief
 
 For each issue, the system must produce:
 - `issue_question`
@@ -187,6 +192,10 @@ The issue planner must output JSON objects similar to:
 - `minority_evidence_ids`
 - `watch_evidence_ids`
 
+Issue-planner contract rules:
+- evidence IDs define a per-issue allowlist that downstream claim composition, validation, persistence, and rendering must all share
+- an issue may not borrow evidence from another issue's allowlist once scopes are assigned
+
 The claim composer must output JSON objects similar to:
 - `claim_id`
 - `issue_id`
@@ -197,6 +206,11 @@ The claim composer must output JSON objects similar to:
 - `confidence`
 - `novelty_vs_prior_brief`
 - `why_it_matters`
+
+Claim-composer contract rules:
+- every delivered claim must stay inside its issue's evidence/citation allowlist
+- validator placeholder states are internal only and must never be rendered as user-visible prose
+- citations shown in HTML/email must be a subset of citations referenced by surviving delivered claims only
 
 Free-form prose generation without structured JSON is out of scope for the model interface.
 
@@ -319,6 +333,8 @@ Outputs:
 - Includes Tier 1 sources when topic is policy-related (if available).
 - Renderer displays issue summaries plus evidence-backed arguments.
 - Renderer can switch between `full` and `compressed` brief modes based on the `BriefPlan` issue budget and source-scarcity policy.
+- Brief-level abstain uses a dedicated abstain render mode, not the normal issue-card layout.
+- `What Changed` is computed after validation from surviving delivered claims only.
 
 ### Alerts
 - Max alerts/day enforced.

@@ -122,3 +122,201 @@ Updated Trellis workflow, skills, worktree config, and spec docs to match the cu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Started open issue agent team
+
+**Date**: 2026-03-10
+**Task**: Started open issue agent team
+
+### Summary
+
+Created Trellis task tree, launched isolated issue streams, and opened PRs #55, #56, and #57 for docs/prioritization, tooling/CI, and runtime #54.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f1a3b79` | (see git log) |
+| `d82619d` | (see git log) |
+| `bd97b20` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 4: Push open-issues PR fixes
+
+**Date**: 2026-03-12
+**Task**: Push open-issues PR fixes
+
+### Summary
+
+Committed and pushed the remaining CI lint fixes for PR #141, reran repo validation locally, and confirmed GitHub CI passed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c06dfcf` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 5: Split oversized open-issues PR
+
+**Date**: 2026-03-12
+**Task**: Split oversized open-issues PR
+
+### Summary
+
+Split the oversized open-issues branch into three focused PRs (#142, #143, #144), pushed all branches, and closed superseded PR #141 after CI passed on the new base PR.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c629a49` | (see git log) |
+| `acc75d3` | (see git log) |
+| `023d951` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 6: Close out open-issue execution
+
+**Date**: 2026-03-14
+**Task**: Close out open-issue execution
+
+### Summary
+
+Archived stale open-issue planning tasks after confirming the actual execution landed via merged PR #156 and #157; left the dirty main workspace untouched.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `631bbc6` | (see git log) |
+| `fb6e298` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 7: Issue 162 placeholder suppression
+
+**Date**: 2026-03-15
+**Task**: Issue 162 placeholder suppression
+
+### Summary
+
+Implemented issue #162 on fix/162-placeholder-suppression, added delivery regressions for partial/hold placeholder leakage, verified with targeted unittest, ruff, and mypy, and opened PR #172.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `90fbe73` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 8: Issues 160 and 165 parallel rollout
+
+**Date**: 2026-03-15
+**Task**: Issues 160 and 165 parallel rollout
+
+### Summary
+
+Started the next daily-brief integrity rollout wave after PR #172 merged. Issue #160 is open as PR #173 with fixture/live publish-gate parity, and issue #165 is open as PR #174 with claim-citation entailment gating plus eval coverage. Verified both issue slices before handoff.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1f3426f` | (see git log) |
+| `120f60e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

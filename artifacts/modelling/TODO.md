@@ -10,6 +10,15 @@ Last updated: 2026-03-12
 - [ ] P0: Define provider selection and registry contract for daily brief runner scripts
   - Acceptance: one spec covers `deterministic`, `openai`, and `codex-oauth` selection plus provider-specific config validation.
 
+- [ ] P0: Define brief-level abstain render contract and withheld-output semantics
+  - Acceptance: held briefs render through a dedicated abstain template and suppress normal issue cards, placeholder prose, and full citation dumps.
+
+- [ ] P0: Define end-to-end per-issue evidence and citation allowlists
+  - Acceptance: issue retrieval, issue planner, claim composer, validator, renderer, and persisted artifacts all share the same issue-local evidence contract.
+
+- [ ] P0: Define post-validation delivered-claim derivations for `What Changed` and visible citations
+  - Acceptance: both surfaces are computed only from surviving delivered claims and their citation subset.
+
 - [x] P0: Define `decision_record` artifact schema and storage location
   - Acceptance: markdown spec + JSON example + field-level validation rules.
 
@@ -28,6 +37,9 @@ Last updated: 2026-03-12
 - [ ] P1: Define claim composer contract and prompt interface
   - Acceptance: claim object schema, grounding rules, delta fields, and evaluation criteria documented.
 
+- [ ] P1: Define safe bottom-line/thesis generation rules
+  - Acceptance: brief thesis is generated from retained issue synthesis with language sanity checks instead of bag-of-words token bundling.
+
 - [ ] P1: Extend validator gates for deterministic fail/abstain behavior
   - Acceptance: explicit gate matrix for citation, paywall, diversity, and budget constraints.
 
@@ -43,3 +55,4 @@ Last updated: 2026-03-12
 - Do not relax paywall, budget hard-stop, or evidence requirements.
 - Treat alert delivery as post-daily-brief scope until the daily-brief path is stable.
 - Use `docs/status-matrix.md` as the canonical modelled/coded/verified status view.
+- Keep post-validation delivery semantics explicit: internal validator placeholders are not user-visible content.
