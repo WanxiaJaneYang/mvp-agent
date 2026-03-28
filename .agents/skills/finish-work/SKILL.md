@@ -16,15 +16,21 @@ Before treating a task as done, use this checklist to ensure the repo, specs, an
 ### 1. Verification
 
 ```bash
+python -m ruff check apps tests scripts tools
+python -m mypy apps tools
 python scripts/validate_artifacts.py
 python scripts/validate_decision_record_schema.py
-python -m compileall -q apps tests scripts
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m compileall -q apps tests scripts tools
+python evals/run_eval_suite.py
+python -m unittest discover -s tests -t . -p "test_*.py" -v
 ```
 
+- [ ] Ruff lint passes for touched files?
+- [ ] Mypy type check passes?
 - [ ] Relevant validation commands passed for the files you touched?
 - [ ] Python code compiles cleanly?
 - [ ] Unit tests pass?
+- [ ] Eval suite passes when models or validators changed?
 - [ ] Modeling/schema validators still pass when relevant?
 
 ### 2. Code-Spec Sync
@@ -68,8 +74,10 @@ If the change spans multiple layers:
 ## Quick Check Flow
 
 ```bash
-python -m compileall -q apps tests scripts
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m ruff check apps tests scripts tools
+python -m mypy apps tools
+python -m compileall -q apps tests scripts tools
+python -m unittest discover -s tests -t . -p "test_*.py" -v
 git status
 git diff --name-only
 ```

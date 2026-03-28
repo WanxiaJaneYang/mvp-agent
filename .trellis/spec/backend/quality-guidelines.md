@@ -6,13 +6,16 @@
 
 ## Required Verification
 
-Use the repo's Python validation flow:
+Use the repo's full CI validation flow:
 
 ```bash
+python -m ruff check apps tests scripts tools
+python -m mypy apps tools
 python scripts/validate_artifacts.py
 python scripts/validate_decision_record_schema.py
-python -m compileall -q apps tests scripts
-python -m unittest discover -s tests -p "test_*.py" -v
+python -m compileall -q apps tests scripts tools
+python evals/run_eval_suite.py
+python -m unittest discover -s tests -t . -p "test_*.py" -v
 ```
 
 Run the relevant subset for small changes and the full suite for cross-cutting changes.
