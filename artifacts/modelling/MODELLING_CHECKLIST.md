@@ -34,7 +34,11 @@ Canonical runtime status view:
 - [FAILING] **S2) Retrieval memory for validated outputs** - Add embedding + retrieval flow for approved historical syntheses
 - [FAILING] **S3) Role-lane orchestration** - Add phased prompts/checks (research, risk, editorial, reviewer) in one runtime
 - [FAILING] **S4) Pre-delivery gate hardening** - Enforce deterministic fail/abstain gates for citation/paywall/diversity/budget
+- [FAILING] **S4a) Abstain render closure** - Brief-level abstain must suppress normal issue cards, placeholders, and full citation dumps
+- [FAILING] **S4b) Per-issue evidence binding** - Retrieval, issue planning, validation, persistence, and rendering must share issue-specific allowlists
 - [IN_PROGRESS] **S5) Operational report templates** - Standardize issue-centered daily brief, event-risk brief, and portfolio-delta outputs
+- [FAILING] **S5a) Delivered-claim derivations** - `What Changed` and visible citations must derive only from surviving delivered claims
+- [FAILING] **S5b) Thesis language safety** - Bottom-line generation must reject malformed token-stitched prose
 - [FAILING] **S6) Reliability metrics** - Track citation failure, retry, abstain, budget-per-report, and latency-to-delivery
 - [IN_PROGRESS] **S7) Model-layer redesign** - Introduce provider-agnostic issue planner and claim composer contracts
 

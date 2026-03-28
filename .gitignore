@@ -4,3 +4,10 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+
+# Runtime-generated outputs
+artifacts/daily/
+artifacts/decision_records/
+artifacts/runtime/agent_runtime.sqlite3
+artifacts/runtime/daily_brief_runs/
+.trellis/tasks/archive/
