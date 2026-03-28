@@ -40,6 +40,8 @@ Required top-level fields:
 11. `guardrail_checks` (object)
 12. `artifacts` (object)
 13. `decision_rationale` (object)
+14. `withheld_claims` (array)
+15. `delivery_summary` (object)
 
 Raw prompt/completion payloads are not allowed in v1.
 
@@ -49,10 +51,28 @@ Raw prompt/completion payloads are not allowed in v1.
 
 Required fields per claim:
 1. `claim_id` (string)
-2. `section` (enum: `prevailing`, `counter`, `minority`, `watch`, `changed`)
-3. `text` (string)
-4. `citation_ids` (array of strings)
-5. `coverage_status` (enum: `supported`, `insufficient_evidence`, `removed`)
+2. `issue_id` (string)
+3. `section` (enum: `prevailing`, `counter`, `minority`, `watch`, `changed`)
+4. `text` (string)
+5. `citation_ids` (array of strings)
+6. `coverage_status` (enum: `schema_valid`, `supported`, `unsupported`)
+7. `delivery_status` (enum: `delivered`, `withheld`, `issue_abstained`, `brief_abstained`, `removed`)
+8. `validator_action` (enum: `kept`, `removed`, `downgraded_internal`, `issue_abstained`, `brief_abstained`)
+
+### 4.1.1 `withheld_claims[]`
+
+Required fields per withheld claim:
+1. `claim_id` (string)
+2. `issue_id` (string)
+3. `reason_code` (enum: `insufficient_evidence`, `cross_issue_leakage`, `placeholder_internal_only`, `brief_abstained`, `issue_abstained`)
+4. `delivery_status` (enum: `withheld`, `issue_abstained`, `brief_abstained`, `removed`)
+
+### 4.1.2 `delivery_summary`
+
+Required fields:
+1. `delivered_claim_count` (integer)
+2. `withheld_claim_count` (integer)
+3. `has_withheld_supported_content` (boolean)
 
 ### 4.2 `rejected_alternatives[]`
 
@@ -109,6 +129,9 @@ Required fields:
 7. `budget_snapshot.allowed` must be false when any spend is >= cap.
 8. If `status != failed`, `artifacts.output_sha256` should be present.
 9. `guardrail_checks` values must be restricted to `pass|warn|fail`.
+10. `claims[].delivery_status = delivered` is required for any claim surfaced to users.
+11. `withheld_claims` must capture every claim removed after validation or withheld from delivery.
+12. If `status = abstained`, `delivery_summary.has_withheld_supported_content` must indicate whether any internally surviving issue content was held back from delivery.
 
 ## 6. Example Reference
 
