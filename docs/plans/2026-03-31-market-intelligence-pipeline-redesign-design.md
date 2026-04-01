@@ -62,7 +62,7 @@ In practice, the system still grows a brief from a pile of documents instead of 
 4. Separate intelligence infrastructure from products.
 5. Keep lower layers deterministic, local-first, and citation-grounded.
 6. Make value gating explicit rather than implicit.
-7. Reuse one selection stack across daily brief, alerts, and future board/dashboard outputs.
+7. Reuse shared event models and score primitives across products, while allowing product-specific selection policies.
 
 ## Existing Design Work To Preserve
 
@@ -164,6 +164,120 @@ apps/agent/
 
 Shared lower-level packages such as `ingest`, `retrieval`, `storage`, and `runtime` remain infrastructure and should not become product-specific.
 
+### Core Object Contracts
+
+#### `canonical_news_item`
+
+Primary key:
+- `news_item_id`
+
+Upstream inputs:
+- normalized `documents`
+- optional representative `chunks`
+
+Downstream consumers:
+- `event_cluster`
+- `daily_market_snapshot`
+
+Scope:
+- persistent
+- canonical
+- not product-scoped
+
+Notes:
+- In Phase 1 this can stay as a lightweight projection over `documents`, with `news_item_id` initially aliasing `doc_id` if that avoids unnecessary table churn.
+
+#### `event_cluster`
+
+Primary key:
+- `event_id`
+
+Upstream inputs:
+- `canonical_news_item[]`
+- representative chunk references for similarity and evidence pointers
+
+Downstream consumers:
+- `event_assessment`
+- `issue_candidate`
+- alerts and board ranking
+
+Scope:
+- persistent
+- canonical
+- not product-scoped
+
+Notes:
+- Clustering is news-item or document centric, not arbitrary chunk centric.
+- `chunk_id` links may be stored as representative evidence pointers, but they do not define cluster identity.
+
+#### `daily_market_snapshot`
+
+Primary key:
+- `snapshot_id`
+
+Upstream inputs:
+- `event_cluster[]`
+- `event_assessment[]`
+- lens taxonomy metadata
+
+Downstream consumers:
+- scoring inputs
+- operator explainability
+- issue framing context
+
+Scope:
+- run-scoped
+- persistent artifact
+- not product-scoped
+
+Notes:
+- This is not a canonical cross-run market object. It is a derived, reproducible run artifact that records how the system saw the day.
+
+#### `issue_candidate`
+
+Primary key:
+- `candidate_id`
+
+Upstream inputs:
+- one or more `event_cluster` records
+- optional `daily_market_snapshot`
+- prior-brief or prior-run delta anchors
+
+Downstream consumers:
+- `selector`
+- `briefing`
+- product-specific selection contexts
+
+Scope:
+- run-scoped
+- persistent
+- not product-scoped
+
+Notes:
+- An issue candidate may map to one event or multiple related events. It should not be constrained to exactly one event cluster.
+
+#### `issue_selection`
+
+Primary key:
+- `(selection_context_id, candidate_id)`
+
+Upstream inputs:
+- `issue_candidate[]`
+- selection policy and consumer context
+
+Downstream consumers:
+- `products/daily_brief`
+- `products/alerts`
+- `products/board`
+
+Scope:
+- run-scoped
+- persistent
+- consumer-scoped
+
+Notes:
+- Selection is not daily-brief-only. The parent `selection_context_id` carries `consumer_kind`, `consumer_id`, `selection_policy_version`, and `selected_by`.
+
 ### Layer 1: `market_stream`
 
 Purpose:
@@ -187,17 +301,9 @@ This is the layer that solves the current "same event told by many articles" pro
 Purpose:
 
 - grow issue candidates from event clusters, not from corpus token frequency
+- allow one issue candidate to combine multiple related event clusters when the market question spans more than one event
 - score and rank issue candidates
 - keep only the few issues worth downstream enrichment
-
-Expected score components:
-
-- `novelty_score`
-- `impact_score`
-- `portfolio_relevance_score`
-- `evidence_strength_score`
-- `cross_source_convergence_score`
-- `redundancy_penalty`
 
 Selection should persist explicit reason codes such as:
 
@@ -243,6 +349,130 @@ Products should include:
 
 The product layer should not be responsible for first discovering what matters. It should only decide how selected issues are rendered, bundled, and delivered.
 
+### Product Policy Boundaries
+
+The redesign should not be interpreted as "one literal selector shared unchanged across every product."
+
+What should be shared:
+
+- event clusters
+- assessment primitives
+- issue candidates
+- score inputs and reason-code vocabulary where the semantics are actually shared
+
+What can stay product-specific:
+
+- daily brief
+  - issue selection
+  - issue enrichment
+  - value-gated publication
+- alerts
+  - event trigger logic
+  - category floors
+  - cooldown and daily caps
+  - evidence quality gate
+- board/dashboard
+  - event ranking
+  - operator visibility
+  - dropped-vs-selected explainability
+
+The correct architectural claim is:
+
+- share the event model and score primitives
+- do not force a single identical selection policy onto daily brief, alerts, and board consumers
+
+This should align with the current alert path in `apps/agent/alerts/scoring.py` and `artifacts/modelling/alert_scoring.md`, not replace those policy gates with a daily-brief-style issue selector.
+
+### Score Primitive Contract
+
+All first-pass scoring primitives should use a `0.0` to `1.0` range and persist both the numeric score and the reason codes that produced it.
+
+#### `novelty_score`
+
+- level: event assessment and issue candidate
+- meaning: how different the event or issue is relative to prior brief or prior run context
+- note: this is contextual and must never live only on the canonical event record
+
+#### `impact_score`
+
+- level: event assessment and issue candidate
+- meaning: expected market transmission breadth and materiality
+- note: alerts may reuse this primitive, but still apply separate category-specific floors
+
+#### `portfolio_relevance_score`
+
+- level: issue candidate
+- meaning: relevance to the repo's target retail ETF-holder audience
+- note: this is not a canonical event property
+
+#### `evidence_strength_score`
+
+- level: issue candidate
+- meaning: adequacy of direct evidence after source-quality, recency, and citation coverage checks
+- note: this is about whether the candidate can support a credible issue write-up
+
+#### `source_convergence_score`
+
+- level: event assessment and issue candidate
+- meaning: whether distinct publishers and source roles converge on the same underlying development
+- note: this is intentionally different from `evidence_strength_score`; convergence measures agreement across independent source paths, not total evidence adequacy
+
+#### `redundancy_penalty`
+
+- level: issue candidate
+- meaning: overlap with already-kept issues or with low-information-gain restatements
+- note: this should align with the current overlap and information-gain gates
+
+#### Initial Total Score Formula
+
+For Phase 1, the issue candidate total score should be explicit and simple:
+
+`total_score = 0.25*novelty + 0.25*impact + 0.20*portfolio_relevance + 0.15*evidence_strength + 0.15*source_convergence - 0.20*redundancy_penalty`
+
+This formula is a starting policy, not a permanent truth. It should be versioned.
+
+#### Tie-Break Rules
+
+If total score ties within the configured tolerance:
+
+1. prefer higher `novelty_score`
+2. then higher `impact_score`
+3. then broader official plus market-media source-role coverage
+4. then stronger delta versus prior brief
+
+#### Selection Veto Conditions
+
+An issue candidate should still be dropped even with a high total score when any of these hold:
+
+- `evidence_strength_score` is below the minimum evidence floor
+- the candidate collapses into an already-kept issue under overlap or information-gain gating
+- the candidate has no distinct thesis beyond a repeated headline cluster
+- the candidate cannot produce a substantive counter or watch path
+
+### Market Snapshot Contract
+
+The market snapshot should be treated as a versioned run artifact, not a loose concept.
+
+Phase 1 contract:
+
+- taxonomy is fixed but versioned
+- an event may map to multiple lenses
+- if no configured lens matches, the event falls into `other`
+- snapshot rows may feed scoring, explainability, and issue framing, but those consumers should read different fields for different purposes
+
+Minimum fields:
+
+- `snapshot_id`
+- `run_id`
+- `taxonomy_version`
+- `lens`
+- `event_ids_json`
+- `lens_summary_json`
+- `score_inputs_json`
+- `operator_notes_json`
+
+This keeps the snapshot useful for operators without turning it into the canonical source of issue identity.
+
 ## Target Pipeline
 
 ### Stages 1-5: Keep The Existing Intake Backbone
@@ -282,7 +512,7 @@ Output:
 - issue candidates with score breakdowns
 - selected issues with explicit selection reasons
 
-Only the top one or two issues should normally proceed to briefing.
+Only the top one or two issues should normally proceed to daily-brief briefing, but other consumers may apply different downstream thresholds through their own selection contexts.
 
 ### Stage 8: Issue-Anchored Evidence Assembly
 
@@ -322,7 +552,7 @@ Publication should require all of:
 Products consume the same selected-issue layer:
 
 - daily brief renders the strongest issues for the day
-- alerts reuse the same event and issue scores instead of inventing a second discovery stack
+- alerts reuse shared event and score primitives, but keep their own trigger and policy gate
 - board/dashboard views expose live event and issue state for operator inspection
 
 ## Current-To-Target File Mapping
@@ -400,39 +630,86 @@ The current data model centers evidence packs around `query_text`. The redesigne
 - `event_type`
 - `first_seen_at`
 - `last_seen_at`
-- `source_count`
-- `publisher_count`
 - `entity_tags_json`
 - `market_tags_json`
-- `novelty_score`
-- `impact_score`
-- `confidence_score`
+- `cluster_version`
 
 #### `event_cluster_items`
 
 - `event_id`
+- `news_item_id`
 - `doc_id`
-- `chunk_id`
+- `representative_chunk_id`
 - `role_hint`
 - `similarity_score`
+
+#### `event_assessments`
+
+- `run_id`
+- `event_id`
+- `profile_id`
+- `scoring_version`
+- `novelty_score`
+- `impact_score`
+- `confidence_score`
+- `source_convergence_score`
+- `reason_codes_json`
+
+#### `market_snapshots`
+
+- `snapshot_id`
+- `run_id`
+- `taxonomy_version`
+- `profile_id`
+- `status`
+- `created_at`
+
+#### `market_snapshot_items`
+
+- `snapshot_id`
+- `lens`
+- `event_ids_json`
+- `lens_summary_json`
+- `score_inputs_json`
+- `operator_notes_json`
 
 #### `issue_candidates`
 
 - `candidate_id`
-- `event_id`
+- `discovery_run_id`
+- `profile_id`
+- `policy_version`
 - `issue_question`
 - `thesis_hint`
 - `novelty_score`
 - `impact_score`
-- `relevance_score`
+- `portfolio_relevance_score`
 - `evidence_strength_score`
+- `source_convergence_score`
 - `delta_score`
+- `redundancy_penalty`
 - `total_score`
 - `reason_codes_json`
 
+#### `issue_candidate_events`
+
+- `candidate_id`
+- `event_id`
+- `relation_kind`
+
+#### `selection_contexts`
+
+- `selection_context_id`
+- `run_id`
+- `consumer_kind`
+- `consumer_id`
+- `selection_policy_version`
+- `selected_by`
+- `created_at`
+
 #### `issue_selections`
 
-- `brief_id`
+- `selection_context_id`
 - `candidate_id`
 - `selected_rank`
 - `selected`
@@ -453,6 +730,22 @@ The current data model centers evidence packs around `query_text`. The redesigne
 - `structured_claims`
   - keep, but source them from `issue_candidates -> issue_selections`
 
+### Canonical Versus Contextual Persistence Rule
+
+Canonical tables should only store identity and stable structural fields.
+
+Do not store run-relative assessments such as:
+
+- novelty versus prior brief
+- impact under a particular consumer profile
+- confidence tied to one clustering or scoring run
+
+Those belong in run-scoped assessment tables keyed by at least:
+
+- `run_id`
+- `profile_id`
+- `scoring_version`
+
 ## Value Gate Contract
 
 The current publish contract separates citation status and analytical status. The redesigned contract should preserve that split and add explicit issue value as a first-class publish condition.
@@ -467,6 +760,37 @@ Expected decision fields:
 - `delivery_mode`
 
 `publish_decision=publish` should require passing value checks, not just the absence of hard integrity failure.
+
+## Phase 1 Additive Migration Contract
+
+This redesign must migrate additively first.
+
+Current compatibility constraints that should remain intact in Phase 1:
+
+- `apps/agent/storage/sqlite_runtime.py`
+  - still persists `evidence_packs.query_text`
+- `apps/agent/pipeline/types.py`
+  - `DailyBriefSynthesisStageData` still carries `query_text`, `evidence_pack_items`, and `issue_evidence_scopes`
+- `evals/run_eval_suite.py`
+  - retrieval cases still run through `query_text`
+
+Phase 1 migration rules:
+
+- add new event, assessment, snapshot, candidate, and selection tables without deleting old tables
+- keep `query_text` end to end for backward compatibility, even if it becomes a derived or placeholder field on the daily-brief path
+- dual-write new selector artifacts beside existing brief artifacts
+- keep old retrieval evals as the baseline and add selector evals in parallel
+- compare baseline `query_text` retrieval against selector-driven issue selection before deleting any old path
+- keep `issue_maps` and `structured_claims` flowing so the renderer and validator do not need a same-phase rewrite
+
+Recommended dual-written artifacts in Phase 1:
+
+- `event_clusters.json`
+- `event_assessments.json`
+- `market_snapshot.json`
+- `issue_candidates.json`
+- `selection_contexts.json`
+- `issue_selections.json`
 
 ## Minimal Refactor Path
 
@@ -486,6 +810,16 @@ with:
 - score + selection
 
 Keep current claim composition and rendering as intact as possible in this phase.
+
+Phase 1 should also explicitly reuse the current `apps/agent/daily_brief/issue_dedup.py` logic instead of deleting it.
+
+Recommended handling:
+
+- keep `issue_dedup` behavior
+- move or wrap it under `issue_discovery/selector.py`
+- treat it as the overlap and information-gain gate on top of scored candidates
+
+That preserves the existing overlap, information-gain, and issue-budget logic while the new candidate builder is still stabilizing.
 
 This is the highest-leverage first cut because it changes what the system chooses to talk about.
 
