@@ -12,20 +12,19 @@ Phase 1 should change what the system chooses to talk about, while keeping the e
 
 Phase 1 covers:
 
-- core object contracts for event and issue discovery
-- scoring primitives and selection formula for `daily_brief` issue selection
-- additive schema changes
-- feature-flagged rollout
-- evaluation and rollout plan
+- core object contracts
+- two-stage scoring
+- additive schema
+- feature flag and iteration budgets
+- eval and rollout
 - success metrics
 
 Phase 1 does not cover:
 
-- product expansion strategy
 - alert-policy redesign
-- board/dashboard UX design
-- replacing current briefing or rendering contracts
-- deleting old `query_text`-based paths
+- board/dashboard product design
+- deletion of the old `query_text` path
+- a same-phase rewrite of current briefing and rendering contracts
 
 ## Phase 1 Consumer
 
@@ -33,281 +32,355 @@ The first consumer for `issue_discovery v0` is `daily_brief`.
 
 Alerts and board/dashboard consumers may later reuse shared event and scoring primitives, but they are not in Phase 1 rollout scope. This avoids forcing alert policy into a daily-brief selection model.
 
+## Target Flow
+
+Phase 1 adopts a two-stage selector and a bounded review loop:
+
+`market_stream -> candidate_builder -> cheap_scoring -> shortlist -> issue_enricher -> rerank/select -> briefing -> critic + hard_gate -> daily_brief`
+
+### Stage A: Candidate Recall
+
+Purpose:
+
+- generate issue candidates from events
+- score them cheaply
+- keep only a top-K shortlist
+
+Expected properties:
+
+- mostly deterministic
+- cheap enough to run across the whole daily event set
+- no recursive full-corpus research
+
+### Stage B: Candidate Enrich + Rerank
+
+Purpose:
+
+- spend extra retrieval and reasoning only on shortlisted issues
+- answer open questions
+- test hypotheses
+- improve the evidence basis before final selection
+
+Expected properties:
+
+- bounded by explicit iteration budgets
+- targeted rather than broad
+- able to rerank or drop shortlisted issues after enrichment
+
+### Stage C: Briefing Review Loop
+
+Purpose:
+
+- assemble issue-specific evidence
+- compose claims
+- review, route revisions, and gate the final artifact
+
+Phase 1 downstream split:
+
+- `evidence_assembler`
+- `claim_composer`
+- `integrity_critic`
+- `value_gate`
+- `revision_router`
+- `hard_gate`
+
 ## Core Object Contracts
 
-Each object contract below defines:
+Each core object contract below defines:
 
 - primary key
 - upstream inputs
 - downstream consumers
 - scope
 
-### `canonical_news_item`
-
-Primary key:
-- `news_item_id`
-
-Upstream inputs:
-- normalized `documents`
-- optional representative `chunks`
-
-Downstream consumers:
-- `event_cluster`
-- `daily_market_snapshot`
-
-Scope:
-- persistent
-- canonical
-- not product-scoped
-
-Phase 1 note:
-- this can begin as a lightweight projection over `documents`
-- `news_item_id` may alias `doc_id` in Phase 1 if that avoids unnecessary schema churn
-
-### `event_cluster`
+### `Event`
 
 Primary key:
 - `event_id`
 
 Upstream inputs:
-- `canonical_news_item[]`
-- representative chunk references for similarity and evidence pointers
+- canonicalized market/news items
+- clustering metadata
 
 Downstream consumers:
-- `event_assessment`
-- `issue_candidate`
-- alerts and board ranking
+- `IssueCandidate`
+- alert ranking
+- board ranking
 
 Scope:
 - persistent
 - canonical
 - not product-scoped
 
-Phase 1 note:
-- clustering is document or news-item centric, not chunk centric
-- `chunk_id` links may be stored as representative evidence pointers, but they do not define cluster identity
+Required fields:
 
-### `event_assessment`
-
-Primary key:
-- `(run_id, event_id, profile_id, scoring_version)`
-
-Upstream inputs:
-- `event_cluster`
-- prior-run or prior-brief context
-- scoring configuration
-
-Downstream consumers:
-- `daily_market_snapshot`
-- `issue_candidate`
-
-Scope:
-- run-scoped
-- persistent
-- not product-scoped
+- `event_id`
+- `cluster_key`
+- `entity_ids`
+- `time_window`
+- `source_ids`
+- `headline_summary`
+- `market_tags`
+- `market_impact_hints`
 
 Phase 1 note:
-- contextual scores such as novelty, impact, and confidence belong here, not on the canonical `event_cluster`
+- this is the top-level event object
+- cluster identity is document/news-item centric, not chunk centric
+- representative chunk IDs may be attached for evidence pointers, but they do not define the event
 
-### `daily_market_snapshot`
-
-Primary key:
-- `snapshot_id`
-
-Upstream inputs:
-- `event_cluster[]`
-- `event_assessment[]`
-- lens taxonomy metadata
-
-Downstream consumers:
-- scoring inputs
-- operator explainability
-- issue framing context
-
-Scope:
-- run-scoped
-- persistent artifact
-- not product-scoped
-
-Phase 1 note:
-- this is not a canonical cross-run market object
-- it is a reproducible run artifact that records how the system saw the day
-
-### `issue_candidate`
+### `IssueCandidate`
 
 Primary key:
-- `candidate_id`
+- `issue_id`
 
 Upstream inputs:
-- one or more `event_cluster` records
-- optional `daily_market_snapshot`
-- prior-brief or prior-run delta anchors
+- one or more `Event` records
+- optional market-state context
+- prior-brief delta anchors
 
 Downstream consumers:
-- `selector`
+- `issue_enricher`
+- `rerank/select`
 - `briefing`
-- selection contexts
 
 Scope:
 - run-scoped
 - persistent
 - not product-scoped
 
-Phase 1 note:
-- an issue candidate may map to one event or multiple related events
-- it must carry run identity and scoring-policy identity
+Required fields:
 
-### `selection_context`
+- `issue_id`
+- `event_ids`
+- `title`
+- `why_now`
+- `angle`
+- `candidate_type`
+- `pre_enrich_score`
+- `status`
+
+Allowed `status` values:
+
+- `observed`
+- `shortlisted`
+- `enriched`
+- `selected`
+- `dropped`
+- `held`
+
+Phase 1 note:
+- an issue candidate may combine multiple related events
+- `pre_enrich_score` is the output of Stage A, not the final product policy decision
+
+### `IssueEnrichment`
 
 Primary key:
-- `selection_context_id`
+- `enrichment_id`
 
 Upstream inputs:
-- `issue_candidate[]`
-- consumer identity
-- selection policy metadata
+- shortlisted `IssueCandidate`
+- planner output
+- targeted retrieval output
 
 Downstream consumers:
-- `issue_selection`
-- product runners
+- `rerank/select`
+- `briefing`
+- `revision_router`
 
 Scope:
 - run-scoped
 - persistent
-- consumer-scoped
+- not product-scoped
+
+Required fields:
+
+- `enrichment_id`
+- `issue_id`
+- `open_questions`
+- `hypotheses`
+- `evidence_requirements`
+- `follow_up_queries`
+- `evidence_ids`
+- `post_enrich_score`
+- `coverage_gaps`
 
 Phase 1 note:
-- this object exists to avoid baking `daily_brief` assumptions into shared selection tables
+- this object is the place where research-like capability is contained
+- enrichment is only allowed for shortlisted issues
 
-### `issue_selection`
+### `ReviewIssue`
 
 Primary key:
-- `(selection_context_id, candidate_id)`
+- `review_issue_id`
 
 Upstream inputs:
-- `issue_candidate[]`
-- `selection_context`
+- `integrity_critic`
+- `value_gate`
+- `hard_gate`
 
 Downstream consumers:
-- `products/daily_brief`
+- `revision_router`
+- final publish decision
 
 Scope:
 - run-scoped
 - persistent
-- consumer-scoped
+- artifact-scoped
+
+Required fields:
+
+- `review_issue_id`
+- `issue_type`
+- `severity`
+- `description`
+- `requires_new_search`
+- `suggested_query`
+- `blocks_publish`
 
 Phase 1 note:
-- in Phase 1 the only live `consumer_kind` is `daily_brief`
-- the table shape should still remain consumer-agnostic
+- this object makes review findings routable instead of burying them in free-form critic text
 
-## Scoring Contract
+## Issue Enricher Contract
 
-### Range
+Phase 1 should add a small enrichment orchestrator under `issue_discovery`, not a repo-wide agent framework.
 
-All scoring primitives in Phase 1 should use a `0.0` to `1.0` range.
+Recommended flow:
 
-Every persisted score should carry:
+`IssueCandidate -> planner -> targeted retrieval -> evidence extraction -> follow-up search -> enrichment summary -> post_enrich_score`
 
-- the numeric value
-- the scoring version
-- reason codes explaining why the score landed where it did
+The planner output should stay narrow. It should only answer:
 
-### Score Primitives
+- what evidence types are needed
+- what open questions remain
+- what hypotheses are testable
+- what follow-up queries are worth running
 
-#### `novelty_score`
+Research remains an enrichment step attached to shortlisted issues. It is not promoted into the system's top-level architecture.
 
-- level: event assessment and issue candidate
-- meaning: difference versus prior brief or prior run context
-- caution: contextual only; do not store as a canonical event field
+## Two-Stage Scoring
 
-#### `impact_score`
+Scoring should be split into three layers rather than one mixed total.
 
-- level: event assessment and issue candidate
-- meaning: expected market transmission breadth and materiality
-- alignment: alerts may reuse this primitive, but still keep alert-specific floors
+### A. `discovery_score`
 
-#### `portfolio_relevance_score`
+Purpose:
+- shared, cheap, upstream shortlist score
 
-- level: issue candidate
-- meaning: relevance to the repo's target retail ETF-holder audience
+Used for:
+- `candidate_builder -> cheap_scoring -> shortlist`
 
-#### `evidence_strength_score`
+Primitives:
 
-- level: issue candidate
-- meaning: adequacy of evidence after source-quality, recency, and citation checks
-
-#### `source_convergence_score`
-
-- level: event assessment and issue candidate
-- meaning: whether distinct publishers and source roles converge on the same development
-
-Difference from `evidence_strength_score`:
-- `evidence_strength_score` asks whether the candidate can support a credible write-up
-- `source_convergence_score` asks whether independent source paths are converging on the same underlying event or issue
-
-#### `redundancy_penalty`
-
-- level: issue candidate
-- meaning: overlap with already-kept or low-information-gain issue candidates
-- alignment: this should be driven by overlap and information-gain gates, not by a second unrelated duplicate detector
-
-### Total Score Formula
+- `novelty`
+- `breadth_of_coverage`
+- `market_linkage`
+- `persistence`
+- `source_diversity`
+- `entity_relevance`
 
 Phase 1 initial formula:
 
-`total_score = 0.25*novelty + 0.25*impact + 0.20*portfolio_relevance + 0.15*evidence_strength + 0.15*source_convergence - 0.20*redundancy_penalty`
+`discovery_score = 0.22*novelty + 0.18*breadth_of_coverage + 0.20*market_linkage + 0.12*persistence + 0.14*source_diversity + 0.14*entity_relevance`
 
-This is a versioned policy, not a canonical truth.
+Range:
+- `0.0` to `1.0`
 
-### Tie-Break Rules
+Output field:
+- `IssueCandidate.pre_enrich_score`
 
-If total scores tie within the configured tolerance:
+### B. `enrichment_score`
 
-1. higher `novelty_score`
-2. then higher `impact_score`
-3. then broader official plus market-media source-role coverage
-4. then stronger delta versus prior brief
+Purpose:
+- shared, more expensive, downstream rerank score
 
-### Selection Veto Conditions
+Used for:
+- post-shortlist reranking after targeted research
 
-A candidate should still be dropped even with a high total score when:
+Primitives:
 
-- `evidence_strength_score` is below the minimum evidence floor
-- the candidate collapses into an already-kept issue under overlap or information-gain gating
-- the candidate has no distinct thesis beyond a headline cluster
-- the candidate cannot support a substantive counter or watch path
+- `evidence_strength`
+- `freshness`
+- `source_quality`
+- `explanatory_yield`
+- `counter_view_coverage`
+- `claimability`
 
-### Reason-Code Alignment
+Phase 1 initial formula:
 
-Phase 1 should persist reason codes that map score outcomes to selection behavior, for example:
+`enrichment_score = 0.24*evidence_strength + 0.14*freshness + 0.16*source_quality + 0.18*explanatory_yield + 0.14*counter_view_coverage + 0.14*claimability`
 
-- `high_novelty`
-- `high_market_transmission`
-- `high_portfolio_relevance`
-- `strong_cross_source_convergence`
-- `low_incremental_value`
-- `issue_budget_exceeded`
-- `below_evidence_floor`
-- `headline_cluster_without_thesis`
+Range:
+- `0.0` to `1.0`
+
+Output field:
+- `IssueEnrichment.post_enrich_score`
+
+### C. `product_policy_score`
+
+Purpose:
+- product-specific final ranking score
+
+Phase 1 consumer:
+- `daily_brief`
+
+Daily-brief policy primitives:
+
+- `value_density`
+- `coverage_balance`
+- `non_redundancy`
+- `brief_fit`
+
+Phase 1 initial daily-brief formula:
+
+`product_policy_score = 0.32*value_density + 0.23*coverage_balance + 0.25*non_redundancy + 0.20*brief_fit`
+
+Range:
+- `0.0` to `1.0`
+
+Phase 1 note:
+- alerts keep their own trigger policy and do not consume this formula
+- board/dashboard ranking can later define its own product policy score
+
+### Score Persistence
+
+Every persisted score in Phase 1 should carry:
+
+- numeric value
+- scoring version
+- reason codes
+
+### Selection Sequence
+
+Phase 1 selection should follow this order:
+
+1. compute `discovery_score` for all candidates
+2. keep only top-K shortlist
+3. enrich shortlisted candidates
+4. compute `enrichment_score`
+5. drop candidates below enrichment floors
+6. compute `product_policy_score` for the daily brief consumer
+7. select final daily-brief issues
+
+This is intentionally not a one-shot universal total score.
 
 ## Additive Schema
 
 ### New Tables
 
-#### `event_clusters`
-
-Canonical fields only:
+#### `events`
 
 - `event_id`
-- `canonical_title`
-- `event_type`
-- `first_seen_at`
-- `last_seen_at`
-- `entity_tags_json`
+- `cluster_key`
+- `entity_ids_json`
+- `time_window_start`
+- `time_window_end`
+- `source_ids_json`
+- `headline_summary`
 - `market_tags_json`
+- `market_impact_hints_json`
 - `cluster_version`
 
-#### `event_cluster_items`
+#### `event_items`
 
 - `event_id`
 - `news_item_id`
@@ -316,59 +389,47 @@ Canonical fields only:
 - `role_hint`
 - `similarity_score`
 
-#### `event_assessments`
-
-- `run_id`
-- `event_id`
-- `profile_id`
-- `scoring_version`
-- `novelty_score`
-- `impact_score`
-- `confidence_score`
-- `source_convergence_score`
-- `reason_codes_json`
-
-#### `market_snapshots`
-
-- `snapshot_id`
-- `run_id`
-- `taxonomy_version`
-- `profile_id`
-- `status`
-- `created_at`
-
-#### `market_snapshot_items`
-
-- `snapshot_id`
-- `lens`
-- `event_ids_json`
-- `lens_summary_json`
-- `score_inputs_json`
-- `operator_notes_json`
-
 #### `issue_candidates`
 
-- `candidate_id`
+- `issue_id`
 - `discovery_run_id`
-- `profile_id`
 - `policy_version`
-- `issue_question`
-- `thesis_hint`
-- `novelty_score`
-- `impact_score`
-- `portfolio_relevance_score`
-- `evidence_strength_score`
-- `source_convergence_score`
-- `delta_score`
-- `redundancy_penalty`
-- `total_score`
+- `event_ids_json`
+- `title`
+- `why_now`
+- `angle`
+- `candidate_type`
+- `pre_enrich_score`
+- `status`
 - `reason_codes_json`
 
-#### `issue_candidate_events`
+#### `issue_enrichments`
 
-- `candidate_id`
-- `event_id`
-- `relation_kind`
+- `enrichment_id`
+- `issue_id`
+- `enrichment_round`
+- `open_questions_json`
+- `hypotheses_json`
+- `evidence_requirements_json`
+- `follow_up_queries_json`
+- `evidence_ids_json`
+- `post_enrich_score`
+- `coverage_gaps_json`
+- `reason_codes_json`
+
+#### `review_issues`
+
+- `review_issue_id`
+- `run_id`
+- `artifact_id`
+- `issue_id`
+- `issue_type`
+- `severity`
+- `description`
+- `requires_new_search`
+- `suggested_query`
+- `blocks_publish`
+- `route_target`
 
 #### `selection_contexts`
 
@@ -383,7 +444,8 @@ Canonical fields only:
 #### `issue_selections`
 
 - `selection_context_id`
-- `candidate_id`
+- `issue_id`
+- `product_policy_score`
 - `selected_rank`
 - `selected`
 - `selection_reason_codes_json`
@@ -418,18 +480,18 @@ Phase 1 rules:
 
 Phase 1 should dual-write:
 
-- `event_clusters.json`
-- `event_assessments.json`
-- `market_snapshot.json`
+- `events.json`
 - `issue_candidates.json`
+- `issue_enrichments.json`
+- `review_issues.json`
 - `selection_contexts.json`
 - `issue_selections.json`
 
-## Feature Flag
+## Feature Flag And Iteration Budgets
 
-Phase 1 should be rollout-gated.
+### Mode Flag
 
-Recommended config shape:
+Recommended config:
 
 - `ISSUE_DISCOVERY_MODE=baseline|shadow|primary`
 
@@ -437,14 +499,24 @@ Behavior:
 
 - `baseline`
   - current `query_text` path remains authoritative
-  - no selection effect from issue discovery v0
 - `shadow`
   - issue discovery v0 runs and persists artifacts
-  - current baseline still decides the brief
-  - selector outputs are evaluated side by side
+  - baseline still decides the brief
 - `primary`
   - issue discovery v0 becomes authoritative for daily-brief issue selection
-  - baseline artifacts may still be written for regression comparison during the rollout window
+
+### Iteration Budgets
+
+Only shortlisted issues may enter iterative enrichment or revision.
+
+Recommended controls:
+
+- `MAX_SHORTLIST_SIZE`
+- `MAX_FOLLOWUP_QUERIES_PER_ISSUE`
+- `MAX_ENRICHMENT_ROUNDS`
+- `MAX_REVISION_ROUNDS`
+
+This makes the framework shallow for alerts later, medium-depth for daily brief, and still bounded for other products.
 
 ## Reuse Of Existing `issue_dedup`
 
@@ -457,49 +529,113 @@ Instead:
 - keep its issue-budget enforcement
 - move or wrap that logic under `issue_discovery/selector.py`
 
-In Phase 1, `issue_dedup` becomes the overlap and information-gain gate on top of scored candidates.
+In Phase 1, `issue_dedup` becomes the overlap and information-gain gate applied after cheap scoring and again after enrichment rerank where needed.
+
+## Briefing Review And Routing
+
+### Split Critics
+
+Phase 1 should treat these as distinct concepts:
+
+- `integrity_critic`
+  - unsupported claim
+  - stale source
+  - weak evidence
+  - numeric mismatch
+  - one-sided framing
+- `value_gate`
+  - whether the issue deserves brief space
+  - whether it adds new explainability
+  - whether it duplicates another issue
+  - whether it meets the product value threshold
+
+### Fixed Revision Routing
+
+Routing should be rule-driven:
+
+- missing source, stale source, weak evidence, numeric mismatch
+  - route back to `issue_enricher`
+- evidence adequate but expression or structure poor
+  - route back to `claim_composer`
+- low value or high duplication
+  - drop
+- passes all gates
+  - render
+
+This should not be left to unconstrained LLM judgment.
+
+## Hard Gates
+
+Phase 1 should add these hard gates:
+
+### `claim_evidence_gate`
+
+- every key claim must bind to explicit `evidence_id`
+
+### `numeric_claim_gate`
+
+- numeric, time, price-move, valuation, and guidance claims must have a checkable source
+
+### `freshness_gate`
+
+- claim types may have different freshness policies
+
+### `source_floor_gate`
+
+- some issue types require Tier 1 or Tier 2 source coverage
+
+### `final_artifact_gate`
+
+- the final rendered brief artifact is gated, not just intermediate sections
+
+### Prohibited Behaviors
+
+Phase 1 should explicitly forbid:
+
+- filling an issue section with generic global facts when no issue-specific evidence exists
+- letting the writer generate citations without deterministic validation
 
 ## Eval And Rollout
 
-### Eval Strategy
+### Shadow Eval
 
-Keep old retrieval evals as the baseline and add selector evals in parallel.
+Phase 1 should run against the current daily-brief selector in parallel.
 
-Phase 1 eval tracks:
+Comparison set:
 
-- baseline `query_text` retrieval behavior
-- issue-discovery shadow outputs
-- overlap and information-gain behavior on candidate sets
-- issue-selection outcomes for daily brief
+- current selector
+- issue discovery v0 in `shadow`
 
-### Shadow Rollout
+### Eval Metrics
 
-Recommended rollout order:
+Track at least:
 
-1. land additive schema and artifact writing
-2. run `shadow` mode on fixtures and eval suites
-3. compare baseline issue outputs versus selector-driven outputs
-4. switch `daily_brief` to `primary` only after thresholds are met
+- `precision@N` for selected issues
+- duplicate rate
+- unsupported-claim rate
+- analyst preference
+- cost
+- latency
 
-### Rollout Checks
+### Rollout Order
 
-Before promoting to `primary`, confirm:
-
-- no regression in citation validation pass rate
-- no regression in downstream renderer compatibility
-- selected issues show lower duplicate or low-information-gain rates than baseline
-- value-critic failures caused by weak issue choice trend down instead of up
+1. land object contracts and additive schema
+2. land two-stage scoring and shortlist flow
+3. add the small enrichment orchestrator
+4. split briefing review into integrity, value, routing, and hard gates
+5. run shadow eval against the current selector
+6. promote to `primary` only after thresholds are met
 
 ## Success Metrics
 
-Phase 1 succeeds when these outcomes hold for the daily-brief path:
+Phase 1 succeeds for the daily-brief path when:
 
-- fewer selected issues are dropped for low information gain
-- fewer selected issues are flagged as headline clusters without a thesis
-- value-critic pass rate improves on selected issues
+- selected issues are less repetitive than the current selector output
+- unsupported-claim rate declines
+- analyst preference improves against the current selector baseline
+- cost and latency stay within accepted rollout budgets
 - citation validation does not regress
-- duplicate-issue merges decrease because better candidates are produced upstream
-- shadow mode shows selector outputs that are at least as evidence-grounded as the baseline path
+- value-gate pass rate improves because issue choice improved upstream
 
 ## Explicit Non-Goals
 
