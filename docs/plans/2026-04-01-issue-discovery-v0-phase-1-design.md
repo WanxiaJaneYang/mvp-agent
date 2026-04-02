@@ -32,6 +32,10 @@ The first consumer for `issue_discovery v0` is `daily_brief`.
 
 Alerts and board/dashboard consumers may later reuse shared event and scoring primitives, but they are not in Phase 1 rollout scope. This avoids forcing alert policy into a daily-brief selection model.
 
+Implementation follow-on:
+
+- `docs/plans/2026-04-02-issue-discovery-v0-implementation-spec.md`
+
 ## Target Flow
 
 Phase 1 adopts a two-stage selector and a bounded review loop:
@@ -171,6 +175,7 @@ Allowed `status` values:
 Phase 1 note:
 - an issue candidate may combine multiple related events
 - `pre_enrich_score` is the output of Stage A, not the final product policy decision
+- multi-event membership should be materialized through `issue_candidate_events` with an explicit `relation_kind`
 
 ### `IssueEnrichment`
 
@@ -349,6 +354,15 @@ Every persisted score in Phase 1 should carry:
 - scoring version
 - reason codes
 
+Phase 1 clarification:
+
+- `confidence_score` is not a selector input in V0
+- if a later implementation persists `confidence_score`, it is for operator inspection only
+- `redundancy_penalty`, if used as an internal helper for `non_redundancy`, must be in `[0,1]`
+- `redundancy_penalty=0` means no redundancy
+- `redundancy_penalty=1` means high redundancy
+- the helper penalty is applied only once
+
 ### Selection Sequence
 
 Phase 1 selection should follow this order:
@@ -402,6 +416,12 @@ This is intentionally not a one-shot universal total score.
 - `pre_enrich_score`
 - `status`
 - `reason_codes_json`
+
+#### `issue_candidate_events`
+
+- `issue_id`
+- `event_id`
+- `relation_kind`
 
 #### `issue_enrichments`
 
