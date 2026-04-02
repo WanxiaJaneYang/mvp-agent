@@ -22,10 +22,11 @@ Keep this managed block so 'trellis update' can refresh the instructions.
 ## Agent Policy
 
 ### Core workflow
-Use `explore -> plan -> code -> verify -> commit` for implementation tasks.
+Use `explore -> plan -> code -> verify -> record` for implementation tasks.
+Treat commits and PRs as the delivery layer on top of that workflow, not as a substitute for planning or verification.
 
 ### Delivery workflow
-Use `issue -> PR -> merge` as the default delivery path for all finalized work.
+Use `issue -> branch/worktree -> PR -> merge` as the default delivery path for all finalized work.
 This applies to design changes, planning documents, implementation work, and bug fixes.
 
 For redesign-heavy work, use the staged delivery chain:
@@ -42,8 +43,9 @@ First land planning, then split the work into child issues, then execute impleme
 5. Summarize what changed, what was validated, and any residual risk.
 6. When a step is finalized, make sure it is tracked through an issue first, then committed into a PR (or the active PR), and merged instead of leaving completed local-only work unpushed.
 7. After redesign is merged, create a planning step before implementation starts; if the plan yields multiple workstreams, create child issues before coding.
-8. For independent tasks that are unlikely to conflict, use separate branches and separate MRs instead of combining them in one MR.
+8. For independent tasks that are unlikely to conflict, use separate branches or worktrees and separate PRs instead of combining them in one PR.
 9. For multi-stream implementation, prefer an agent team working against child issues instead of one undifferentiated branch of work.
+10. Match guidance to the current branch state; do not assume unmerged redesign docs or workflows already exist on `master`.
 
 ### Repo-specific non-negotiables
 1. No uncited factual claims in generated analysis outputs.
@@ -52,6 +54,7 @@ First land planning, then split the work into child issues, then execute impleme
 4. Minimize context bloat by reading only files needed for the current step.
 
 ### Policy references
-- MR policy and approval workflow: `.codex/mr-flow-and-approvals.md`
+- PR and approval workflow: `.codex/mr-flow-and-approvals.md`
 - Reusable local skills: `.codex/skills/`, `.agents/skills/`
+- Current repo status: `docs/status-matrix.md`, `README.md`
 

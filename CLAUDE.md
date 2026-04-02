@@ -4,165 +4,175 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 **Financial News & Macro Literature Review Assistant (MVP/v1)**  
-Local-first Python app that ingests macro/market sources (RSS/HTML/PDF) and produces **citation-grounded** daily briefs + major-event alerts for retail investors.
+Local-first Python app that ingests macro and market sources (RSS, HTML, PDF), stores evidence locally, and produces citation-grounded daily briefs plus major-event alerts.
 
-**Current Phase:** Modelling (designing system architecture, schemas, and pipelines before implementation)
+**Current Phase:** Early implementation. The modelling pack still matters, but the repository already contains runtime code, delivery paths, storage, validators, and eval coverage.
 
 ---
 
-## Non‑Negotiables
-1. **No uncited factual claims.** Every bullet/claim must have ≥1 valid citation (URL + published timestamp).
+## Non-Negotiables
+1. **No uncited factual claims.** Every bullet or claim must have at least one valid citation with URL and published timestamp.
 2. **Local-first.** No cloud storage requirements for v1.
-3. **Paywall compliance.** If a source is `paywall_policy: metadata_only`, do **not** fabricate full text.
-4. **Budget safety.** Respect strict caps and stop when caps are reached (see Budget section).
+3. **Paywall compliance.** If a source is `paywall_policy: metadata_only`, do not fabricate full text.
+4. **Budget safety.** Respect strict caps and stop when caps are reached.
 5. **Minimize context bloat.** Read only files needed for the current step.
 
-
-## User Preference: Greeting & Context Sentinel
-- Begin every assistant message with: **"Hello Jane,"**
 ---
 
-## Cost & Context Discipline (Claude Code)
-Claude Code costs scale with context size; long sessions can degrade as context fills. Use the built-in commands intentionally.
-
-### Session Hygiene
-- Use `/cost` to inspect session token spend (API-billed usage); if you’re on a subscription, use `/stats` instead.
-- Use `/clear` between unrelated tasks to avoid stale context being repeatedly processed.
-- Use `/compact` only when needed; keep compaction instructions specific to the current objective.
-
-### Default Output Limits
-- Keep responses concise: **≤ 120 lines** unless explicitly requested.
-- Prefer checklists + diffs over long explanations.
-- Never paste full articles; store IDs/snippets only.
+## Cost & Context Discipline
+- Keep responses concise unless the user explicitly asks for depth.
+- Prefer diffs, checklists, and file-level summaries over long narration.
+- Never paste full articles; store IDs, snippets, and metadata instead.
+- Use `/clear` between unrelated tasks and `/compact` only when the session actually needs it.
 
 ---
 
-## Setup & Environment (Windows)
+## Setup & Environment
 
-### Activate venv
-```cmd
-.venv\Scripts\activate
+Install the local dev toolchain with:
+
+```bash
+python -m pip install -e ".[dev]"
 ```
 
-### Install deps (once code exists)
-```cmd
-pip install -r requirements.txt
+Core verification commands:
+
+```bash
+python scripts/validate_artifacts.py
+python scripts/validate_decision_record_schema.py
+python -m ruff check apps tests scripts tools
+python -m mypy apps tools
+python -m unittest discover -s tests -t . -p "test_*.py" -v
+```
+
+Daily-brief runtime and eval entry points:
+
+```bash
+python scripts/run_daily_brief.py
+python scripts/run_daily_brief_fixture.py
+python -m unittest discover -s tests/evals -p "test_*.py" -v
 ```
 
 ---
 
-## Repository Structure (authoritative)
+## Repository Reality
 
-```
+```text
+apps/
+  agent/
+    alerts/        # alert scoring and policy gates
+    daily_brief/   # daily-brief runtime
+    delivery/      # html, email, and scheduler helpers
+    ingest/        # fetch/extract/normalize/dedup helpers
+    pipeline/      # shared run/stage types and pipeline helpers
+    portfolio/     # portfolio input and relevance helpers
+    retrieval/     # chunking and retrieval helpers
+    runtime/       # budget and runtime helpers
+    storage/       # sqlite runtime persistence
+    synthesis/     # synthesis post-processing
+    validators/    # citation and output validators
+tests/
+  agent/           # runtime and tooling tests
+  evals/           # eval harness tests
+scripts/           # validation and runner entry points
 artifacts/
-├── PRD.md                      # Authoritative requirements (frozen)
-├── PROJECT_FACT.md             # Constraints (budget, timezone, policies)
-└── modelling/
-    ├── source_registry.yaml
-    ├── data_model.md
-    ├── pipeline.md
-    ├── citation_contract.md
-    ├── alert_scoring.md
-    └── backlog.json
-
-apps/agent/                      # Future: agent runner, tools, RAG store, validators
-evals/                           # Future: regression checks for modelling outputs
-ops/                             # Future: operational scripts and utilities
-claude-progress.txt              # Durable progress log (append-only)
+  modelling/       # modelling contracts, schemas, and backlog
+docs/
+  plans/           # planning and implementation notes
 ```
+
+Before assuming an area is still only planned, check:
+- `README.md`
+- `docs/status-matrix.md`
+- the relevant `apps/agent/` and `tests/agent/` packages
 
 ---
 
-## Development Workflow (small, verifiable steps)
-Follow: **Explore → Plan → Execute → Verify → Log**
+## Workflow
 
-1) **Explore**
-- Read only the artifact(s) needed for this step.
+Follow the repo and Trellis flow:
 
-2) **Plan**
-- State exactly which files will change (ideally 1–4).
-- Define a clear verification step (command/assertion/checklist).
+```text
+explore -> plan -> execute -> verify -> record
+```
 
-3) **Execute**
-- Make the smallest change that satisfies the step.
+Before editing:
+- read `AGENTS.md`
+- read `.trellis/workflow.md`
+- read `README.md` and `docs/status-matrix.md` when the task touches repo-level workflow or structure
+- read only the code and artifacts needed for the task
 
-4) **Verify**
-- Run the verification command(s) and report results.
-- If verification fails, fix the root cause (don’t suppress).
+When recording work:
+- prefer Trellis task and workspace recording
+- treat `claude-progress.txt` as legacy context, not the primary workflow contract
 
-5) **Log**
-- Append to `claude-progress.txt`:
-  - what changed
-  - files touched
-  - verification run + outcome
-  - the next single step
+---
+
+## Current Implementation Reality
+
+Implemented in-tree today includes:
+- daily-brief runtime plus local HTML and email delivery
+- ingestion, retrieval, SQLite persistence, and citation validation
+- alert scoring, policy gates, and alert delivery runtime
+- eval harness coverage and golden cases
+- portfolio relevance mapping and local persistence
+
+The modelling artifacts still matter, but they are no longer the whole repo.
 
 ---
 
 ## Architecture Principles
 
-### Daily Pipeline (planned)
-```
-fetch → extract → normalize → chunk → index → retrieve → synthesize → validate citations → deliver
+### Daily Pipeline
+```text
+fetch -> extract -> normalize -> chunk -> index -> retrieve -> synthesize -> validate citations -> deliver
 ```
 
-### Output Structure Requirements
+### Output Requirements
 All synthesis outputs must include:
-- **Prevailing view** (mainstream narrative)
-- **Counterarguments** (alternative perspectives)
-- **Minority view** (dissenting opinions)
-- **What to watch** (falsification indicators)
-- **Citations per bullet** (mandatory, validated)
+- prevailing view
+- counterarguments
+- minority view
+- what to watch
+- citations per bullet
 
 ---
 
-## Modelling Deliverables (Definition of Done)
-
-A. `artifacts/modelling/source_registry.yaml` ✅  
-B. `artifacts/modelling/data_model.md` (SQLite schema + FTS plan + IDs + indices)  
-C. `artifacts/modelling/pipeline.md` (stages + failure handling + incremental runs)  
-D. `artifacts/modelling/citation_contract.md` ✅  
-E. `artifacts/modelling/alert_scoring.md` (thresholds + rate limits + bundling)  
-F. `artifacts/modelling/backlog.json` (tickets w/ acceptance criteria; valid JSON)
-
----
-
-## RAG & Retrieval Guidance
+## Retrieval Guidance
 
 ### Context Management
 - Never paste long articles; store locally and reference by ID.
-- Retrieve selectively (top relevant chunks only).
-- Diversify sources (avoid single-publisher dominance).
-- Prefer credible sources (Tier 1/2 for policy/macro).
-- Cite stored evidence, not “memory”.
+- Retrieve selectively from the indexed corpus.
+- Diversify sources; avoid single-publisher dominance.
+- Prefer higher-credibility sources for policy and macro claims.
+- Cite stored evidence, not memory.
 
-### Retrieval Strategy (planned)
-- Hybrid: keyword (FTS/BM25) + semantic (vector embeddings)
-- Recency weighting for time-sensitive content
-- Credibility tier weighting
-- Diversity constraints
+### Retrieval Strategy
+- Hybrid lexical plus semantic retrieval is already part of the runtime direction.
+- Recency, source quality, and diversity should stay explicit in reasoning and validation.
 
 ---
 
-## Tooling Requirements
-All tools must be:
-- Narrowly scoped (no overlapping responsibilities)
-- Clearly named (purpose obvious)
-- Token-efficient (return IDs + short snippets + metadata)
-- Robust (timeouts, missing pages, paywalls)
+## Tooling Expectations
+All tools should be:
+- narrowly scoped
+- clearly named
+- token-efficient
+- robust against timeouts, missing pages, and paywalls
 
 ---
 
-## Budget & Safety (two layers)
+## Budget & Safety
 
-### Layer 1: Claude Code interaction discipline
-- Keep tasks small + verifiable.
-- Avoid multi-agent “teams” unless necessary.
-- Check `/cost` periodically (API users) and `/clear` between tasks.
+### Interaction discipline
+- Keep tasks small and verifiable.
+- Avoid multi-agent teams unless they are actually necessary.
+- Check cost and context hygiene before long or repetitive loops.
 
-### Layer 2: App runtime budget guard (local config)
-- Budget caps live in `.env` (local-only; never committed) and are enforced by the app/harness **before** any model call.
-- Guard should hard-fail when cap exceeded to prevent runaway loops.
+### Runtime guardrails
+- Budget caps live in `.env` and must never be bypassed casually.
+- The runtime should fail closed on hard budget limits.
+- Stop on configured hard limits instead of trying to push through.
 
 Recommended `.env` keys:
 - `BUDGET_MONTHLY_USD=100`
@@ -171,12 +181,6 @@ Recommended `.env` keys:
 - `BUDGET_MODE=hard_fail`
 - `BUDGET_STATE_PATH=.budget_state.json`
 
-### Safety Rules
-- Never run uncontrolled loops.
-- Enforce max tool calls per run.
-- Enforce max pages fetched per run.
-- Stop immediately when budget caps are reached.
-
 ---
 
 ## Content Policy
@@ -184,25 +188,14 @@ Recommended `.env` keys:
 - No sensational phrasing
 - Balanced presentation of views
 - Explicit uncertainty markers
-- No investment instructions (scenarios + risks only)
-- Portfolio: relevance/risk flags only (no buy/sell signals)
+- No direct investment instructions
+- Portfolio handling should stay at relevance and risk framing, not buy or sell signals
 
 ---
 
 ## Key Constraints
-- **User timezone:** Asia/Singapore
 - **Target user:** Retail long-term ETF holders
-- **Provider:** Anthropic Claude (Claude Code now; Messages API later)
 - **Storage:** SQLite (local)
 - **Secrets:** `.env` (gitignored)
-
----
-
-## Phase Completion Criteria
-Modelling phase is complete when:
-- [ ] All deliverables (A–F) exist and validate
-- [ ] `backlog.json` validates with acceptance criteria
-- [ ] Citation validator passes
-- [ ] Budget guard implemented and enabled by default
-- [ ] At least 10 golden test cases in `evals/`
-
+- **Runtime provider choice:** Check the current runner and config; do not assume a single provider stack
+- **Timezone and user context:** Do not hardcode a static user timezone; use current task context, project facts, and runtime inputs instead
