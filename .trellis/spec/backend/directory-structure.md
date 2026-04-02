@@ -21,7 +21,9 @@ tests/
 scripts/           # validation entry points used by CI
 artifacts/
   modelling/       # planned contracts, schemas, fixtures, backlog
-docs/plans/        # design and implementation plans
+docs/
+  adr/             # durable architecture decisions
+  plans/           # design and implementation plans
 ```
 
 ---
@@ -32,6 +34,8 @@ docs/plans/        # design and implementation plans
 - Add tests under the mirrored `tests/agent/<domain>/` location.
 - Put executable verification entry points in `scripts/`.
 - Put planned schema/persistence contracts in `artifacts/modelling/`, not inline comments or ad-hoc docs.
+- Put durable architecture decisions in `docs/adr/`.
+- Keep `docs/plans/` for time-bound design and implementation plans, not long-lived ADRs.
 
 ---
 
