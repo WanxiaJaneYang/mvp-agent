@@ -15,6 +15,7 @@
 **Files:**
 - Create: `apps/agent/storage/source_control_plane.py`
 - Modify: `apps/agent/pipeline/types.py`
+- Modify: `artifacts/modelling/data_model.md`
 - Test: `tests/agent/storage/test_source_control_plane.py`
 
 **Step 1: Write the failing test**
@@ -75,6 +76,8 @@ class SourceOperatorStateRow(TypedDict):
     current_strategy_id: str | None
 ```
 
+Update `artifacts/modelling/data_model.md` with the additive control-plane schema so runtime code is not the only source of truth for the new persistence contract.
+
 **Step 4: Run test to verify it passes**
 
 Run: `python -m unittest tests.agent.storage.test_source_control_plane -v`
@@ -84,7 +87,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add apps/agent/storage/source_control_plane.py apps/agent/pipeline/types.py tests/agent/storage/test_source_control_plane.py
+git add apps/agent/storage/source_control_plane.py apps/agent/pipeline/types.py artifacts/modelling/data_model.md tests/agent/storage/test_source_control_plane.py
 git commit -m "feat: add source control plane storage foundation"
 ```
 
