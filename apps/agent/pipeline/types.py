@@ -65,6 +65,10 @@ class SourceRegistryEntry(TypedDict):
     url: Required[str]
     base_url: NotRequired[str]
     type: Required[str]
+    fetch_via: NotRequired[str]
+    source_role: NotRequired[str]
+    timestamp_authority: NotRequired[str]
+    content_mode: NotRequired[str]
     credibility_tier: Required[int]
     paywall_policy: Required[str]
     fetch_interval: Required[str]
@@ -136,6 +140,16 @@ class SourceOnboardingRunRow(TypedDict):
     proposed_strategy_id: str | None
     error_message: str | None
     result_summary_json: str | None
+
+
+class ResolvedSource(TypedDict):
+    source_id: str
+    contract: SourceRegistryEntry
+    operator_state: SourceOperatorStateRow
+    current_strategy: SourceStrategyVersionRow | None
+    latest_strategy: SourceStrategyVersionRow | None
+    latest_onboarding_run: SourceOnboardingRunRow | None
+    runtime_eligible: bool
 
 
 class RuntimeDocumentRecord(TypedDict):

@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import yaml  # type: ignore[import-untyped]
 
-from apps.agent.pipeline.types import SourceRegistryEntry
+from apps.agent.pipeline.types import ResolvedSource, SourceRegistryEntry
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REGISTRY_PATH = ROOT / "artifacts" / "modelling" / "source_registry.yaml"
@@ -58,3 +58,17 @@ def load_active_source_subset(
         raise ValueError(f"Unknown active source ids: {', '.join(missing_ids)}")
 
     return active_sources
+
+
+def load_runtime_eligible_sources(
+    *,
+    base_dir: Path,
+    registry_path: Path | None = None,
+) -> list[ResolvedSource]:
+    from apps.agent.runtime.resolved_sources import load_resolved_sources
+
+    return [
+        source
+        for source in load_resolved_sources(base_dir=base_dir, registry_path=registry_path)
+        if source["runtime_eligible"]
+    ]
