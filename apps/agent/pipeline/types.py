@@ -214,6 +214,16 @@ class SourceOnboardingRunRow(TypedDict):
     result_summary_json: str | None
 
 
+class ResolvedSource(TypedDict):
+    source_id: str
+    contract: SourceRegistryEntry
+    operator_state: SourceOperatorStateRow
+    current_strategy: SourceStrategyVersionRow | None
+    latest_strategy: SourceStrategyVersionRow | None
+    latest_onboarding_run: SourceOnboardingRunRow | None
+    runtime_eligible: bool
+
+
 class RuntimeDocumentRecord(TypedDict):
     source_id: str
     publisher: str
