@@ -65,6 +65,10 @@ class SourceRegistryEntry(TypedDict):
     url: Required[str]
     base_url: NotRequired[str]
     type: Required[str]
+    fetch_via: NotRequired[str]
+    source_role: NotRequired[str]
+    timestamp_authority: NotRequired[str]
+    content_mode: NotRequired[str]
     credibility_tier: Required[int]
     paywall_policy: Required[str]
     fetch_interval: Required[str]
@@ -89,6 +93,63 @@ class SourceRow(TypedDict):
     enabled: int
     created_at: str
     updated_at: str
+
+
+class SourceOperatorStateRow(TypedDict):
+    source_id: str
+    is_active: int
+    strategy_state: str
+    current_strategy_id: str | None
+    latest_strategy_id: str | None
+    last_onboarding_run_id: str | None
+    last_collection_status: str
+    last_collection_started_at: str | None
+    last_collection_finished_at: str | None
+    last_collection_error: str | None
+    activated_at: str | None
+    deactivated_at: str | None
+    updated_at: str
+
+
+class SourceStrategyVersionRow(TypedDict):
+    strategy_id: str
+    source_id: str
+    version: int
+    strategy_status: str
+    entrypoint_url: str
+    fetch_via: str
+    content_mode: str
+    parser_profile: str | None
+    max_items_per_run: int
+    strategy_summary_json: str
+    strategy_details_json: str
+    created_from_run_id: str | None
+    created_at: str
+    approved_at: str | None
+
+
+class SourceOnboardingRunRow(TypedDict):
+    onboarding_run_id: str
+    source_id: str
+    status: str
+    worker_kind: str
+    worker_ref: str | None
+    submitted_at: str
+    started_at: str | None
+    finished_at: str | None
+    proposed_strategy_id: str | None
+    error_message: str | None
+    result_summary_json: str | None
+
+
+class ResolvedSource(TypedDict):
+    source_id: str
+    contract: SourceRegistryEntry
+    operator_state: SourceOperatorStateRow
+    current_strategy: SourceStrategyVersionRow | None
+    latest_strategy: SourceStrategyVersionRow | None
+    latest_onboarding_run: SourceOnboardingRunRow | None
+    runtime_eligible: bool
 
 
 class RuntimeDocumentRecord(TypedDict):
