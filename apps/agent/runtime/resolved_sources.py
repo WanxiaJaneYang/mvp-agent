@@ -5,9 +5,16 @@ from typing import cast
 
 from apps.agent.pipeline.types import (
     ResolvedSource,
+    SourceCollectionStatus,
+    SourceContentMode,
+    SourceFetchVia,
     SourceOperatorStateRow,
     SourceRegistryEntry,
+    SourceRole,
+    SourceStrategyState,
+    SourceStrategyStatus,
     SourceStrategyVersionRow,
+    SourceTimestampAuthority,
 )
 from apps.agent.runtime.source_scope import load_source_registry
 from apps.agent.storage.source_control_plane import SourceControlPlaneStore
@@ -86,11 +93,11 @@ def _default_operator_state(source_id: str) -> SourceOperatorStateRow:
     return SourceOperatorStateRow(
         source_id=source_id,
         is_active=0,
-        strategy_state="missing",
+        strategy_state=SourceStrategyState.MISSING,
         current_strategy_id=None,
         latest_strategy_id=None,
         last_onboarding_run_id=None,
-        last_collection_status="idle",
+        last_collection_status=SourceCollectionStatus.IDLE,
         last_collection_started_at=None,
         last_collection_finished_at=None,
         last_collection_error=None,
@@ -121,10 +128,10 @@ def _is_runtime_eligible(
 ) -> bool:
     return (
         bool(operator_state["is_active"])
-        and operator_state["strategy_state"] == "ready"
+        and operator_state["strategy_state"] == SourceStrategyState.READY
         and operator_state["current_strategy_id"] is not None
         and current_strategy is not None
-        and current_strategy["strategy_status"] == "approved"
+        and current_strategy["strategy_status"] == SourceStrategyStatus.APPROVED
     )
 
 
@@ -137,44 +144,44 @@ def _with_contract_fallbacks(source: SourceRegistryEntry) -> SourceRegistryEntry
     return cast(SourceRegistryEntry, normalized)
 
 
-def _default_fetch_via(source_type: str) -> str:
+def _default_fetch_via(source_type: str) -> SourceFetchVia:
     if source_type == "rss":
-        return "direct_rss"
+        return SourceFetchVia.DIRECT_RSS
     if source_type == "html":
-        return "direct_html"
+        return SourceFetchVia.DIRECT_HTML
     if source_type == "pdf":
-        return "direct_pdf"
-    return "hybrid"
+        return SourceFetchVia.DIRECT_PDF
+    return SourceFetchVia.HYBRID
 
 
-def _default_source_role(source: SourceRegistryEntry) -> str:
+def _default_source_role(source: SourceRegistryEntry) -> SourceRole:
     credibility_tier = int(source.get("credibility_tier", 4))
     if credibility_tier >= 4:
-        return "monitor_only"
-    return "supplementary"
+        return SourceRole.MONITOR_ONLY
+    return SourceRole.SUPPLEMENTARY
 
 
-def _default_timestamp_authority(source: SourceRegistryEntry) -> str:
+def _default_timestamp_authority(source: SourceRegistryEntry) -> SourceTimestampAuthority:
     source_type = str(source["type"])
     if source_type == "rss":
-        return "feed_timestamp"
-    return "retrieval_time_only"
+        return SourceTimestampAuthority.FEED_TIMESTAMP
+    return SourceTimestampAuthority.RETRIEVAL_TIME_ONLY
 
 
-def _default_content_mode(source: SourceRegistryEntry) -> str:
+def _default_content_mode(source: SourceRegistryEntry) -> SourceContentMode:
     source_type = str(source["type"])
     tags = {str(tag) for tag in source.get("tags", [])}
     if "event_calendar" in tags:
-        return "calendar_event"
+        return SourceContentMode.CALENDAR_EVENT
     # Metadata-only sources stay snippet-oriented even when transported via RSS.
     # This keeps downstream handling aligned with paywall constraints instead of
     # implying full feed-index semantics from the transport alone.
     if str(source.get("paywall_policy", "")) == "metadata_only":
-        return "snippet_only"
+        return SourceContentMode.SNIPPET_ONLY
     if source_type == "pdf":
-        return "article_full_text"
+        return SourceContentMode.ARTICLE_FULL_TEXT
     if source_type == "rss":
-        return "feed_index"
+        return SourceContentMode.FEED_INDEX
     if source_type == "api":
-        return "structured_data"
-    return "listing_page"
+        return SourceContentMode.STRUCTURED_DATA
+    return SourceContentMode.LISTING_PAGE

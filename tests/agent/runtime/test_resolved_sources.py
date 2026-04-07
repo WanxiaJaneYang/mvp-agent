@@ -6,6 +6,15 @@ from tempfile import TemporaryDirectory
 
 import yaml
 
+from apps.agent.pipeline.types import (
+    SourceCollectionStatus,
+    SourceContentMode,
+    SourceFetchVia,
+    SourceRole,
+    SourceStrategyState,
+    SourceStrategyStatus,
+    SourceTimestampAuthority,
+)
 from apps.agent.runtime.resolved_sources import get_resolved_source, load_resolved_sources
 from apps.agent.storage.source_control_plane import SourceControlPlaneStore
 
@@ -51,11 +60,11 @@ class ResolvedSourcesTests(unittest.TestCase):
                 {
                     "source_id": "reuters_business",
                     "is_active": 1,
-                    "strategy_state": "ready",
+                    "strategy_state": SourceStrategyState.READY,
                     "current_strategy_id": "strat_reuters_001",
                     "latest_strategy_id": "strat_reuters_001",
                     "last_onboarding_run_id": None,
-                    "last_collection_status": "idle",
+                    "last_collection_status": SourceCollectionStatus.IDLE,
                     "last_collection_started_at": None,
                     "last_collection_finished_at": None,
                     "last_collection_error": None,
@@ -69,10 +78,10 @@ class ResolvedSourcesTests(unittest.TestCase):
                     "strategy_id": "strat_reuters_001",
                     "source_id": "reuters_business",
                     "version": 1,
-                    "strategy_status": "approved",
+                    "strategy_status": SourceStrategyStatus.APPROVED,
                     "entrypoint_url": "https://www.reuters.com/business/",
-                    "fetch_via": "direct_rss",
-                    "content_mode": "article_full_text",
+                    "fetch_via": SourceFetchVia.DIRECT_RSS,
+                    "content_mode": SourceContentMode.ARTICLE_FULL_TEXT,
                     "parser_profile": None,
                     "max_items_per_run": 25,
                     "strategy_summary_json": "{\"headline\":\"business feed\"}",
@@ -86,11 +95,11 @@ class ResolvedSourcesTests(unittest.TestCase):
                 {
                     "source_id": "wsj_markets",
                     "is_active": 1,
-                    "strategy_state": "missing",
+                    "strategy_state": SourceStrategyState.MISSING,
                     "current_strategy_id": None,
                     "latest_strategy_id": None,
                     "last_onboarding_run_id": None,
-                    "last_collection_status": "idle",
+                    "last_collection_status": SourceCollectionStatus.IDLE,
                     "last_collection_started_at": None,
                     "last_collection_finished_at": None,
                     "last_collection_error": None,
@@ -166,25 +175,67 @@ class ResolvedSourcesTests(unittest.TestCase):
                 for item in load_resolved_sources(base_dir=base_dir, registry_path=registry_path)
             }
 
-            self.assertEqual(resolved["zerohedge"]["contract"]["source_role"], "monitor_only")
-            self.assertEqual(resolved["zerohedge"]["contract"]["fetch_via"], "direct_rss")
-            self.assertEqual(resolved["zerohedge"]["contract"]["timestamp_authority"], "feed_timestamp")
-            self.assertEqual(resolved["zerohedge"]["contract"]["content_mode"], "feed_index")
+            self.assertEqual(resolved["zerohedge"]["contract"]["source_role"], SourceRole.MONITOR_ONLY)
+            self.assertEqual(resolved["zerohedge"]["contract"]["fetch_via"], SourceFetchVia.DIRECT_RSS)
+            self.assertEqual(
+                resolved["zerohedge"]["contract"]["timestamp_authority"],
+                SourceTimestampAuthority.FEED_TIMESTAMP,
+            )
+            self.assertEqual(
+                resolved["zerohedge"]["contract"]["content_mode"],
+                SourceContentMode.FEED_INDEX,
+            )
 
-            self.assertEqual(resolved["us_bls_schedule"]["contract"]["source_role"], "supplementary")
-            self.assertEqual(resolved["us_bls_schedule"]["contract"]["fetch_via"], "direct_html")
-            self.assertEqual(resolved["us_bls_schedule"]["contract"]["timestamp_authority"], "retrieval_time_only")
-            self.assertEqual(resolved["us_bls_schedule"]["contract"]["content_mode"], "calendar_event")
+            self.assertEqual(
+                resolved["us_bls_schedule"]["contract"]["source_role"],
+                SourceRole.SUPPLEMENTARY,
+            )
+            self.assertEqual(
+                resolved["us_bls_schedule"]["contract"]["fetch_via"],
+                SourceFetchVia.DIRECT_HTML,
+            )
+            self.assertEqual(
+                resolved["us_bls_schedule"]["contract"]["timestamp_authority"],
+                SourceTimestampAuthority.RETRIEVAL_TIME_ONLY,
+            )
+            self.assertEqual(
+                resolved["us_bls_schedule"]["contract"]["content_mode"],
+                SourceContentMode.CALENDAR_EVENT,
+            )
 
-            self.assertEqual(resolved["seekingalpha_news"]["contract"]["source_role"], "monitor_only")
-            self.assertEqual(resolved["seekingalpha_news"]["contract"]["fetch_via"], "direct_html")
-            self.assertEqual(resolved["seekingalpha_news"]["contract"]["timestamp_authority"], "retrieval_time_only")
-            self.assertEqual(resolved["seekingalpha_news"]["contract"]["content_mode"], "snippet_only")
+            self.assertEqual(
+                resolved["seekingalpha_news"]["contract"]["source_role"],
+                SourceRole.MONITOR_ONLY,
+            )
+            self.assertEqual(
+                resolved["seekingalpha_news"]["contract"]["fetch_via"],
+                SourceFetchVia.DIRECT_HTML,
+            )
+            self.assertEqual(
+                resolved["seekingalpha_news"]["contract"]["timestamp_authority"],
+                SourceTimestampAuthority.RETRIEVAL_TIME_ONLY,
+            )
+            self.assertEqual(
+                resolved["seekingalpha_news"]["contract"]["content_mode"],
+                SourceContentMode.SNIPPET_ONLY,
+            )
 
-            self.assertEqual(resolved["wsj_markets"]["contract"]["source_role"], "supplementary")
-            self.assertEqual(resolved["wsj_markets"]["contract"]["fetch_via"], "direct_rss")
-            self.assertEqual(resolved["wsj_markets"]["contract"]["timestamp_authority"], "feed_timestamp")
-            self.assertEqual(resolved["wsj_markets"]["contract"]["content_mode"], "snippet_only")
+            self.assertEqual(
+                resolved["wsj_markets"]["contract"]["source_role"],
+                SourceRole.SUPPLEMENTARY,
+            )
+            self.assertEqual(
+                resolved["wsj_markets"]["contract"]["fetch_via"],
+                SourceFetchVia.DIRECT_RSS,
+            )
+            self.assertEqual(
+                resolved["wsj_markets"]["contract"]["timestamp_authority"],
+                SourceTimestampAuthority.FEED_TIMESTAMP,
+            )
+            self.assertEqual(
+                resolved["wsj_markets"]["contract"]["content_mode"],
+                SourceContentMode.SNIPPET_ONLY,
+            )
 
     def test_get_resolved_source_returns_none_for_missing_current_strategy_pointer(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -215,11 +266,11 @@ class ResolvedSourcesTests(unittest.TestCase):
                 {
                     "source_id": "reuters_business",
                     "is_active": 1,
-                    "strategy_state": "ready",
+                    "strategy_state": SourceStrategyState.READY,
                     "current_strategy_id": "strat_missing",
                     "latest_strategy_id": None,
                     "last_onboarding_run_id": None,
-                    "last_collection_status": "idle",
+                    "last_collection_status": SourceCollectionStatus.IDLE,
                     "last_collection_started_at": None,
                     "last_collection_finished_at": None,
                     "last_collection_error": None,
