@@ -4,8 +4,18 @@ import sqlite3
 from pathlib import Path
 
 from apps.agent.pipeline.types import (
+    SOURCE_COLLECTION_STATUS_VALUES,
+    SOURCE_ONBOARDING_RUN_STATUS_VALUES,
+    SOURCE_STRATEGY_STATE_VALUES,
+    SOURCE_STRATEGY_STATUS_VALUES,
+    SourceCollectionStatus,
+    SourceContentMode,
+    SourceFetchVia,
     SourceOnboardingRunRow,
+    SourceOnboardingRunStatus,
     SourceOperatorStateRow,
+    SourceStrategyState,
+    SourceStrategyStatus,
     SourceStrategyVersionRow,
 )
 
@@ -277,7 +287,7 @@ class SourceControlPlaneStore:
         self,
         onboarding_run_id: str,
         *,
-        status: str,
+        status: SourceOnboardingRunStatus,
         proposed_strategy_id: str | None = None,
         started_at: str | None = None,
         finished_at: str | None = None,
@@ -357,7 +367,7 @@ def _row_to_operator_state(row: sqlite3.Row) -> SourceOperatorStateRow:
     return SourceOperatorStateRow(
         source_id=str(row["source_id"]),
         is_active=int(row["is_active"]),
-        strategy_state=str(row["strategy_state"]),
+        strategy_state=SourceStrategyState(str(row["strategy_state"])),
         current_strategy_id=None
         if row["current_strategy_id"] is None
         else str(row["current_strategy_id"]),
@@ -365,7 +375,7 @@ def _row_to_operator_state(row: sqlite3.Row) -> SourceOperatorStateRow:
         last_onboarding_run_id=None
         if row["last_onboarding_run_id"] is None
         else str(row["last_onboarding_run_id"]),
-        last_collection_status=str(row["last_collection_status"]),
+        last_collection_status=SourceCollectionStatus(str(row["last_collection_status"])),
         last_collection_started_at=None
         if row["last_collection_started_at"] is None
         else str(row["last_collection_started_at"]),
@@ -386,10 +396,10 @@ def _row_to_strategy_version(row: sqlite3.Row) -> SourceStrategyVersionRow:
         strategy_id=str(row["strategy_id"]),
         source_id=str(row["source_id"]),
         version=int(row["version"]),
-        strategy_status=str(row["strategy_status"]),
+        strategy_status=SourceStrategyStatus(str(row["strategy_status"])),
         entrypoint_url=str(row["entrypoint_url"]),
-        fetch_via=str(row["fetch_via"]),
-        content_mode=str(row["content_mode"]),
+        fetch_via=SourceFetchVia(str(row["fetch_via"])),
+        content_mode=SourceContentMode(str(row["content_mode"])),
         parser_profile=None if row["parser_profile"] is None else str(row["parser_profile"]),
         max_items_per_run=int(row["max_items_per_run"]),
         strategy_summary_json=str(row["strategy_summary_json"]),
@@ -406,7 +416,7 @@ def _row_to_onboarding_run(row: sqlite3.Row) -> SourceOnboardingRunRow:
     return SourceOnboardingRunRow(
         onboarding_run_id=str(row["onboarding_run_id"]),
         source_id=str(row["source_id"]),
-        status=str(row["status"]),
+        status=SourceOnboardingRunStatus(str(row["status"])),
         worker_kind=str(row["worker_kind"]),
         worker_ref=None if row["worker_ref"] is None else str(row["worker_ref"]),
         submitted_at=str(row["submitted_at"]),
@@ -424,18 +434,22 @@ def _row_to_onboarding_run(row: sqlite3.Row) -> SourceOnboardingRunRow:
 
 def _initialize_schema(connection: sqlite3.Connection) -> None:
     connection.execute("PRAGMA foreign_keys = ON")
+    source_strategy_state_values = _sql_enum_values(SOURCE_STRATEGY_STATE_VALUES)
+    source_collection_status_values = _sql_enum_values(SOURCE_COLLECTION_STATUS_VALUES)
+    source_strategy_status_values = _sql_enum_values(SOURCE_STRATEGY_STATUS_VALUES)
+    source_onboarding_run_status_values = _sql_enum_values(SOURCE_ONBOARDING_RUN_STATUS_VALUES)
     statements = (
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS source_operator_state (
           source_id TEXT PRIMARY KEY,
           is_active INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0,1)),
-          strategy_state TEXT NOT NULL DEFAULT 'missing'
-            CHECK (strategy_state IN ('missing', 'proposed', 'ready', 'paused')),
+          strategy_state TEXT NOT NULL DEFAULT '{SourceStrategyState.MISSING.value}'
+            CHECK (strategy_state IN ({source_strategy_state_values})),
           current_strategy_id TEXT,
           latest_strategy_id TEXT,
           last_onboarding_run_id TEXT,
-          last_collection_status TEXT NOT NULL DEFAULT 'idle'
-            CHECK (last_collection_status IN ('idle', 'queued', 'running', 'succeeded', 'failed')),
+          last_collection_status TEXT NOT NULL DEFAULT '{SourceCollectionStatus.IDLE.value}'
+            CHECK (last_collection_status IN ({source_collection_status_values})),
           last_collection_started_at TEXT,
           last_collection_finished_at TEXT,
           last_collection_error TEXT,
@@ -444,13 +458,13 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           updated_at TEXT NOT NULL
         )
         """,
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS source_strategy_versions (
           strategy_id TEXT PRIMARY KEY,
           source_id TEXT NOT NULL,
           version INTEGER NOT NULL,
           strategy_status TEXT NOT NULL
-            CHECK (strategy_status IN ('proposed', 'approved', 'superseded', 'rejected')),
+            CHECK (strategy_status IN ({source_strategy_status_values})),
           entrypoint_url TEXT NOT NULL,
           fetch_via TEXT NOT NULL,
           content_mode TEXT NOT NULL,
@@ -463,12 +477,12 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           approved_at TEXT
         )
         """,
-        """
+        f"""
         CREATE TABLE IF NOT EXISTS source_onboarding_runs (
           onboarding_run_id TEXT PRIMARY KEY,
           source_id TEXT NOT NULL,
           status TEXT NOT NULL
-            CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+            CHECK (status IN ({source_onboarding_run_status_values})),
           worker_kind TEXT NOT NULL,
           worker_ref TEXT,
           submitted_at TEXT NOT NULL,
@@ -482,3 +496,7 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
     )
     for statement in statements:
         connection.execute(statement)
+
+
+def _sql_enum_values(values: tuple[str, ...]) -> str:
+    return ", ".join(f"'{value}'" for value in values)

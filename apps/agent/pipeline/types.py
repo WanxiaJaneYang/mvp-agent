@@ -21,6 +21,78 @@ class RunStatus(str, Enum):
     PARTIAL = "partial"
 
 
+class SourceStrategyState(str, Enum):
+    MISSING = "missing"
+    PROPOSED = "proposed"
+    READY = "ready"
+    PAUSED = "paused"
+
+
+class SourceCollectionStatus(str, Enum):
+    IDLE = "idle"
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class SourceStrategyStatus(str, Enum):
+    PROPOSED = "proposed"
+    APPROVED = "approved"
+    SUPERSEDED = "superseded"
+    REJECTED = "rejected"
+
+
+class SourceOnboardingRunStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class SourceFetchVia(str, Enum):
+    DIRECT_RSS = "direct_rss"
+    DIRECT_HTML = "direct_html"
+    DIRECT_PDF = "direct_pdf"
+    OPENBB = "openbb"
+    BOCHA_SEARCH = "bocha_search"
+    HYBRID = "hybrid"
+
+
+class SourceRole(str, Enum):
+    AUTHORITATIVE = "authoritative"
+    SUPPLEMENTARY = "supplementary"
+    MONITOR_ONLY = "monitor_only"
+
+
+class SourceTimestampAuthority(str, Enum):
+    SOURCE_PAGE = "source_page"
+    FEED_TIMESTAMP = "feed_timestamp"
+    PROVIDER_TIMESTAMP = "provider_timestamp"
+    RETRIEVAL_TIME_ONLY = "retrieval_time_only"
+
+
+class SourceContentMode(str, Enum):
+    ARTICLE_FULL_TEXT = "article_full_text"
+    SNIPPET_ONLY = "snippet_only"
+    STRUCTURED_DATA = "structured_data"
+    CALENDAR_EVENT = "calendar_event"
+    LISTING_PAGE = "listing_page"
+    FEED_INDEX = "feed_index"
+
+
+SOURCE_STRATEGY_STATE_VALUES: tuple[str, ...] = tuple(state.value for state in SourceStrategyState)
+SOURCE_COLLECTION_STATUS_VALUES: tuple[str, ...] = tuple(
+    status.value for status in SourceCollectionStatus
+)
+SOURCE_STRATEGY_STATUS_VALUES: tuple[str, ...] = tuple(
+    status.value for status in SourceStrategyStatus
+)
+SOURCE_ONBOARDING_RUN_STATUS_VALUES: tuple[str, ...] = tuple(
+    status.value for status in SourceOnboardingRunStatus
+)
+
+
 DailyBriefOutputSection = Literal["prevailing", "counter", "minority", "watch", "changed"]
 DailyBriefClaimKind = Literal["prevailing", "counter", "minority", "watch"]
 DailyBriefNoveltyLabel = Literal["new", "continued", "reframed", "weakened", "strengthened", "reversed", "unknown"]
@@ -70,6 +142,10 @@ class SourceRegistryEntry(TypedDict):
     fetch_interval: Required[str]
     tags: NotRequired[list[str]]
     per_fetch_cap: NotRequired[int]
+    fetch_via: NotRequired[SourceFetchVia]
+    source_role: NotRequired[SourceRole]
+    timestamp_authority: NotRequired[SourceTimestampAuthority]
+    content_mode: NotRequired[SourceContentMode]
 
 
 class PlannedFetchItem(TypedDict):
@@ -94,11 +170,11 @@ class SourceRow(TypedDict):
 class SourceOperatorStateRow(TypedDict):
     source_id: str
     is_active: int
-    strategy_state: str
+    strategy_state: SourceStrategyState
     current_strategy_id: str | None
     latest_strategy_id: str | None
     last_onboarding_run_id: str | None
-    last_collection_status: str
+    last_collection_status: SourceCollectionStatus
     last_collection_started_at: str | None
     last_collection_finished_at: str | None
     last_collection_error: str | None
@@ -111,10 +187,10 @@ class SourceStrategyVersionRow(TypedDict):
     strategy_id: str
     source_id: str
     version: int
-    strategy_status: str
+    strategy_status: SourceStrategyStatus
     entrypoint_url: str
-    fetch_via: str
-    content_mode: str
+    fetch_via: SourceFetchVia
+    content_mode: SourceContentMode
     parser_profile: str | None
     max_items_per_run: int
     strategy_summary_json: str
@@ -127,7 +203,7 @@ class SourceStrategyVersionRow(TypedDict):
 class SourceOnboardingRunRow(TypedDict):
     onboarding_run_id: str
     source_id: str
-    status: str
+    status: SourceOnboardingRunStatus
     worker_kind: str
     worker_ref: str | None
     submitted_at: str
