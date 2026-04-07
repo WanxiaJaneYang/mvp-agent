@@ -376,6 +376,7 @@ CREATE TABLE IF NOT EXISTS source_onboarding_runs (
 - Source contract remains file-based and reviewed in `source_registry.yaml`.
 - Control-plane tables store mutable operator state, strategy lifecycle, and onboarding lifecycle.
 - Runtime eligibility is computed from the join of source contract and control-plane records; it is not stored as a separate source-of-truth table.
+- The literal values shown in the `CHECK` constraints mirror the enum contracts in `apps/agent/pipeline/types.py` and should be kept in sync with those definitions.
 
 ## 5. Index Plan
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import yaml
 
+from apps.agent.pipeline.types import SourceContentMode, SourceFetchVia, SourceRole
 from apps.agent.runtime.source_scope import load_active_source_subset, load_source_registry
 
 
@@ -52,6 +53,71 @@ class SourceScopeTests(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 load_active_source_subset(registry=registry, active_ids_path=active_ids_path)
+
+    def test_load_source_registry_normalizes_optional_contract_enums(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            registry_path = Path(temp_dir) / "source_registry.yaml"
+            registry_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "sources": [
+                            {
+                                "id": "reuters_business",
+                                "name": "Reuters - Business News",
+                                "url": "https://www.reuters.com/business/",
+                                "type": "rss",
+                                "credibility_tier": 1,
+                                "paywall_policy": "full",
+                                "fetch_interval": "daily",
+                                "fetch_via": "direct_rss",
+                                "source_role": "supplementary",
+                                "timestamp_authority": "feed_timestamp",
+                                "content_mode": "feed_index",
+                            }
+                        ]
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            registry = load_source_registry(registry_path=registry_path)
+
+            self.assertEqual(registry["reuters_business"]["fetch_via"], SourceFetchVia.DIRECT_RSS)
+            self.assertEqual(registry["reuters_business"]["source_role"], SourceRole.SUPPLEMENTARY)
+            self.assertEqual(
+                registry["reuters_business"]["content_mode"], SourceContentMode.FEED_INDEX
+            )
+
+    def test_invalid_source_contract_enum_value_includes_source_id_and_field_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            registry_path = Path(temp_dir) / "source_registry.yaml"
+            registry_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "sources": [
+                            {
+                                "id": "reuters_business",
+                                "name": "Reuters - Business News",
+                                "url": "https://www.reuters.com/business/",
+                                "type": "rss",
+                                "credibility_tier": 1,
+                                "paywall_policy": "full",
+                                "fetch_interval": "daily",
+                                "fetch_via": "scrape",
+                            }
+                        ]
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                r"Invalid 'fetch_via' value 'scrape' for source 'reuters_business'",
+            ):
+                load_source_registry(registry_path=registry_path)
 
     def test_validate_artifacts_script_includes_runtime_subset_artifact(self):
         validate_script = (

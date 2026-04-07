@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 from apps.agent.pipeline.types import (
     SOURCE_COLLECTION_STATUS_VALUES,
@@ -18,6 +19,8 @@ from apps.agent.pipeline.types import (
     SourceStrategyStatus,
     SourceStrategyVersionRow,
 )
+
+_UNSET = object()
 
 
 def control_plane_db_path(*, base_dir: Path) -> Path:
@@ -288,35 +291,59 @@ class SourceControlPlaneStore:
         onboarding_run_id: str,
         *,
         status: SourceOnboardingRunStatus,
-        proposed_strategy_id: str | None = None,
-        started_at: str | None = None,
-        finished_at: str | None = None,
+        proposed_strategy_id: str | None | object = _UNSET,
+        started_at: str | None | object = _UNSET,
+        finished_at: str | None | object = _UNSET,
         error_message: str | None = None,
         result_summary_json: str | None = None,
+        clear_error_message: bool = False,
+        clear_result_summary_json: bool = False,
     ) -> None:
+        update_fields: list[str] = ["status = ?"]
+        parameters: list[Any] = [status]
+        _append_optional_assignment(
+            update_fields,
+            parameters,
+            column_name="proposed_strategy_id",
+            value=proposed_strategy_id,
+        )
+        _append_optional_assignment(
+            update_fields,
+            parameters,
+            column_name="started_at",
+            value=started_at,
+        )
+        _append_optional_assignment(
+            update_fields,
+            parameters,
+            column_name="finished_at",
+            value=finished_at,
+        )
+        _append_preserving_nullable_assignment(
+            update_fields,
+            parameters,
+            column_name="error_message",
+            value=error_message,
+            clear=clear_error_message,
+        )
+        _append_preserving_nullable_assignment(
+            update_fields,
+            parameters,
+            column_name="result_summary_json",
+            value=result_summary_json,
+            clear=clear_result_summary_json,
+        )
+        parameters.append(onboarding_run_id)
         connection = self._connect()
         try:
             connection.execute(
-                """
+                f"""
                 UPDATE source_onboarding_runs
                 SET
-                  status = ?,
-                  proposed_strategy_id = ?,
-                  started_at = COALESCE(?, started_at),
-                  finished_at = COALESCE(?, finished_at),
-                  error_message = ?,
-                  result_summary_json = ?
+                  {", ".join(update_fields)}
                 WHERE onboarding_run_id = ?
                 """,
-                (
-                    status,
-                    proposed_strategy_id,
-                    started_at,
-                    finished_at,
-                    error_message,
-                    result_summary_json,
-                    onboarding_run_id,
-                ),
+                tuple(parameters),
             )
             connection.commit()
         finally:
@@ -387,7 +414,7 @@ def _row_to_operator_state(row: sqlite3.Row) -> SourceOperatorStateRow:
         else str(row["last_collection_error"]),
         activated_at=None if row["activated_at"] is None else str(row["activated_at"]),
         deactivated_at=None if row["deactivated_at"] is None else str(row["deactivated_at"]),
-        updated_at=str(row["updated_at"]),
+        updated_at=None if row["updated_at"] is None else str(row["updated_at"]),
     )
 
 
@@ -500,3 +527,30 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
 
 def _sql_enum_values(values: tuple[str, ...]) -> str:
     return ", ".join(f"'{value}'" for value in values)
+
+
+def _append_optional_assignment(
+    update_fields: list[str],
+    parameters: list[Any],
+    *,
+    column_name: str,
+    value: object,
+) -> None:
+    if value is _UNSET:
+        return
+    update_fields.append(f"{column_name} = ?")
+    parameters.append(value)
+
+
+def _append_preserving_nullable_assignment(
+    update_fields: list[str],
+    parameters: list[Any],
+    *,
+    column_name: str,
+    value: str | None,
+    clear: bool,
+) -> None:
+    update_fields.append(
+        f"{column_name} = CASE WHEN ? THEN NULL ELSE COALESCE(?, {column_name}) END"
+    )
+    parameters.extend([1 if clear else 0, value])

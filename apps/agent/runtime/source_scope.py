@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from enum import Enum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
@@ -17,6 +18,8 @@ from apps.agent.pipeline.types import (
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REGISTRY_PATH = ROOT / "artifacts" / "modelling" / "source_registry.yaml"
 DEFAULT_ACTIVE_IDS_PATH = ROOT / "artifacts" / "runtime" / "v1_active_sources.yaml"
+
+_EnumT = TypeVar("_EnumT", bound=Enum)
 
 
 def load_source_registry(*, registry_path: Path | None = None) -> dict[str, SourceRegistryEntry]:
@@ -78,12 +81,15 @@ def _normalize_source_registry_entry(source: Mapping[str, Any]) -> SourceRegistr
 def _normalize_optional_enum_field(
     payload: dict[str, Any],
     field_name: str,
-    enum_type: type[SourceFetchVia]
-    | type[SourceRole]
-    | type[SourceTimestampAuthority]
-    | type[SourceContentMode],
+    enum_type: type[_EnumT],
 ) -> None:
     value = payload.get(field_name)
     if value is None:
         return
-    payload[field_name] = enum_type(str(value))
+    try:
+        payload[field_name] = enum_type(str(value))
+    except ValueError:
+        source_id = payload.get("id", "?")
+        raise ValueError(
+            f"Invalid {field_name!r} value {value!r} for source {source_id!r}"
+        ) from None
