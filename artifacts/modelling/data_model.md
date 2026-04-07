@@ -322,6 +322,62 @@ CREATE TABLE IF NOT EXISTS budget_ledger (
 );
 ```
 
+### 4.11 Source Control Plane
+
+```sql
+CREATE TABLE IF NOT EXISTS source_operator_state (
+  source_id TEXT PRIMARY KEY, -- matches source_registry.yaml id
+  is_active INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0,1)),
+  strategy_state TEXT NOT NULL CHECK (strategy_state IN ('missing', 'proposed', 'ready', 'paused')),
+  current_strategy_id TEXT,
+  latest_strategy_id TEXT,
+  last_onboarding_run_id TEXT,
+  last_collection_status TEXT NOT NULL CHECK (last_collection_status IN ('idle', 'queued', 'running', 'succeeded', 'failed')),
+  last_collection_started_at TEXT,
+  last_collection_finished_at TEXT,
+  last_collection_error TEXT,
+  activated_at TEXT,
+  deactivated_at TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS source_strategy_versions (
+  strategy_id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL, -- joins to file-based source contract
+  version INTEGER NOT NULL,
+  strategy_status TEXT NOT NULL CHECK (strategy_status IN ('proposed', 'approved', 'superseded', 'rejected')),
+  entrypoint_url TEXT NOT NULL,
+  fetch_via TEXT NOT NULL,
+  content_mode TEXT NOT NULL,
+  parser_profile TEXT,
+  max_items_per_run INTEGER NOT NULL,
+  strategy_summary_json TEXT NOT NULL,
+  strategy_details_json TEXT NOT NULL,
+  created_from_run_id TEXT,
+  created_at TEXT NOT NULL,
+  approved_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS source_onboarding_runs (
+  onboarding_run_id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL, -- joins to file-based source contract
+  status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
+  worker_kind TEXT NOT NULL,
+  worker_ref TEXT,
+  submitted_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT,
+  proposed_strategy_id TEXT,
+  error_message TEXT,
+  result_summary_json TEXT
+);
+```
+
+- Source contract remains file-based and reviewed in `source_registry.yaml`.
+- Control-plane tables store mutable operator state, strategy lifecycle, and onboarding lifecycle.
+- Runtime eligibility is computed from the join of source contract and control-plane records; it is not stored as a separate source-of-truth table.
+- The literal values shown in the `CHECK` constraints mirror the enum contracts in `apps/agent/pipeline/types.py` and should be kept in sync with those definitions.
+
 ## 5. Index Plan
 
 ```sql
