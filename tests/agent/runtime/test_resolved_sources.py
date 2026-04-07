@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 
 import yaml
 
-from apps.agent.runtime.resolved_sources import load_resolved_sources
+from apps.agent.runtime.resolved_sources import get_resolved_source, load_resolved_sources
 from apps.agent.storage.source_control_plane import SourceControlPlaneStore
 
 
@@ -144,6 +144,16 @@ class ResolvedSourcesTests(unittest.TestCase):
                                 "fetch_interval": "daily",
                                 "tags": ["market_narrative", "equity_risk"],
                             },
+                            {
+                                "id": "wsj_markets",
+                                "name": "Wall Street Journal - Markets",
+                                "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+                                "type": "rss",
+                                "credibility_tier": 2,
+                                "paywall_policy": "metadata_only",
+                                "fetch_interval": "daily",
+                                "tags": ["market_narrative", "us"],
+                            },
                         ]
                     },
                     sort_keys=False,
@@ -170,6 +180,11 @@ class ResolvedSourcesTests(unittest.TestCase):
             self.assertEqual(resolved["seekingalpha_news"]["contract"]["fetch_via"], "direct_html")
             self.assertEqual(resolved["seekingalpha_news"]["contract"]["timestamp_authority"], "retrieval_time_only")
             self.assertEqual(resolved["seekingalpha_news"]["contract"]["content_mode"], "snippet_only")
+
+            self.assertEqual(resolved["wsj_markets"]["contract"]["source_role"], "supplementary")
+            self.assertEqual(resolved["wsj_markets"]["contract"]["fetch_via"], "direct_rss")
+            self.assertEqual(resolved["wsj_markets"]["contract"]["timestamp_authority"], "feed_timestamp")
+            self.assertEqual(resolved["wsj_markets"]["contract"]["content_mode"], "snippet_only")
 
     def test_get_resolved_source_returns_none_for_missing_current_strategy_pointer(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -213,8 +228,6 @@ class ResolvedSourcesTests(unittest.TestCase):
                     "updated_at": "2026-04-04T00:00:00Z",
                 }
             )
-
-            from apps.agent.runtime.resolved_sources import get_resolved_source
 
             resolved = get_resolved_source(
                 "reuters_business",

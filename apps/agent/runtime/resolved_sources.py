@@ -166,6 +166,9 @@ def _default_content_mode(source: SourceRegistryEntry) -> str:
     tags = {str(tag) for tag in source.get("tags", [])}
     if "event_calendar" in tags:
         return "calendar_event"
+    # Metadata-only sources stay snippet-oriented even when transported via RSS.
+    # This keeps downstream handling aligned with paywall constraints instead of
+    # implying full feed-index semantics from the transport alone.
     if str(source.get("paywall_policy", "")) == "metadata_only":
         return "snippet_only"
     if source_type == "pdf":
