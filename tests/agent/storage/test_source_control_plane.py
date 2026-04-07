@@ -91,6 +91,18 @@ class SourceControlPlaneStoreTests(unittest.TestCase):
             self.assertEqual(strategies[0]["strategy_id"], "strat_001")
             self.assertEqual(runs[0]["onboarding_run_id"], "onboard_001")
 
+            store.update_onboarding_run(
+                "onboard_001",
+                status="succeeded",
+                proposed_strategy_id="strat_001",
+                finished_at="2026-04-04T00:10:00Z",
+                result_summary_json="{\"status\":\"ready_for_review\"}",
+            )
+            updated_runs = store.list_onboarding_runs("reuters_business")
+
+            self.assertEqual(updated_runs[0]["status"], "succeeded")
+            self.assertEqual(updated_runs[0]["proposed_strategy_id"], "strat_001")
+
     def test_rejects_invalid_lifecycle_status_values(self) -> None:
         with TemporaryDirectory() as tmpdir:
             store = SourceControlPlaneStore(base_dir=Path(tmpdir))

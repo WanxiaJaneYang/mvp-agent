@@ -104,7 +104,7 @@ class SourceOperatorStateRow(TypedDict):
     last_collection_error: str | None
     activated_at: str | None
     deactivated_at: str | None
-    updated_at: str
+    updated_at: str | None
 
 
 class SourceStrategyVersionRow(TypedDict):

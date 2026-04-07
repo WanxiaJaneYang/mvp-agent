@@ -273,6 +273,45 @@ class SourceControlPlaneStore:
         finally:
             connection.close()
 
+    def update_onboarding_run(
+        self,
+        onboarding_run_id: str,
+        *,
+        status: str,
+        proposed_strategy_id: str | None = None,
+        started_at: str | None = None,
+        finished_at: str | None = None,
+        error_message: str | None = None,
+        result_summary_json: str | None = None,
+    ) -> None:
+        connection = self._connect()
+        try:
+            connection.execute(
+                """
+                UPDATE source_onboarding_runs
+                SET
+                  status = ?,
+                  proposed_strategy_id = ?,
+                  started_at = COALESCE(?, started_at),
+                  finished_at = COALESCE(?, finished_at),
+                  error_message = ?,
+                  result_summary_json = ?
+                WHERE onboarding_run_id = ?
+                """,
+                (
+                    status,
+                    proposed_strategy_id,
+                    started_at,
+                    finished_at,
+                    error_message,
+                    result_summary_json,
+                    onboarding_run_id,
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
     def list_onboarding_runs(self, source_id: str) -> list[SourceOnboardingRunRow]:
         return self.list_onboarding_runs_by_source_ids([source_id]).get(source_id, [])
 
