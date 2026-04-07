@@ -194,10 +194,19 @@ class SourceControlPlaneStore:
             connection.close()
 
     def list_strategy_versions(self, source_id: str) -> list[SourceStrategyVersionRow]:
+        return self.list_strategy_versions_by_source_ids([source_id]).get(source_id, [])
+
+    def list_strategy_versions_by_source_ids(
+        self,
+        source_ids: list[str],
+    ) -> dict[str, list[SourceStrategyVersionRow]]:
+        if not source_ids:
+            return {}
         connection = self._connect()
         try:
+            placeholders = ", ".join("?" for _ in source_ids)
             rows = connection.execute(
-                """
+                f"""
                 SELECT
                   strategy_id,
                   source_id,
@@ -214,14 +223,18 @@ class SourceControlPlaneStore:
                   created_at,
                   approved_at
                 FROM source_strategy_versions
-                WHERE source_id = ?
-                ORDER BY version DESC, created_at DESC
+                WHERE source_id IN ({placeholders})
+                ORDER BY source_id ASC, version DESC, created_at DESC
                 """,
-                (source_id,),
+                tuple(source_ids),
             ).fetchall()
         finally:
             connection.close()
-        return [_row_to_strategy_version(row) for row in rows]
+        grouped: dict[str, list[SourceStrategyVersionRow]] = {source_id: [] for source_id in source_ids}
+        for row in rows:
+            strategy = _row_to_strategy_version(row)
+            grouped[strategy["source_id"]].append(strategy)
+        return grouped
 
     def insert_onboarding_run(self, row: SourceOnboardingRunRow) -> None:
         connection = self._connect()
@@ -261,10 +274,19 @@ class SourceControlPlaneStore:
             connection.close()
 
     def list_onboarding_runs(self, source_id: str) -> list[SourceOnboardingRunRow]:
+        return self.list_onboarding_runs_by_source_ids([source_id]).get(source_id, [])
+
+    def list_onboarding_runs_by_source_ids(
+        self,
+        source_ids: list[str],
+    ) -> dict[str, list[SourceOnboardingRunRow]]:
+        if not source_ids:
+            return {}
         connection = self._connect()
         try:
+            placeholders = ", ".join("?" for _ in source_ids)
             rows = connection.execute(
-                """
+                f"""
                 SELECT
                   onboarding_run_id,
                   source_id,
@@ -278,14 +300,18 @@ class SourceControlPlaneStore:
                   error_message,
                   result_summary_json
                 FROM source_onboarding_runs
-                WHERE source_id = ?
-                ORDER BY submitted_at DESC, onboarding_run_id DESC
+                WHERE source_id IN ({placeholders})
+                ORDER BY source_id ASC, submitted_at DESC, onboarding_run_id DESC
                 """,
-                (source_id,),
+                tuple(source_ids),
             ).fetchall()
         finally:
             connection.close()
-        return [_row_to_onboarding_run(row) for row in rows]
+        grouped: dict[str, list[SourceOnboardingRunRow]] = {source_id: [] for source_id in source_ids}
+        for row in rows:
+            run = _row_to_onboarding_run(row)
+            grouped[run["source_id"]].append(run)
+        return grouped
 
 
 def _row_to_operator_state(row: sqlite3.Row) -> SourceOperatorStateRow:
@@ -363,12 +389,14 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS source_operator_state (
           source_id TEXT PRIMARY KEY,
-          is_active INTEGER NOT NULL DEFAULT 0,
-          strategy_state TEXT NOT NULL DEFAULT 'missing',
+          is_active INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0,1)),
+          strategy_state TEXT NOT NULL DEFAULT 'missing'
+            CHECK (strategy_state IN ('missing', 'proposed', 'ready', 'paused')),
           current_strategy_id TEXT,
           latest_strategy_id TEXT,
           last_onboarding_run_id TEXT,
-          last_collection_status TEXT NOT NULL DEFAULT 'idle',
+          last_collection_status TEXT NOT NULL DEFAULT 'idle'
+            CHECK (last_collection_status IN ('idle', 'queued', 'running', 'succeeded', 'failed')),
           last_collection_started_at TEXT,
           last_collection_finished_at TEXT,
           last_collection_error TEXT,
@@ -382,7 +410,8 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
           strategy_id TEXT PRIMARY KEY,
           source_id TEXT NOT NULL,
           version INTEGER NOT NULL,
-          strategy_status TEXT NOT NULL,
+          strategy_status TEXT NOT NULL
+            CHECK (strategy_status IN ('proposed', 'approved', 'superseded', 'rejected')),
           entrypoint_url TEXT NOT NULL,
           fetch_via TEXT NOT NULL,
           content_mode TEXT NOT NULL,
@@ -399,7 +428,8 @@ def _initialize_schema(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS source_onboarding_runs (
           onboarding_run_id TEXT PRIMARY KEY,
           source_id TEXT NOT NULL,
-          status TEXT NOT NULL,
+          status TEXT NOT NULL
+            CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
           worker_kind TEXT NOT NULL,
           worker_ref TEXT,
           submitted_at TEXT NOT NULL,
