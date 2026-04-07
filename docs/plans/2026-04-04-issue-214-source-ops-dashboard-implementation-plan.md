@@ -215,6 +215,8 @@ runtime_eligible = (
     bool(operator_state["is_active"])
     and operator_state["strategy_state"] == "ready"
     and operator_state["current_strategy_id"] is not None
+    and current_strategy is not None
+    and current_strategy["strategy_status"] == "approved"
 )
 ```
 

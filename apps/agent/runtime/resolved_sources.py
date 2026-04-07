@@ -57,10 +57,30 @@ def get_resolved_source(
     base_dir: Path,
     registry_path: Path | None = None,
 ) -> ResolvedSource:
-    for source in load_resolved_sources(base_dir=base_dir, registry_path=registry_path):
-        if source["source_id"] == source_id:
-            return source
-    raise ValueError(f"Unknown source id: {source_id}")
+    registry = load_source_registry(registry_path=registry_path)
+    contract = registry.get(source_id)
+    if contract is None:
+        raise ValueError(f"Unknown source id: {source_id}")
+
+    store = SourceControlPlaneStore(base_dir=base_dir)
+    operator_state = store.get_operator_state(source_id) or _default_operator_state(source_id)
+    strategies = store.list_strategy_versions(source_id)
+    onboarding_runs = store.list_onboarding_runs(source_id)
+    current_strategy = _pick_current_strategy(operator_state=operator_state, strategies=strategies)
+    latest_strategy = strategies[0] if strategies else None
+    latest_onboarding_run = onboarding_runs[0] if onboarding_runs else None
+    return ResolvedSource(
+        source_id=source_id,
+        contract=_with_contract_fallbacks(contract),
+        operator_state=operator_state,
+        current_strategy=current_strategy,
+        latest_strategy=latest_strategy,
+        latest_onboarding_run=latest_onboarding_run,
+        runtime_eligible=_is_runtime_eligible(
+            operator_state=operator_state,
+            current_strategy=current_strategy,
+        ),
+    )
 
 
 def _default_operator_state(source_id: str) -> SourceOperatorStateRow:
@@ -77,7 +97,7 @@ def _default_operator_state(source_id: str) -> SourceOperatorStateRow:
         last_collection_error=None,
         activated_at=None,
         deactivated_at=None,
-        updated_at="",
+        updated_at=None,
     )
 
 

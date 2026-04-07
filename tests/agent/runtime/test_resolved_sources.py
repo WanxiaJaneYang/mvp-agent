@@ -157,16 +157,73 @@ class ResolvedSourcesTests(unittest.TestCase):
             }
 
             self.assertEqual(resolved["zerohedge"]["contract"]["source_role"], "monitor_only")
+            self.assertEqual(resolved["zerohedge"]["contract"]["fetch_via"], "direct_rss")
             self.assertEqual(resolved["zerohedge"]["contract"]["timestamp_authority"], "feed_timestamp")
             self.assertEqual(resolved["zerohedge"]["contract"]["content_mode"], "feed_index")
 
             self.assertEqual(resolved["us_bls_schedule"]["contract"]["source_role"], "supplementary")
+            self.assertEqual(resolved["us_bls_schedule"]["contract"]["fetch_via"], "direct_html")
             self.assertEqual(resolved["us_bls_schedule"]["contract"]["timestamp_authority"], "retrieval_time_only")
             self.assertEqual(resolved["us_bls_schedule"]["contract"]["content_mode"], "calendar_event")
 
             self.assertEqual(resolved["seekingalpha_news"]["contract"]["source_role"], "monitor_only")
+            self.assertEqual(resolved["seekingalpha_news"]["contract"]["fetch_via"], "direct_html")
             self.assertEqual(resolved["seekingalpha_news"]["contract"]["timestamp_authority"], "retrieval_time_only")
             self.assertEqual(resolved["seekingalpha_news"]["contract"]["content_mode"], "snippet_only")
+
+    def test_get_resolved_source_returns_none_for_missing_current_strategy_pointer(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            registry_path = base_dir / "registry.yaml"
+            registry_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "sources": [
+                            {
+                                "id": "reuters_business",
+                                "name": "Reuters - Business News",
+                                "url": "https://www.reuters.com/business/",
+                                "type": "rss",
+                                "credibility_tier": 2,
+                                "paywall_policy": "full",
+                                "fetch_interval": "daily",
+                            }
+                        ]
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            store = SourceControlPlaneStore(base_dir=base_dir)
+            store.upsert_operator_state(
+                {
+                    "source_id": "reuters_business",
+                    "is_active": 1,
+                    "strategy_state": "ready",
+                    "current_strategy_id": "strat_missing",
+                    "latest_strategy_id": None,
+                    "last_onboarding_run_id": None,
+                    "last_collection_status": "idle",
+                    "last_collection_started_at": None,
+                    "last_collection_finished_at": None,
+                    "last_collection_error": None,
+                    "activated_at": "2026-04-04T00:00:00Z",
+                    "deactivated_at": None,
+                    "updated_at": "2026-04-04T00:00:00Z",
+                }
+            )
+
+            from apps.agent.runtime.resolved_sources import get_resolved_source
+
+            resolved = get_resolved_source(
+                "reuters_business",
+                base_dir=base_dir,
+                registry_path=registry_path,
+            )
+
+            self.assertIsNone(resolved["current_strategy"])
+            self.assertFalse(resolved["runtime_eligible"])
 
 
 if __name__ == "__main__":
