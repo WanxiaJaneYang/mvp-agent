@@ -21,12 +21,16 @@ def load_resolved_sources(
 ) -> list[ResolvedSource]:
     registry = load_source_registry(registry_path=registry_path)
     store = SourceControlPlaneStore(base_dir=base_dir)
+    source_ids = list(registry.keys())
+    operator_states = {row["source_id"]: row for row in store.list_operator_states()}
+    strategies_by_source = store.list_strategy_versions_by_source_ids(source_ids)
+    onboarding_runs_by_source = store.list_onboarding_runs_by_source_ids(source_ids)
 
     resolved: list[ResolvedSource] = []
     for source_id, contract in registry.items():
-        operator_state = store.get_operator_state(source_id) or _default_operator_state(source_id)
-        strategies = store.list_strategy_versions(source_id)
-        onboarding_runs = store.list_onboarding_runs(source_id)
+        operator_state = operator_states.get(source_id) or _default_operator_state(source_id)
+        strategies = strategies_by_source.get(source_id, [])
+        onboarding_runs = onboarding_runs_by_source.get(source_id, [])
         current_strategy = _pick_current_strategy(operator_state=operator_state, strategies=strategies)
         latest_strategy = strategies[0] if strategies else None
         latest_onboarding_run = onboarding_runs[0] if onboarding_runs else None
@@ -108,9 +112,9 @@ def _is_runtime_eligible(
 def _with_contract_fallbacks(source: SourceRegistryEntry) -> SourceRegistryEntry:
     normalized = dict(source)
     normalized.setdefault("fetch_via", _default_fetch_via(str(source["type"])))
-    normalized.setdefault("source_role", "authoritative")
-    normalized.setdefault("timestamp_authority", "source_page")
-    normalized.setdefault("content_mode", _default_content_mode(str(source["type"])))
+    normalized.setdefault("source_role", _default_source_role(source))
+    normalized.setdefault("timestamp_authority", _default_timestamp_authority(source))
+    normalized.setdefault("content_mode", _default_content_mode(source))
     return cast(SourceRegistryEntry, normalized)
 
 
@@ -124,9 +128,31 @@ def _default_fetch_via(source_type: str) -> str:
     return "hybrid"
 
 
-def _default_content_mode(source_type: str) -> str:
+def _default_source_role(source: SourceRegistryEntry) -> str:
+    credibility_tier = int(source.get("credibility_tier", 4))
+    if credibility_tier >= 4:
+        return "monitor_only"
+    return "supplementary"
+
+
+def _default_timestamp_authority(source: SourceRegistryEntry) -> str:
+    source_type = str(source["type"])
+    if source_type == "rss":
+        return "feed_timestamp"
+    return "retrieval_time_only"
+
+
+def _default_content_mode(source: SourceRegistryEntry) -> str:
+    source_type = str(source["type"])
+    tags = {str(tag) for tag in source.get("tags", [])}
+    if "event_calendar" in tags:
+        return "calendar_event"
+    if str(source.get("paywall_policy", "")) == "metadata_only":
+        return "snippet_only"
     if source_type == "pdf":
         return "article_full_text"
     if source_type == "rss":
         return "feed_index"
-    return "article_full_text"
+    if source_type == "api":
+        return "structured_data"
+    return "listing_page"

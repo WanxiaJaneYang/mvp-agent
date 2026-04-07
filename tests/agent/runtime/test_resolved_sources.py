@@ -106,6 +106,68 @@ class ResolvedSourcesTests(unittest.TestCase):
             self.assertEqual([item["source_id"] for item in eligible], ["reuters_business"])
             self.assertEqual(eligible[0]["current_strategy"]["strategy_id"], "strat_reuters_001")
 
+    def test_fallback_contract_semantics_remain_conservative_for_unannotated_sources(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            base_dir = Path(tmpdir)
+            registry_path = base_dir / "registry.yaml"
+            registry_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "sources": [
+                            {
+                                "id": "zerohedge",
+                                "name": "Zero Hedge - Markets",
+                                "url": "https://www.zerohedge.com/s/RSS",
+                                "type": "rss",
+                                "credibility_tier": 4,
+                                "paywall_policy": "full",
+                                "fetch_interval": "daily",
+                                "tags": ["market_narrative", "contrarian"],
+                            },
+                            {
+                                "id": "us_bls_schedule",
+                                "name": "U.S. Bureau of Labor Statistics - Economic Release Schedule",
+                                "url": "https://www.bls.gov/schedule/news_release/",
+                                "type": "html",
+                                "credibility_tier": 1,
+                                "paywall_policy": "full",
+                                "fetch_interval": "weekly",
+                                "tags": ["macro_data", "event_calendar", "us"],
+                            },
+                            {
+                                "id": "seekingalpha_news",
+                                "name": "Seeking Alpha - Market News",
+                                "url": "https://seekingalpha.com/market-news",
+                                "type": "html",
+                                "credibility_tier": 4,
+                                "paywall_policy": "metadata_only",
+                                "fetch_interval": "daily",
+                                "tags": ["market_narrative", "equity_risk"],
+                            },
+                        ]
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            resolved = {
+                item["source_id"]: item
+                for item in load_resolved_sources(base_dir=base_dir, registry_path=registry_path)
+            }
+
+            self.assertEqual(resolved["zerohedge"]["contract"]["source_role"], "monitor_only")
+            self.assertEqual(resolved["zerohedge"]["contract"]["timestamp_authority"], "feed_timestamp")
+            self.assertEqual(resolved["zerohedge"]["contract"]["content_mode"], "feed_index")
+
+            self.assertEqual(resolved["us_bls_schedule"]["contract"]["source_role"], "supplementary")
+            self.assertEqual(resolved["us_bls_schedule"]["contract"]["timestamp_authority"], "retrieval_time_only")
+            self.assertEqual(resolved["us_bls_schedule"]["contract"]["content_mode"], "calendar_event")
+
+            self.assertEqual(resolved["seekingalpha_news"]["contract"]["source_role"], "monitor_only")
+            self.assertEqual(resolved["seekingalpha_news"]["contract"]["timestamp_authority"], "retrieval_time_only")
+            self.assertEqual(resolved["seekingalpha_news"]["contract"]["content_mode"], "snippet_only")
+
 
 if __name__ == "__main__":
     unittest.main()
