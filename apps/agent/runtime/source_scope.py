@@ -8,6 +8,7 @@ from typing import Any, TypeVar, cast
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
 from apps.agent.pipeline.types import (
+    ResolvedSource,
     SourceContentMode,
     SourceFetchVia,
     SourceRegistryEntry,
@@ -93,3 +94,17 @@ def _normalize_optional_enum_field(
         raise ValueError(
             f"Invalid {field_name!r} value {value!r} for source {source_id!r}"
         ) from None
+
+
+def load_runtime_eligible_sources(
+    *,
+    base_dir: Path,
+    registry_path: Path | None = None,
+) -> list[ResolvedSource]:
+    from apps.agent.runtime.resolved_sources import load_resolved_sources
+
+    return [
+        source
+        for source in load_resolved_sources(base_dir=base_dir, registry_path=registry_path)
+        if source["runtime_eligible"]
+    ]
