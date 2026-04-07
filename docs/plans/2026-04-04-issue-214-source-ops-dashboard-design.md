@@ -19,10 +19,10 @@ This design does not turn the dashboard into the source of truth for source cont
 
 The current repo has:
 
-- a reviewed source list in [artifacts/modelling/source_registry.yaml](/D:/aiProjects/workspaces/mvp-agent/.worktrees/issue-214-source-ops-dashboard/artifacts/modelling/source_registry.yaml)
+- a reviewed source list in `artifacts/modelling/source_registry.yaml`
 - an active-subset artifact in `artifacts/runtime/v1_active_sources.yaml`
-- direct type-based runtime source resolution in [apps/agent/runtime/source_scope.py](/D:/aiProjects/workspaces/mvp-agent/.worktrees/issue-214-source-ops-dashboard/apps/agent/runtime/source_scope.py)
-- dashboard-local JSON state in [tools/repo_dashboard/services/status_store.py](/D:/aiProjects/workspaces/mvp-agent/.worktrees/issue-214-source-ops-dashboard/tools/repo_dashboard/services/status_store.py)
+- direct type-based runtime source resolution in `apps/agent/runtime/source_scope.py`
+- dashboard-local JSON state in `tools/repo_dashboard/services/status_store.py`
 
 That is not enough for the new operating model.
 
