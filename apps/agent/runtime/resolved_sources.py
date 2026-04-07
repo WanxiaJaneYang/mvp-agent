@@ -5,7 +5,6 @@ from typing import cast
 
 from apps.agent.pipeline.types import (
     ResolvedSource,
-    SourceOnboardingRunRow,
     SourceOperatorStateRow,
     SourceRegistryEntry,
     SourceStrategyVersionRow,
