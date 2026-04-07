@@ -6,7 +6,13 @@ from typing import Any, cast
 
 import yaml  # type: ignore[import-untyped,unused-ignore]
 
-from apps.agent.pipeline.types import SourceRegistryEntry
+from apps.agent.pipeline.types import (
+    SourceContentMode,
+    SourceFetchVia,
+    SourceRegistryEntry,
+    SourceRole,
+    SourceTimestampAuthority,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REGISTRY_PATH = ROOT / "artifacts" / "modelling" / "source_registry.yaml"
@@ -20,7 +26,7 @@ def load_source_registry(*, registry_path: Path | None = None) -> dict[str, Sour
 
     sources = payload.get("sources", [])
     return {
-        str(source["id"]): cast(SourceRegistryEntry, dict(source))
+        str(source["id"]): _normalize_source_registry_entry(source)
         for source in sources
     }
 
@@ -34,7 +40,7 @@ def load_active_source_subset(
     resolved_registry: dict[str, SourceRegistryEntry]
     if registry is not None:
         resolved_registry = {
-            str(source_id): cast(SourceRegistryEntry, dict(source))
+            str(source_id): _normalize_source_registry_entry(source)
             for source_id, source in registry.items()
         }
     else:
@@ -58,3 +64,26 @@ def load_active_source_subset(
         raise ValueError(f"Unknown active source ids: {', '.join(missing_ids)}")
 
     return active_sources
+
+
+def _normalize_source_registry_entry(source: Mapping[str, Any]) -> SourceRegistryEntry:
+    normalized = dict(source)
+    _normalize_optional_enum_field(normalized, "fetch_via", SourceFetchVia)
+    _normalize_optional_enum_field(normalized, "source_role", SourceRole)
+    _normalize_optional_enum_field(normalized, "timestamp_authority", SourceTimestampAuthority)
+    _normalize_optional_enum_field(normalized, "content_mode", SourceContentMode)
+    return cast(SourceRegistryEntry, normalized)
+
+
+def _normalize_optional_enum_field(
+    payload: dict[str, Any],
+    field_name: str,
+    enum_type: type[SourceFetchVia]
+    | type[SourceRole]
+    | type[SourceTimestampAuthority]
+    | type[SourceContentMode],
+) -> None:
+    value = payload.get(field_name)
+    if value is None:
+        return
+    payload[field_name] = enum_type(str(value))
